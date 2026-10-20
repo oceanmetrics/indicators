@@ -17,6 +17,9 @@ import { VOCAB_IDS } from './data.ts'
 
 const DIR = resolve(__dirname, '../../../catalog')
 const have = existsSync(resolve(DIR, 'indicators.json')) && existsSync(resolve(DIR, 'coverage.parquet'))
+// reading every values file of the real catalog (265 files, 2026-10-20) takes 10–25 s on a busy machine: more than
+// vitest's 10 s default for a hook, which failed both catalog tests under load while each passed alone
+const CATALOG_LOAD_MS = 60_000
 const ab = (b: Buffer) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer
 
 describe.skipIf(!have)('the Place view on the real catalog', () => {
@@ -30,7 +33,7 @@ describe.skipIf(!have)('the Place view on the real catalog', () => {
     for (const ind of manifest.indicators) for (const c of ind.collections) {
       values.set(c.path, groupByPlace(await readValues(ab(readFileSync(resolve(DIR, c.path))))))
     }
-  })
+  }, CATALOG_LOAD_MS)
 
   it('every status-grain coverage row is reproduced: status, trend, sentence and the long-term statistics', () => {
     let checked = 0, withStatus = 0
