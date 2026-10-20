@@ -12,10 +12,11 @@ import { VOCAB_IDS } from './data.ts'
 const DIR = resolve(__dirname, '../../../catalog')
 const have = existsSync(resolve(DIR, 'indicators.json')) && existsSync(resolve(DIR, 'coverage.parquet'))
 
+// a skipped describe still runs its body to collect the tests: read nothing unless the catalog is there (CI has none)
 describe.skipIf(!have)('the real catalog', async () => {
-  const manifest = JSON.parse(readFileSync(resolve(DIR, 'indicators.json'), 'utf8')) as Manifest
-  const buf = readFileSync(resolve(DIR, 'coverage.parquet'))
-  const rows = (await parquetReadObjects({ file: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer })).map(normalizeRow)
+  const manifest = (have ? JSON.parse(readFileSync(resolve(DIR, 'indicators.json'), 'utf8')) : { indicators: [] }) as Manifest
+  const buf = have ? readFileSync(resolve(DIR, 'coverage.parquet')) : null
+  const rows = buf ? (await parquetReadObjects({ file: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer })).map(normalizeRow) : []
   const idx = indexCoverage(rows, manifest.indicators)
   const ids = new Set(manifest.indicators.map(i => i.id))
 
