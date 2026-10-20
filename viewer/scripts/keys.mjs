@@ -1,7 +1,8 @@
 // keyboard check of the viewer, keys only: Tab reaches a Matrix cell, Enter opens its drawer, Esc closes it and focus
 // returns to the cell; Tab reaches a place link, Enter opens the Place view, and its controls are reachable by Tab.
 // the first pass is places as rows (#axes=p), the second the default, indicators as rows with places in columns: the same cell round
-// trip, and Tab + Enter on a remove button; then the Place view's breadcrumb returns to the cell it came from.
+// trip, and Tab + Enter on a remove button; then the Place view's breadcrumb returns to the cell it came from. at the end, the order:
+// Alt+arrow and the Move buttons move a header, a drag onto another header of its group does, grouping off lifts the limit, and the Order control.
 //   node viewer/scripts/keys.mjs [--url https://oceanmetrics.io/indicators/] [--data <catalog base URL>]
 import puppeteer from 'puppeteer-core'
 
@@ -291,6 +292,133 @@ if (exp) {
   check(await page.waitForSelector('.layout.full', { hidden: true, timeout: 5000 }).then(() => true, () => false), 'expanded fallback: Esc leaves')
   check(/\bfull\b/.test((await focused())?.cls ?? ''), 'expanded fallback: focus is on the button')
 } else check(false, 'expanded fallback: Tab reaches the button')
+
+// ---- the order: move a header with the keys (Alt+arrow anywhere in it, a plain arrow on its Move button), drag it, a group, both orientations ----
+const said = () => page.evaluate(() => document.querySelector('p[role=status].mbon-sr-only')?.textContent ?? '')
+const heads = (sel) => page.evaluate(s => [...document.querySelectorAll(s)].map(e => e.dataset.id), sel)
+const waitHash = (re) => page.waitForFunction(r => new RegExp(r).test(location.hash), { timeout: 5000 }, re.source).then(() => true, () => false)
+const moveBtn = async (axis, kind, id) => page.evaluate(([a, k, i]) => {
+  const th = [...document.querySelectorAll('th[data-ax]')].find(e => e.dataset.ax === a && e.dataset.kind === k && e.dataset.id === i)
+  th?.querySelector('button.mvb')?.focus()
+  return !!th
+}, [axis, kind, id])
+
+// default matrix (indicators in rows, places in columns): a place column, plain arrow on its Move button
+await fresh('')
+const cols0 = await heads('thead th[data-ax=places][data-kind=item]')
+check(cols0.length > 3, `order: the place columns are headers you can move (${cols0.length})`)
+const [first, second] = cols0
+check(await moveBtn('places', 'item', first), 'order: the first place column has a Move button')
+await page.keyboard.press('ArrowRight')
+check(await waitHash(/ps=custom/), `order: ArrowRight on a place's Move button moves it later: ps=custom (${await page.evaluate(() => location.hash)})`)
+const cols1 = await heads('thead th[data-ax=places][data-kind=item]')
+check(cols1[0] === second && cols1[1] === first, 'order: the column moved one place to the right')
+check(/Moved .* after /.test(await said()), `order: the move is announced ("${await said()}")`)
+check(await page.evaluate(f => document.activeElement?.matches('button.mvb') && document.activeElement.closest('th')?.dataset.id === f, first), 'order: focus stays on the moved header\'s Move button')
+// Alt+arrow from the header's link goes back; the first place cannot go earlier
+await page.evaluate(f => [...document.querySelectorAll('th[data-ax=places][data-kind=item]')].find(e => e.dataset.id === f)?.querySelector('a.pn')?.focus(), first)
+await page.keyboard.down('Alt'); await page.keyboard.press('ArrowLeft'); await page.keyboard.up('Alt')
+await page.waitForFunction(([a, b]) => { const h = [...document.querySelectorAll('thead th[data-ax=places][data-kind=item]')].map(e => e.dataset.id); return h[0] === a && h[1] === b }, { timeout: 5000 }, [first, second]).catch(() => {})
+check((await heads('thead th[data-ax=places][data-kind=item]'))[0] === first, 'order: Alt+ArrowLeft on the place link moves it back')
+check(await page.evaluate(f => document.activeElement?.matches('a.pn') && document.activeElement.closest('th')?.dataset.id === f, first), 'order: focus stays on the link')
+await page.keyboard.down('Alt'); await page.keyboard.press('ArrowLeft'); await page.keyboard.up('Alt')
+check(/already first/.test(await said()), `order: the first place cannot go earlier, and it says so ("${await said()}")`)
+
+// an indicator row (up and down)
+await fresh('')
+const rows0 = await heads('tbody th[data-ax=indicators][data-kind=item]')
+check(await moveBtn('indicators', 'item', rows0[0]), 'order: the first indicator row has a Move button')
+await page.keyboard.press('ArrowDown')
+check(await waitHash(/is=custom/), `order: ArrowDown on an indicator's Move button moves it down: is=custom (${await page.evaluate(() => location.hash)})`)
+const rows1 = await heads('tbody th[data-ax=indicators][data-kind=item]')
+check(rows1[1] === rows0[0] && rows1[0] === rows0[1], 'order: the row moved one place down')
+// the last indicator of a group cannot move into the next group: ArrowDown stays put and says why
+const groupOf = id => page.evaluate(i => { const th = [...document.querySelectorAll('tbody th[data-ax=indicators][data-kind=item]')].find(e => e.dataset.id === i); let r = th?.closest('tr'); while (r && !r.classList.contains('band')) r = r.previousElementSibling; return r?.querySelector('th')?.dataset.id }, id)
+const lastOfFirst = await page.evaluate(() => { const bands = [...document.querySelectorAll('tbody tr.band')]; const r = bands[1]?.previousElementSibling; return r?.querySelector('th[data-ax]')?.dataset.id })
+if (lastOfFirst) {
+  const g0 = await groupOf(lastOfFirst)
+  await moveBtn('indicators', 'item', lastOfFirst)
+  await page.keyboard.press('ArrowDown')
+  check((await groupOf(lastOfFirst)) === g0 && /already last/.test(await said()), `order: an indicator stays in its group ("${await said()}")`)
+}
+
+// a group (a whole category of indicators), plain arrow on its Move button
+await fresh('')
+const groups0 = await heads('tbody tr.band th[data-ax=indicators][data-kind=group]')
+if (groups0.length > 1) {
+  await moveBtn('indicators', 'group', groups0[0])
+  await page.keyboard.press('ArrowDown')
+  check(await waitHash(/is=custom/) && /io=g:/.test(await page.evaluate(() => location.hash)), `order: ArrowDown on a group's Move button moves the whole group (${await page.evaluate(() => location.hash)})`)
+  const groups1 = await heads('tbody tr.band th[data-ax=indicators][data-kind=group]')
+  check(groups1[1] === groups0[0], 'order: the group moved below the next one')
+}
+
+// places as rows: ArrowUp/Down on a place row; a group of places moves too (two groups in the selection)
+await fresh('#axes=p&pi=coll:places,coll:noaa_nerrs')
+const prow = await heads('tbody th[data-ax=places][data-kind=item]')
+await moveBtn('places', 'item', prow[1])
+await page.keyboard.press('ArrowUp')
+check(await waitHash(/ps=custom/), `order: ArrowUp on a place row moves it up (${await page.evaluate(() => location.hash)})`)
+check((await heads('tbody th[data-ax=places][data-kind=item]'))[0] === prow[1], 'order: the place row moved up')
+const pg0 = await heads('tbody tr.band th[data-ax=places][data-kind=group]')
+check(pg0.length === 2, `order: two place groups (${pg0.join(', ')})`)
+await moveBtn('places', 'group', pg0[0])
+await page.keyboard.press('ArrowDown')
+check((await heads('tbody tr.band th[data-ax=places][data-kind=group]'))[0] === pg0[1], 'order: the place group moved below the other')
+
+// drag and drop (synthetic drag events with a real DataTransfer): a column onto another column of its group, a refused drop into another group
+const drag = (axis, kind, from, to, half) => page.evaluate(([a, k, f, t, h]) => {
+  const find = id => [...document.querySelectorAll('th[data-ax]')].find(e => e.dataset.ax === a && e.dataset.kind === k && e.dataset.id === id)
+  const src = find(f), dst = find(t)
+  if (!src || !dst) return 'missing'
+  const dt = new DataTransfer()
+  const r = dst.getBoundingClientRect()
+  const pos = { clientX: r.left + (h === 'after' ? r.width * 0.75 : r.width * 0.25), clientY: r.top + (h === 'after' ? r.height * 0.75 : r.height * 0.25), bubbles: true, cancelable: true, dataTransfer: dt }
+  src.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }))
+  dst.dispatchEvent(new DragEvent('dragover', pos))
+  const mark = dst.dataset.drop
+  if (mark === 'no') { src.dispatchEvent(new DragEvent('dragend', { bubbles: true })); return 'no' }
+  dst.dispatchEvent(new DragEvent('drop', pos))
+  src.dispatchEvent(new DragEvent('dragend', { bubbles: true }))
+  return mark
+}, [axis, kind, from, to, half])
+await fresh('#pi=coll:places,coll:noaa_nerrs')
+const dcols = await heads('thead th[data-ax=places][data-kind=item]')
+const dres = await drag('places', 'item', dcols[0], dcols[2], 'after')
+check(dres === 'after', `drag: a column over another one shows a drop bar after it (${dres})`)
+await waitHash(/ps=custom/)
+const dafter = await heads('thead th[data-ax=places][data-kind=item]')
+check(dafter[2] === dcols[0], `drag: dropping a column after another moves it (${dcols[0]} is now third)`)
+const lastCol = dcols[dcols.length - 1]
+const refused = await drag('places', 'item', dafter[0], lastCol, 'before')
+check(refused === 'no', `drag: a place cannot be dropped into another group (${refused})`)
+// grouping off: anything goes anywhere
+await fresh('#pi=coll:places,coll:noaa_nerrs&pg=0')
+check(await page.evaluate(() => !document.querySelector('tr.groups')), 'order: grouping off draws no group row')
+const fcols = await heads('thead th[data-ax=places][data-kind=item]')
+const fres = await drag('places', 'item', fcols[fcols.length - 1], fcols[0], 'before')
+check(fres === 'before', `drag: with grouping off a place goes anywhere (${fres})`)
+await waitHash(/ps=custom/)
+check((await heads('thead th[data-ax=places][data-kind=item]'))[0] === fcols[fcols.length - 1], 'drag: the place from the last column is now first')
+
+// the Order control in the Select section: Tab to it, Enter opens its panel, a sort key writes ps=, Esc returns focus
+await fresh('#pi=coll:places,coll:mr_eez')
+was = await page.evaluate(() => location.hash)
+t = await tabUntil(f => f.tag === 'BUTTON' && /\btrig\b/.test(f.cls) && /^(A to Z|Places:|Indicators:)/.test(f.label ?? ''), 300)
+check(!!t, `order control: Tab reaches its button${t ? ` ("${t.f.label}")` : ''}`)
+if (t) {
+  await page.keyboard.press('Enter')
+  check(await page.waitForSelector('.pop[role=dialog]', { timeout: 10000 }).then(() => true, () => false), 'order control: Enter opens the panel')
+  const ns = await tabUntil(f => f.tag === 'BUTTON' && f.label === 'North to south', 20)
+  check(!!ns, 'order control: Tab reaches "North to south"')
+  if (ns) {
+    await page.keyboard.press('Enter')
+    check(await hashChanged(was, 'ps=ns'), `order control: Enter writes ps=ns (${await page.evaluate(() => location.hash)})`)
+  }
+  await closeWithEsc(t, 'order control')
+}
+// every view carries the order: the Matrix, Map and Report tabs keep ps=ns
+check(await page.evaluate(() => [...document.querySelectorAll('nav.views a')].every(a => /ps=ns/.test(a.getAttribute('href') ?? ''))), 'order: the Matrix, Map and Report tabs carry ps=ns')
 
 await browser.close()
 console.log(fails.length ? `${fails.length} keyboard check(s) failed` : 'keyboard checks passed')

@@ -56,7 +56,7 @@ describe('the report a spec chooses', () => {
   })
   it('the budget counts the gated report, with the categories the vocabulary groups it in', () => {
     const r = buildReport(catalog, idx, spec({ layout: 'cards' }), 'onms')
-    expect(r.groups.map(g => g.term.id)).toEqual(['water-quality', 'response'])
+    expect(r.groups.map(g => g.term.id)).toEqual(['response', 'water-quality'])
     expect(r.budget).toMatchObject({ places: 3, indicators: 3, panels: 9, ok: true, over: [] })
     expect(buildReport(catalog, idx, spec({ layout: 'small-multiples' }), 'onms').budget.ok).toBe(true)
     expect(buildReport(catalog, idx, spec({ layout: 'map-sheet' }), 'onms').budget.over).toEqual(['indicators > 1'])
@@ -65,7 +65,7 @@ describe('the report a spec chooses', () => {
     const r = buildReport(catalog, idx, spec({}), 'onms')
     // sst everywhere but the EEZ ("live": erddap-places can compute it), chl in Bravo ("no data"), sdg in the sanctuaries
     expect(r.empties.map(e => `${e.place.id}/${e.ind.id}/${e.kind}`)).toEqual([
-      'NMS:A/sdg/na', 'NMS:B/chl/nodata', 'NMS:B/sdg/na', 'MRGID:1/sst/live', 'MRGID:1/chl/live',
+      'MRGID:1/sst/live', 'MRGID:1/chl/live', 'NMS:A/sdg/na', 'NMS:B/chl/nodata', 'NMS:B/sdg/na',
     ])
   })
   it('collapsing is on offer only when a chosen indicator is not its series lead', () => {
@@ -84,9 +84,21 @@ describe('the report a spec chooses', () => {
     const r = buildReport(catalog, idx, spec({ indicators: { include: ['all'], exclude: [] } }), 'onms')
     expect(ids(r.indicators)).toEqual(['sst', 'oisst', 'chl', 'sdg'])
   })
-  it('orders places by collection, then name', () => {
-    const r = buildReport(catalog, idx, spec({ places: { include: ['MRGID:1', 'NMS:B', 'NMS:A'], exclude: [], context: false } }), 'onms')
+  it('orders places by group title, then name (A-Z)', () => {
+    const r = buildReport(catalog, idx, spec({ places: { include: ['MRGID:1', 'NMS:B', 'NMS:A'], exclude: [], context: false } }), 'onms', c => (c === 'places' ? 'Aardvark sanctuaries' : 'Zebra EEZs'))
     expect(ids(r.places)).toEqual(['NMS:A', 'NMS:B', 'MRGID:1'])
+    expect(ids(buildReport(catalog, idx, spec({ places: { include: ['MRGID:1', 'NMS:B', 'NMS:A'], exclude: [], context: false } }), 'onms').places)).toEqual(['MRGID:1', 'NMS:A', 'NMS:B'])
+  })
+  it('follows the spec\'s order: a custom place order, no grouping, the vocabulary order of the indicators', () => {
+    const all = { include: ['MRGID:1', 'NMS:B', 'NMS:A'], exclude: [], context: false }
+    const custom = spec({ places: all, order: { ...DEFAULT_SPEC.order, places: { sort: 'custom', group: true, custom: ['NMS:B'] } } })
+    expect(ids(buildReport(catalog, idx, custom, 'onms').places)).toEqual(['MRGID:1', 'NMS:B', 'NMS:A'])
+    const flat = spec({ places: all, order: { ...DEFAULT_SPEC.order, places: { sort: 'custom', group: false, custom: ['NMS:B', 'MRGID:1'] } } })
+    expect(ids(buildReport(catalog, idx, flat, 'onms').places)).toEqual(['NMS:B', 'MRGID:1', 'NMS:A'])
+    const vocab = spec({ order: { ...DEFAULT_SPEC.order, indicators: { sort: 'vocab', group: true, custom: [] } } })
+    expect(buildReport(catalog, idx, vocab, 'onms').groups.map(g => g.term.id)).toEqual(['water-quality', 'response'])
+    const none = spec({ order: { ...DEFAULT_SPEC.order, indicators: { sort: 'az', group: false, custom: [] } } })
+    expect(buildReport(catalog, idx, none, 'onms').groups.map(g => [g.term.id, g.indicators.map(i => i.id)])).toEqual([['', ['chl', 'sdg', 'sst']]])
   })
 })
 
@@ -102,8 +114,8 @@ describe('words and the request', () => {
   const E = buildReport(catalog, idx, spec({}), 'onms').empties
   it('lists the empty cells, at most max, then a count of the rest', () => {
     expect(emptyLines(E, 2)).toEqual([
-      '- Alpha (NMS:A) / sdg (sdg): not applicable',
-      '- Bravo (NMS:B) / chl (chl): no data',
+      '- Zed EEZ (MRGID:1) / sst (sst): not computed yet',
+      '- Zed EEZ (MRGID:1) / chl (chl): not computed yet',
       '- ... and 3 more',
     ])
   })

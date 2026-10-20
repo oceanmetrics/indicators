@@ -6,6 +6,7 @@
   import { Icon } from '../../../../src/icons/index.ts'
   import type { IconName } from '../../../../src/icons/index.ts'
   import { exceptionRank } from '../../../../src/report/spec.ts'
+  import { isDefaultAxis } from '../../../../src/report/order.ts'
   import type { ReportSpec } from '../../../../src/report/spec.ts'
   import type { Catalog, Indicator, Term, VocabId } from '../data.ts'
   import type { Depth } from '../hash.ts'
@@ -31,7 +32,8 @@
   }
   let { catalog, idx, spec, places, groups, depth, vocab, titles, placeHref, all = false }: Props = $props()
 
-  const sorting = $derived(spec.style.status !== 'values')
+  // exceptions first is the default order of a status method; an order the reader chose (a sort key, grouping off, their own) is kept
+  const sorting = $derived(spec.style.status !== 'values' && isDefaultAxis(spec.order.indicators))
   // the tab chosen per place; the first category with an indicator here by default
   let chosen = $state<Record<string, string>>({})
 

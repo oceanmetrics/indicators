@@ -1,18 +1,22 @@
 // the whole gazetteer's places by name, for the place picker and the Matrix rows of a place no one has computed yet. read from
 // the gazetteer's index (index/places_index.parquet, 5 MB) with hyparquet range requests on the three columns the viewer needs
-// (place_id, name, collection), the first time a group with places that are not computed is opened or chosen: never in the
+// (place_id, name, collection, bbox), the first time a group with places that are not computed is opened or chosen: never in the
 // entry chunk. plain functions, tested with a synthetic reader.
+import { bboxCentre } from '../../../src/coverage/centre.ts'
 import type { CoverageIndex, Place } from './matrix.ts'
 import type { Layers, PlaceSet } from './data.ts'
 import type { PlaceSel } from './selection.ts'
 
 /** the bucket host, not the storage host: that one answers with a 302 that has no CORS headers (as map/gazetteer.ts directUrl) */
 export const PLACES_INDEX_URL = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer/index/places_index.parquet'
-export const INDEX_COLUMNS = ['place_id', 'name', 'collection']
+export const INDEX_COLUMNS = ['place_id', 'name', 'collection', 'bbox']
 
 export type GazetteerPlaces = Map<string, Place[]>
 
-/** the index's rows as places by collection (by name; a row with no id or collection is skipped, a missing name is the id) */
+/**
+ * the index's rows as places by collection (by name; a row with no id or collection is skipped, a missing name is the id). the
+ * centre of a place's bbox (`lat`, `lon`) is the coverage builder's own function, so a place has the same position here as in coverage.
+ */
 export function placesByCollection(rows: readonly Record<string, unknown>[]): GazetteerPlaces {
   const out: GazetteerPlaces = new Map()
   for (const r of rows) {
@@ -21,7 +25,8 @@ export function placesByCollection(rows: readonly Record<string, unknown>[]): Ga
     if (!id || !coll) continue
     const name = typeof r.name === 'string' && r.name ? r.name : id
     if (!out.has(coll)) out.set(coll, [])
-    out.get(coll)!.push({ id, name, coll })
+    const at = bboxCentre(r.bbox as Parameters<typeof bboxCentre>[0])
+    out.get(coll)!.push({ id, name, coll, ...(at ?? {}) })
   }
   for (const list of out.values()) list.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
   return out

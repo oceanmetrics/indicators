@@ -44,7 +44,7 @@
 
   const spec = $derived(view.spec)
   const idx = $derived(indexCoverage(catalog.coverage))
-  const model = $derived(buildReport(catalog, idx, spec, view.vocab))
+  const model = $derived(buildReport(catalog, idx, spec, view.vocab, titles))
   const info = $derived(LAYOUTS[spec.layout])
   const title = $derived(reportTitle(spec))
   // the two layouts that hold a map are loaded when first needed: MapLibre is its own chunk (the Map view's)

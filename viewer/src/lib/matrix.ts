@@ -7,6 +7,8 @@ import { shownGrainOrder } from '../../../src/coverage/build.ts'
 import type { CoverageRow } from '../../../src/coverage/build.ts'
 import { GROUP_ORDER } from './data.ts'
 import type { Indicator, Term, VocabId, Vocab } from './data.ts'
+import { DEFAULT_ORDER, orderIndicators, orderPlaces } from '../../../src/report/order.ts'
+import type { AxisOrder, IndicatorSort, PlaceSort } from '../../../src/report/order.ts'
 
 /**
  * a place. `coll` is its group: its home gazetteer collection (coverage `place_coll`, else the values collection).
@@ -20,6 +22,9 @@ export interface Place {
   valuesColls?: string[]
   /** a place of a derived layer: the id of the feature of another layer that draws it (coverage `display_id`) */
   displayId?: string | null
+  /** the centre of the place's bbox (coverage `lat` and `lon`; the gazetteer index's bbox for a place nobody computed): what north to south and west to east order by */
+  lat?: number | null
+  lon?: number | null
 }
 
 /** the values collections that hold rows of a place */
@@ -49,8 +54,12 @@ export function indexCoverage(rows: CoverageRow[]): CoverageIndex {
     if (!byKey.has(k)) byKey.set(k, new Map())
     byKey.get(k)!.set(r.time_grain, r)
     const have = places.get(r.place_id)
-    if (!have) places.set(r.place_id, { id: r.place_id, name: r.place_name || r.place_id, coll: r.place_coll || r.coll, valuesColls: [r.coll], ...(r.display_id ? { displayId: r.display_id } : {}) })
-    else if (!have.valuesColls!.includes(r.coll)) have.valuesColls!.push(r.coll)
+    if (!have) {
+      places.set(r.place_id, {
+        id: r.place_id, name: r.place_name || r.place_id, coll: r.place_coll || r.coll, valuesColls: [r.coll],
+        ...(r.display_id ? { displayId: r.display_id } : {}), ...(r.lat != null && r.lon != null ? { lat: r.lat, lon: r.lon } : {}),
+      })
+    } else if (!have.valuesColls!.includes(r.coll)) have.valuesColls!.push(r.coll)
   }
   const list = [...places.values()]
   for (const p of list) p.valuesColls!.sort()
@@ -203,29 +212,21 @@ export interface ColumnGroup {
 }
 
 const OTHER: Term = { id: 'other', label: 'Other' }
+/** the one group of an ungrouped list of indicators (its id is empty: a view that draws group headers leaves this one out) */
+export const FLAT_TERM: Term = { id: '', label: 'All indicators' }
+/** the order the Place view's cards keep: the vocabulary's term order, a series together with its lead first */
+export const VOCAB_ORDER: AxisOrder<IndicatorSort> = { sort: 'vocab', group: true, custom: [] }
 
 /**
- * columns grouped by a vocabulary, in the vocabulary's term order; groups with no indicator are dropped, and an
- * indicator whose tag is not a term of the vocabulary goes to a last group "Other". within a group, a series'
- * indicators stay together (the lead first) in the order given.
+ * columns (or rows) of indicators in the order given (src/report/order.ts: grouped by a vocabulary's categories, the groups and the
+ * indicators A-Z by default, or the vocabulary's own order, or the reader's custom order; ungrouped it is one group, `FLAT_TERM`).
+ * an indicator whose tag is not a term of the vocabulary goes to a last group "Other". with no order given it is the vocabulary
+ * order, where a series' indicators stay together (the lead first) in the order given.
  */
-export function groupColumns(indicators: Indicator[], vocabs: Record<VocabId, Vocab>, vocab: VocabId): ColumnGroup[] {
+export function groupColumns(indicators: Indicator[], vocabs: Record<VocabId, Vocab>, vocab: VocabId, order: AxisOrder<IndicatorSort> = VOCAB_ORDER): ColumnGroup[] {
   const terms = vocabs[vocab]?.terms ?? []
-  const known = new Set(terms.map(t => t.id))
-  const seriesRank = new Map<string, number>()
-  indicators.forEach(i => { if (!seriesRank.has(i.series)) seriesRank.set(i.series, seriesRank.size) })
-  const pool = indicators.map((ind, n) => ({ ind, n }))
-  const order = (a: { ind: Indicator; n: number }, b: { ind: Indicator; n: number }) =>
-    (seriesRank.get(a.ind.series) as number) - (seriesRank.get(b.ind.series) as number) || Number(b.ind.lead) - Number(a.ind.lead) || a.n - b.n
-  const groups: ColumnGroup[] = []
-  for (const term of [...terms, OTHER]) {
-    const inGroup = pool.filter(x => {
-      const tag = x.ind.category[vocab]
-      return term === OTHER ? !tag || !known.has(tag) : tag === term.id
-    }).sort(order).map(x => x.ind)
-    if (inGroup.length) groups.push({ term, indicators: inGroup })
-  }
-  return groups
+  const byId = new Map<string, Term>([...terms.map(t => [t.id, t] as [string, Term]), [OTHER.id, OTHER]])
+  return orderIndicators(indicators, order, vocab, terms).map(g => ({ term: order.group ? byId.get(g.id) ?? OTHER : FLAT_TERM, indicators: g.items }))
 }
 
 /**
@@ -252,22 +253,22 @@ export interface RowGroup {
 export const ROW_CAP = 300
 
 /**
- * the rows of the chosen places: grouped by their home collection (the Matrix's group order), a case-insensitive search of
- * name or id narrows them, the computed places (some coverage) come first in each group and then by name, and a group of
- * more than `cap` places shows the first `cap` (its `total` says how many there are)
+ * the rows of the chosen places in the order given (src/report/order.ts: grouped by their home collection with the groups A-Z by
+ * title and the places A-Z by default, or by a sort key, or the reader's custom order; ungrouped it is one group with the
+ * collection ''). a case-insensitive search of name or id narrows them first. a group of more than `cap` places shows `cap` of
+ * them, in order: the computed places (some coverage) are kept before the others, so a group of thousands still shows what has
+ * values; its `total` says how many there are.
  */
-export function selectionRows(places: Place[], idx: CoverageIndex, q: string, cap = ROW_CAP): RowGroup[] {
+export function selectionRows(
+  places: Place[], idx: CoverageIndex, q: string, order: AxisOrder<PlaceSort> = DEFAULT_ORDER.places, groupLabel: (coll: string) => string = c => c, cap = ROW_CAP,
+): RowGroup[] {
   const needle = q.trim().toLowerCase()
   const computed = new Set(idx.places.map(p => p.id))
-  const by = new Map<string, Place[]>()
-  for (const p of places) {
-    if (needle && !p.name.toLowerCase().includes(needle) && !p.id.toLowerCase().includes(needle)) continue
-    if (!by.has(p.coll)) by.set(p.coll, [])
-    by.get(p.coll)!.push(p)
-  }
-  return orderGroups(by.keys()).map(coll => {
-    const all = by.get(coll)!.sort((a, b) => Number(computed.has(b.id)) - Number(computed.has(a.id)) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
-    return all.length > cap ? { coll, places: all.slice(0, cap), total: all.length } : { coll, places: all }
+  const hits = needle ? places.filter(p => p.name.toLowerCase().includes(needle) || p.id.toLowerCase().includes(needle)) : places
+  return orderPlaces(hits, order, groupLabel).map(g => {
+    if (g.items.length <= cap) return { coll: g.id, places: g.items }
+    const keep = new Set([...g.items.filter(p => computed.has(p.id)), ...g.items.filter(p => !computed.has(p.id))].slice(0, cap))
+    return { coll: g.id, places: g.items.filter(p => keep.has(p)), total: g.items.length }
   })
 }
 

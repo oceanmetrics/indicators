@@ -4,6 +4,7 @@
 import { budget, coverageCounts, expandIndicators, expandPlaces, LAYOUTS, seriesLeads } from '../../../../src/report/spec.ts'
 import type { Budget, ReportSpec } from '../../../../src/report/spec.ts'
 import type { Catalog, Indicator, VocabId } from '../data.ts'
+import { orderPlaces } from '../../../../src/report/order.ts'
 import { cellModel, groupColumns, pickRow } from '../matrix.ts'
 import type { CellKind, ColumnGroup, CoverageIndex, Place } from '../matrix.ts'
 import { SOURCE_HREF } from '../credits.ts'
@@ -15,11 +16,11 @@ export interface EmptyCell {
 }
 
 export interface ReportModel {
-  /** the places the spec chooses that have a value for at least one chosen indicator, by collection then name */
+  /** the places the spec chooses that have a value for at least one chosen indicator, in the spec's order (groups A-Z, places A-Z by default) */
   places: Place[]
   /** the indicators the spec chooses that have a value for at least one chosen place, in manifest order */
   indicators: Indicator[]
-  /** the indicators grouped by the vocabulary (term order, "Other" last) */
+  /** the indicators in the spec's order: grouped by the vocabulary's categories (A-Z by default, "Other" last), or one group when the spec ungroups them */
   groups: ColumnGroup[]
   budget: Budget
   /** place x indicator pairs with no value */
@@ -31,16 +32,15 @@ export interface ReportModel {
 const hasValue = (idx: CoverageIndex, p: Place, i: Indicator) => pickRow(idx, p.id, i)?.last_value != null
 
 /** a spec in this catalog: the rules expanded (the place sets from the manifest), then gated by coverage (a column or a row with no value is left out) */
-export function buildReport(catalog: Pick<Catalog, 'manifest' | 'coverage'>, idx: CoverageIndex, spec: ReportSpec, vocab: VocabId): ReportModel {
+export function buildReport(
+  catalog: Pick<Catalog, 'manifest' | 'coverage'>, idx: CoverageIndex, spec: ReportSpec, vocab: VocabId, groupLabel: (coll: string) => string = c => c,
+): ReportModel {
   const all = catalog.manifest.indicators
   const chosenPlaces = expandPlaces(spec.places, idx.places, catalog.manifest.place_sets ?? [])
   const counts = coverageCounts(catalog.coverage, chosenPlaces)
   const indicators = expandIndicators(spec.indicators, all).filter(i => (counts.get(i.id) ?? 0) > 0)
-  const collRank = new Map(idx.colls.map((c, n) => [c, n]))
-  const places = chosenPlaces
-    .filter(p => indicators.some(i => hasValue(idx, p, i)))
-    .sort((a, b) => (collRank.get(a.coll) ?? 99) - (collRank.get(b.coll) ?? 99) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
-  const groups = groupColumns(indicators, catalog.manifest.vocabularies, vocab)
+  const places = orderPlaces(chosenPlaces.filter(p => indicators.some(i => hasValue(idx, p, i))), spec.order.places, groupLabel).flatMap(g => g.items)
+  const groups = groupColumns(indicators, catalog.manifest.vocabularies, vocab, spec.order.indicators)
   const leads = new Set(seriesLeads(all).values())
   const empties: EmptyCell[] = []
   for (const p of places) {

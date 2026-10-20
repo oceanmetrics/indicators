@@ -2,7 +2,8 @@
   // the Select section, above the Matrix, Map and Report tabs: the one selection they share. a place picker (place sets, groups
   // and places of the whole gazetteer, computed or not), an indicator picker (the vocabulary, the leads and show-empty switches
   // and the tree) and a line of what is chosen. every tick is a change of the report spec's rules (pi, px, ii, ix: selection.ts,
-  // report/tree.ts), so a view switch carries the selection and a link is the selection. the Place view carries it in its hash
+  // report/tree.ts), so a view switch carries the selection and a link is the selection. the Order control (sort keys, grouping, reset)
+  // is part of it too: the order (ps pg po is ig io) is shared by the Matrix, Map and Report like the rules. the Place view carries it in its hash
   // and has no Select section of its own.
   import type { Catalog, Layers } from './data.ts'
   import type { ViewState } from './hash.ts'
@@ -13,6 +14,7 @@
   import type { Selection } from './selection.ts'
   import PlacePicker from './pick/PlacePicker.svelte'
   import IndicatorPicker from './pick/IndicatorPicker.svelte'
+  import OrderPicker from './pick/OrderPicker.svelte'
   import { multiLabel, placeGroups, placeSetInfos, selectionLine } from './pick/places.ts'
   import { multiIndicatorLabel } from './pick/indicators.ts'
 
@@ -69,6 +71,7 @@
       vocab={view.vocab} onvocab={v => onchange({ vocab: v })} chosen={chosenInds} {idx} places={computedChosen} nPlaces={places.length} ontoggle={tickInd}
       leads={leadsOnly(view.spec.indicators)} onleads={v => setSelection({ indicators: setLeadsOnly(view.spec.indicators, v) })}
       showEmpty={view.showEmpty} onempty={v => onchange({ showEmpty: v })} />
+    <OrderPicker order={view.spec.order} vocab={view.vocab} onchange={order => setSelection({ order })} />
   </div>
   <p class="line" role="status" aria-live="polite">{selectionLine(placeWords, indicators.length)}</p>
 </section>
