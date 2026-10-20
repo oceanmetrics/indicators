@@ -106,6 +106,10 @@ indicators.json + coverage.parquet ──► viewer/ (imports src/status/, src/i
   glyphs from `brand/glyphs.py` (primitives on the 24-px grid), EOV glyphs from `brand/eov_trace.py` (traced GOOS
   badges). All feed the generated `src/icons/icon-paths.ts`; the sprite, `icons.css` and contact sheet are built
   from it. Earlier glyphs stay byte-identical (`brand/icons.lock.json`).
+  The generator writes the map as two parts that `icon-paths.ts` composes: `icon-core.ts` (every family but eov-, loaded
+  up front) and `icon-paths-eov.ts` (the traced eov- paths, about 19 kB gzip, loaded the first time an eov- glyph draws:
+  `src/icons/eov.svelte.ts`). Viewer code imports `src/icons/index.ts`, never `icon-paths.ts` at run time, or the eov-
+  paths return to the first load.
 - **GOOS badges are used unmodified** (`assets/goos-eov/`, resized to WebP only), always with "Credit: Global Ocean
   Observing System (GOOS)", never in the Ocean Metrics sprite, never with the GOOS logo.
 - **Themes:** `brand/themes/mbon.css` (the kit's tokens as they are) and `oceanmetrics.css` (DESIGN.md mapped onto

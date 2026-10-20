@@ -66,6 +66,10 @@
   --control-bg:     #ffffff;
   --control-hover:  #e6f5f8;
   --selected-bg:    #e4f6fa;
+  --overlay-bg:     #ffffff;           /* the raised surface: pickers, floating panels */
+  --overlay-border: var(--border-strong);
+  --overlay-shadow: 0 12px 32px #0821292e, 0 2px 6px #0821291a;
+  --map-sea:        #d0cfd4;           /* under the basemap: the Arctic cap its tiles do not cover, seen on the globe */
 
   --pipe-dataset-ink:  #6d4aa7;
   --pipe-place-ink:    #01375f;
@@ -114,6 +118,10 @@
   --control-bg:     #12414d;
   --control-hover:  #174a57;
   --selected-bg:    #1a5462;
+  --overlay-bg:     #164755;
+  --overlay-border: #4b8999;
+  --overlay-shadow: 0 0 0 1px #86d6e51a, 0 18px 48px #000a;
+  --map-sea:        #232227;
 
   --pipe-dataset-ink:  #b39ae0;
   --pipe-place-ink:    #7fb0e6;
@@ -122,6 +130,9 @@
 
   color-scheme: dark;
 }
+
+/* the kit Menu panel stands off the page like the pickers and the drawer (the kit styles it with its own popover tokens) */
+.mbon-menu .panel.panel { background: var(--overlay-bg); border-color: var(--overlay-border); box-shadow: var(--overlay-shadow); }
 </style>
 <link rel="stylesheet" href="icons.css">
 <style>

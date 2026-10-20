@@ -1,8 +1,11 @@
 <script lang="ts">
   // the one renderer of the Ocean Metrics icon set: a name from the generated map, never a raw path string
   // (a hand-typed "MDI" path is exactly the mistake the generator exists to prevent). aria-hidden unless the icon
-  // carries its own accessible name (title); an unknown name renders nothing rather than throwing.
-  import { ICON_PATHS, type IconName } from "./icon-paths";
+  // carries its own accessible name (title); an unknown name renders nothing rather than throwing. the eov- paths load
+  // on first use (eov.svelte.ts): until they arrive an eov- icon keeps its box empty, so nothing shifts when it draws.
+  import { CORE_PATHS } from "./icon-core.ts";
+  import type { IconName } from "./icon-paths.ts";
+  import { eov, isEovName, loadEov } from "./eov.svelte.ts";
 
   interface Props {
     name: IconName;
@@ -14,7 +17,9 @@
   }
 
   let { name, size = 20, title, class: className = "" }: Props = $props();
-  const d = $derived((ICON_PATHS as Record<string, string>)[name]);
+  const lazy = $derived(isEovName(name));
+  $effect(() => { if (lazy && !eov.paths) loadEov().catch(() => {}); });
+  const d = $derived(lazy ? eov.paths?.[name] : (CORE_PATHS as Record<string, string>)[name]);
 </script>
 
 {#if d}
@@ -30,6 +35,8 @@
   >
     <path fill="currentColor" {d} />
   </svg>
+{:else if lazy}
+  <svg class="om-icon {className}" viewBox="0 0 24 24" width={size} height={size} role={title ? "img" : undefined} aria-label={title} aria-hidden={title ? undefined : "true"} focusable="false"></svg>
 {/if}
 
 <style>

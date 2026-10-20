@@ -13,12 +13,18 @@ import {
   EOV_FILE,
   EOV_META_FILE,
   ICON_MAP_FILE,
+  CORE_FILE,
+  EOV_PATHS_FILE,
   OUTPUT_FILE,
+  generateEovPathsSource,
+  generateIconCoreSource,
   generateIconPathsSource,
   resolveIconPaths,
 } from "./build-icon-paths.mjs";
 import { CSS_FILE, LOCK_FILE, SPRITE_FILE, checkLock, generateCss, generateSprite } from "./build-icons.mjs";
 import { ICON_FAMILIES, ICON_PATHS, ICON_SOURCES } from "../src/icons/icon-paths";
+import { CORE_PATHS, EOV_NAMES } from "../src/icons/icon-core";
+import { EOV_PATHS } from "../src/icons/icon-paths-eov";
 
 const ROOT = resolve(__dirname, "..");
 const readJson = (f: string, fb: any = {}) => (existsSync(f) ? JSON.parse(readFileSync(f, "utf8")) : fb);
@@ -154,9 +160,22 @@ describe("icon-paths", () => {
     }
   });
 
-  it("regenerating icon-paths.ts is byte-identical to the committed file", () => {
+  it("regenerating icon-paths.ts, icon-core.ts and icon-paths-eov.ts is byte-identical to the committed files", () => {
     const { paths, sources } = resolveIconPaths(ICON_MAP, MDI, BESPOKE, EOV, EOV_META);
     expect(generateIconPathsSource(paths, sources)).toBe(readFileSync(OUTPUT_FILE, "utf8"));
+    expect(generateIconCoreSource(paths)).toBe(readFileSync(CORE_FILE, "utf8"));
+    expect(generateEovPathsSource(paths)).toBe(readFileSync(EOV_PATHS_FILE, "utf8"));
+  });
+
+  // the viewer loads icon-core.ts up front and icon-paths-eov.ts on first use (the traced eov- paths were 19 kB of a
+  // 31 kB map in the first load, which put the entry over its budget on 2026-10-20): the two parts are the whole map
+  it("the viewer's two parts split the map by family and together are the whole of it, in name order", () => {
+    const core = Object.keys(CORE_PATHS), eov = Object.keys(EOV_PATHS);
+    expect(core.some((n) => n.startsWith("eov-"))).toBe(false);
+    expect(eov.every((n) => n.startsWith("eov-"))).toBe(true);
+    expect([...EOV_NAMES]).toEqual(eov);
+    expect(Object.keys(ICON_PATHS)).toEqual([...core, ...eov].sort());
+    expect({ ...CORE_PATHS, ...EOV_PATHS }).toEqual(ICON_PATHS);
   });
 
   it("regenerating om-icons.svg and icons.css is byte-identical to the committed files", () => {

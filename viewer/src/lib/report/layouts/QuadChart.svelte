@@ -4,7 +4,7 @@
   // captions say where a point is in words (statistical, never better or worse), and each marker is the status glyph of the
   // point. the coordinates and words are src/status/quad.ts. points with no coordinates are listed under the chart with why,
   // and a table (details) carries every number for those who do not read the plot.
-  import { ICON_PATHS, Icon } from '../../../../../src/icons/index.ts'
+  import { CORE_PATHS, Icon } from '../../../../../src/icons/index.ts'
   import type { IconName } from '../../../../../src/icons/index.ts'
   import { QUADRANT_SHORT, QUADRANT_WORDS, fmt, quadAlt, quadPoint, quadWhy, quadWords, quadrantOf } from '../../../../../src/status/index.ts'
   import type { QuadPoint } from '../../../../../src/status/index.ts'
@@ -52,7 +52,7 @@
   let hover = $state<string | null>(null)
   const tip = $derived(drawn.find(e => e.it.key === hover) ?? null)
   const statusIcon = (s: string | null | undefined) => (`st-${s ?? 'none'}` as IconName)
-  const glyph = (name: string) => (ICON_PATHS as Record<string, string>)[name] ?? ''
+  const glyph = (name: string) => (CORE_PATHS as Record<string, string>)[name] ?? ''   // st- and tr- glyphs: up-front paths
   const words = (e: { m: CardModel | null; pt: QuadPoint }) => quadWords(e.pt, e.m?.method)
 </script>
 
