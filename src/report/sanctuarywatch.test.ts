@@ -79,6 +79,11 @@ describe('captions and the staging sheet', () => {
     expect(c.long).toContain('relative to the place\'s own record (iea-sd)')
     expect(c.long).toContain('say nothing about better or worse')
     expect(c.long).toContain(f.permalink)
+    expect(c.long).toContain('Source: NOAA Coral Reef Watch (2018). Configuration abc123def456')
+  })
+  it('a citation without a closing full stop gets one before the configuration', () => {
+    const f = { ...figure(), indicator: { ...figure().indicator, citation: 'Values: Ocean Metrics, https://oceanmetrics.io/indicators/' } }
+    expect(swCaptions(f).long).toContain('https://oceanmetrics.io/indicators/. Configuration abc123def456')
   })
   it('figures.csv has the staging columns, quotes what needs quoting, and leaves scene and icon empty', () => {
     const f = figure()

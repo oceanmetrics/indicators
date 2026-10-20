@@ -141,11 +141,12 @@ export function swCaptions(f: SwFigure): { short: string; long: string; md: stri
     : f.method === 'names-pct'
       ? `The dashed line is the median of ${f.place.name}'s own record and the dotted lines its 10th and 90th percentiles; the shaded band is the last ${f.recent} years.`
       : 'The values as published, without a status.'
+  const end = (t: string) => (/[.!?]$/.test(t.trim()) ? t.trim() : t.trim() + '.')
   const long = [
     how,
     `Status and trend are relative to the place's own record (${f.method}); they are statistical and say nothing about better or worse.`,
-    f.indicator.method ? `Method: ${f.indicator.method}` : '',
-    f.indicator.citation ? `Source: ${f.indicator.citation}` : '',
+    f.indicator.method ? end(`Method: ${f.indicator.method}`) : '',
+    f.indicator.citation ? end(`Source: ${f.indicator.citation}`) : '',
     `Configuration ${f.configHash}, manifest ${f.manifestVersion}. Data and permalink: ${f.permalink}`,
   ].filter(Boolean).join(' ')
   const md = `# Captions\n\n## Short\n\n${short}\n\n## Extended\n\n${long}\n`
