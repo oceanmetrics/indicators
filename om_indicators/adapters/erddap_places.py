@@ -293,17 +293,23 @@ class Fetcher:
       return list(ex.map(fn, items))
 
 
-def resolve_places(index_path: Path, place_ids: Iterable[str], coll: str = COLL) -> None:
-  """every place must be exactly one row with collection `coll` in the gazetteer index, else raise naming it."""
+def resolve_places(index_path: Path, place_ids: Iterable[str], coll: str = COLL) -> set[str]:
+  """the places of `coll` that the gazetteer index no longer lists: retired places, whose stale items are skipped (e.g.
+  MRGID:8439 and PSGID:939, which left erddap-places' `places` collection in 2.0.0, 2026-10-20, while the stats
+  collection still linked their items until its next run). a place listed more than once in `coll` raises, naming it."""
   t = pq.read_table(index_path, columns=["place_id", "collection"]).to_pylist()
   count: dict[str, int] = defaultdict(int)
   for r in t:
     if r["collection"] == coll:
       count[r["place_id"]] += 1
+  retired: set[str] = set()
   for pid in sorted(set(place_ids)):
-    if count[pid] != 1:
+    if count[pid] == 0:
+      retired.add(pid)
+    elif count[pid] != 1:
       raise ValueError(f"place_id {pid!r} resolves to {count[pid]} rows with collection {coll!r} in the gazetteer index, "
                        "expected exactly 1")
+  return retired
 
 
 def _commit() -> str | None:
@@ -367,13 +373,16 @@ def run(out: Path, base: str = DEFAULT_BASE, cache: Path = Path("cache/erddap-pl
   if not items:
     raise ValueError(f"no items in {base}")
 
-  # places must resolve, each in its own collection, before anything is fetched or written
+  # places must resolve, each in its own collection, before anything is fetched or written; a place the index no
+  # longer lists in its collection is retired and its items are skipped (named in the summary)
   index_path = f.cached(_child(gazetteer, "index/places_index.parquet"), "places_index", None)
   by_coll: dict[str, list[str]] = defaultdict(list)
   for _, it in items:
     by_coll[item_coll(it)].append(it["properties"]["erddap-places:place_id"])
-  for c, pids in sorted(by_coll.items()):
-    resolve_places(index_path, pids, c)
+  retired = {(c, pid) for c, pids in sorted(by_coll.items()) for pid in resolve_places(index_path, pids, c)}
+  items = [(loc, it) for loc, it in items if (item_coll(it), it["properties"]["erddap-places:place_id"]) not in retired]
+  if not items:
+    raise ValueError(f"every item in {base} is of a place the gazetteer index no longer lists")
 
   datasets = {d: f.read_json(_child(gazetteer, f"erddap/{d}/collection.json"))
               for d in sorted({it["properties"]["erddap-places:dataset_id"] for _, it in items})}
@@ -392,7 +401,8 @@ def run(out: Path, base: str = DEFAULT_BASE, cache: Path = Path("cache/erddap-pl
   for e in loaded:
     groups[(e["dataset"], e["variable"], e["coll"])].append(e)
 
-  summary: dict = {"files": [], "empty": [], "partial": [], "items": len(loaded), "unknown_classes": []}
+  summary: dict = {"files": [], "empty": [], "partial": [], "items": len(loaded), "unknown_classes": [],
+                   "retired": sorted(f"{c}/{pid}" for c, pid in retired)}
   places_seen: set[str] = set()
   for (ds, var, coll), es in sorted(groups.items()):
     meta = datasets[ds].get("cube:variables", {}).get(var)

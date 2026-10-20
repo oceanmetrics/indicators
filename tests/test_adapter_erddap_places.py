@@ -252,16 +252,31 @@ def test_partial_status_is_taken_from_the_item_or_else_the_collection_link(tmp_p
   assert summary["partial"] == ["dhw_5km/CRW_SST/NMS:FKNMS", "dhw_5km/CRW_SST/NMS:PMNM"]
 
 
-def test_a_place_missing_from_the_index_raises_naming_it(tmp_path):
+def test_a_place_the_index_no_longer_lists_is_retired_and_its_items_skipped(tmp_path):
   base = make_tree(tmp_path / "pub", [sst("NMS:CINMS"), sst("NMS:GHOST")], index={"NMS:CINMS": ["places"]})
-  with pytest.raises(ValueError, match=r"place_id 'NMS:GHOST' resolves to 0 rows"):
+  summary = ep.run(tmp_path / "cat", base=base, cache=tmp_path / "cache")
+  assert summary["retired"] == ["places/NMS:GHOST"]
+  assert [f["places"] for f in summary["files"]] == [1] and summary["places"] == ["NMS:CINMS"]
+
+
+def test_regression_pitcairn_left_places_2_0_0_and_its_stale_item_is_skipped(tmp_path):
+  # places 2.0.0 (2026-10-20) dropped MRGID:8439 and PSGID:939; the stats collection linked their items until its next run
+  base = make_tree(tmp_path / "pub", [sst("NMS:CINMS"), sst("MRGID:8439")],
+                   index={"NMS:CINMS": ["places"], "MRGID:8439": ["mr_eez"]})
+  summary = ep.run(tmp_path / "cat", base=base, cache=tmp_path / "cache")
+  assert summary["retired"] == ["places/MRGID:8439"] and summary["places"] == ["NMS:CINMS"]
+
+
+def test_every_item_retired_raises(tmp_path):
+  base = make_tree(tmp_path / "pub", [sst("MRGID:8439")], index={"MRGID:8439": ["mr_eez"]})
+  with pytest.raises(ValueError, match="no longer lists"):
     ep.run(tmp_path / "cat", base=base, cache=tmp_path / "cache")
   assert not (tmp_path / "cat").exists()
 
 
-def test_a_place_only_in_another_collection_does_not_resolve(tmp_path):
-  base = make_tree(tmp_path / "pub", [sst("MRGID:8439")], index={"MRGID:8439": ["mr_eez"]})
-  with pytest.raises(ValueError, match=r"place_id 'MRGID:8439' resolves to 0 rows"):
+def test_a_place_listed_twice_in_its_collection_raises_naming_it(tmp_path):
+  base = make_tree(tmp_path / "pub", [sst("NMS:CINMS")], index={"NMS:CINMS": ["places", "places"]})
+  with pytest.raises(ValueError, match=r"place_id 'NMS:CINMS' resolves to 2 rows"):
     ep.run(tmp_path / "cat", base=base, cache=tmp_path / "cache")
 
 
