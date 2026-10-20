@@ -217,7 +217,11 @@ back to the Place view; `?theme=` and `?brand=` work as in the app, and `main.em
 
 ## Publishing
 
-- **Catalog:** `.github/workflows/catalog.yml` runs daily (08:07 UTC) on the self-hosted `macmini` runner:
+- **Runners:** the Mac mini has two self-hosted runners of the `oceanmetrics` organisation, and a runner takes one job at a
+  time. `macmini` (`~/actions-runner/erddap-places`) holds the long jobs: erddap-places' daily precompute (hours) and the
+  monthly obis-h3 release. `macmini-quick` (`~/actions-runner/quick`, label `macmini-quick` only, so no long job lands on
+  it) runs this repo's short jobs: the catalog and the request runs, which otherwise waited behind the precompute.
+- **Catalog:** `.github/workflows/catalog.yml` runs daily (08:07 UTC) on the self-hosted `macmini-quick` runner:
   `scripts/build_catalog.sh` (erddap-places, eco-indicators, the Copernicus Marine place producer's folder and obis rebuilt from what they publish, the SDG series pulled
   from the published catalog), then `scripts/publish_catalog.sh` syncs to `s3://oceanmetrics.io-public/indicators/` (values first, the
   manifest last; `--delete` only under `indicators/values/`). Read it at https://storage.oceanmetrics.io/indicators/
