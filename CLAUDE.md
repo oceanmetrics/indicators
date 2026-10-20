@@ -20,6 +20,8 @@ npx vitest run src/status/ecoidx.test.ts          # one file
 npm run check                                     # svelte-check + tsc
 npm run dev                                       # viewer on http://localhost:5181/ (reads catalog/)
 node viewer/scripts/shoot.mjs [--only <name>]     # screenshots -> docs/shots/; look at them
+node viewer/scripts/shoot.mjs --url https://oceanmetrics.io/indicators/ --out docs/shots/live   # the deployed site
+node viewer/scripts/keys.mjs [--url <site>]       # keyboard: cell -> drawer -> Esc -> focus back; place link -> Place view
 npm run icons:paths && npm run icons:build && npm run icons:sheet   # after any change to brand/ sources
 Rscript fixtures/ecoidx/build_iea_sd_fixtures.R ~/Github/noaa-iea/ecoidx   # regenerate the iea-sd cross-check
 ```

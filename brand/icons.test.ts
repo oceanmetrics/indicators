@@ -365,3 +365,38 @@ describe("no hex colour literal outside the token and theme files", () => {
     expect(HEX.test("use #ui-search")).toBe(false);
   });
 });
+
+// ---- text contrast (WCAG 2.1 AA, >= 4.5:1) ----
+// the colours body text, headings, links and labels are set in, on the page and on a surface, in both themes and both
+// modes. --text-muted is for captions only (DESIGN.md: "reserved for captions"), so it is held to the 3:1 of large or
+// incidental text, not 4.5.
+describe("text contrast (WCAG 2.1 AA)", () => {
+  const TEXT = ["--text-strong", "--text-heading", "--text-body", "--link", "--label-color"];
+  const rows: string[] = [];
+  const muted: string[] = [];
+  for (const [theme, file] of Object.entries(THEMES)) {
+    for (const mode of ["light", "dark"] as const) {
+      const env = cascade([KIT, file], mode);
+      for (const ground of GROUNDS) {
+        const bg = resolveVar(`var(${ground})`, env);
+        for (const role of TEXT) {
+          const fg = resolveVar(`var(${role})`, env);
+          if (ratio(fg, bg) < 4.5) rows.push(`[${theme} ${mode}] ${role} ${fg} on ${ground} ${bg}: ${ratio(fg, bg).toFixed(2)}:1`);
+        }
+        const m = resolveVar("var(--text-muted)", env);
+        if (ratio(m, bg) < 3) muted.push(`[${theme} ${mode}] --text-muted ${m} on ${ground} ${bg}: ${ratio(m, bg).toFixed(2)}:1`);
+      }
+    }
+  }
+  it("body text, headings, links and labels reach 4.5:1 in both themes and modes", () => {
+    expect(rows).toEqual([]);
+  });
+  // the kit's own --text-muted (#8499a3) is 2.83:1 on its light page, and the mbon theme keeps the kit's tokens as
+  // they are (a decision), so the viewer never draws text or marks in it: --text-body instead
+  it("muted caption text reaches 3:1 except the kit's own light value, which the viewer never uses", () => {
+    expect(muted.filter((m) => !m.startsWith("[mbon light]"))).toEqual([]);
+    const uses = walk(resolve(ROOT, "viewer/src")).filter((f) => /\.(svelte|ts|css)$/.test(f))
+      .filter((f) => /var\(--text-muted\)/.test(readFileSync(f, "utf8")));
+    expect(uses).toEqual([]);
+  });
+});

@@ -1,7 +1,7 @@
 // screenshots of the Matrix and the Place view with the real catalog: docs/shots/matrix_<brand>_<theme>[_390].png,
 // the drawer, and place_<place>_<brand>_<theme>[_390].png.
 // headless Chrome through puppeteer-core, against the dev server (started here when nothing answers on the port).
-//   node viewer/scripts/shoot.mjs [--url http://localhost:5181/] [--only matrix_mbon_dark]
+//   node viewer/scripts/shoot.mjs [--url http://localhost:5181/] [--only matrix_mbon_dark] [--out docs/shots/live]
 import { spawn } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import puppeteer from 'puppeteer-core'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const OUT = resolve(ROOT, 'docs/shots')
+const OUT = resolve(ROOT, process.argv.includes('--out') ? process.argv[process.argv.indexOf('--out') + 1] : 'docs/shots')
 const CHROME = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d }
 const URL_BASE = arg('--url', 'http://localhost:5181/')

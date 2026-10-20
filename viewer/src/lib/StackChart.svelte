@@ -39,7 +39,7 @@
 </div>
 
 <style>
-  .wrap { min-width: 0; width: 100%; --c0: var(--pipe-dataset-ink); --c1: var(--pipe-method-ink); --c2: var(--pipe-delivery-ink); --c3: var(--pipe-place-ink); --c4: var(--facet-org); --c5: var(--facet-content); --c-other: var(--text-muted); }
+  .wrap { min-width: 0; width: 100%; --c0: var(--pipe-dataset-ink); --c1: var(--pipe-method-ink); --c2: var(--pipe-delivery-ink); --c3: var(--pipe-place-ink); --c4: var(--facet-org); --c5: var(--facet-content); --c-other: var(--text-body); }
   svg { display: block; max-width: 100%; overflow: visible; }
   text { font-family: var(--font-mono); font-size: 11px; fill: var(--text-body); }
   .unit { fill: var(--text-strong); font-weight: 600; }
@@ -49,7 +49,7 @@
   .c0 { fill: var(--c0); } .c1 { fill: var(--c1); } .c2 { fill: var(--c2); } .c3 { fill: var(--c3); } .c4 { fill: var(--c4); } .c5 { fill: var(--c5); } .c-other { fill: var(--c-other); }
   .key { list-style: none; margin: var(--space-1) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); font: var(--type-small); font-size: 0.75rem; color: var(--text-body); }
   .key li { display: inline-flex; align-items: center; gap: var(--space-2); }
-  .pct { font-family: var(--font-mono); color: var(--text-muted); }
+  .pct { font-family: var(--font-mono); color: var(--text-body); }
   .sw { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 2px; }
   .sw.c0 { background: var(--c0); } .sw.c1 { background: var(--c1); } .sw.c2 { background: var(--c2); } .sw.c3 { background: var(--c3); } .sw.c4 { background: var(--c4); } .sw.c5 { background: var(--c5); } .sw.c-other { background: var(--c-other); }
 </style>

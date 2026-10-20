@@ -76,7 +76,7 @@
   .win { fill: var(--selected-bg); stroke: var(--border-strong); stroke-width: 1; stroke-dasharray: 3 3; }
   .band { fill: var(--bg-tint); }
   .edge { stroke: var(--border-strong); stroke-width: 1; }
-  .mean { stroke: var(--text-muted); stroke-width: 1.5; stroke-dasharray: 5 3; }
+  .mean { stroke: var(--text-body); stroke-width: 1.5; stroke-dasharray: 5 3; }
   .line { fill: none; stroke: var(--link); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
   .pt { fill: var(--bg-surface); stroke: var(--link); stroke-width: 1.6; }
   .last { fill: var(--link); stroke: var(--bg-surface); stroke-width: 1.5; }
@@ -84,7 +84,7 @@
   .key li { display: inline-flex; align-items: center; gap: var(--space-2); }
   .sw { display: inline-block; width: 1.25rem; height: 0.75rem; box-sizing: border-box; }
   .sw.line { height: 0; border-top: 2px solid var(--link); }
-  .sw.mean { height: 0; border-top: 2px dashed var(--text-muted); }
+  .sw.mean { height: 0; border-top: 2px dashed var(--text-body); }
   .sw.band { background: var(--bg-tint); border: 1px solid var(--border-strong); }
   .sw.win { background: var(--selected-bg); border: 1px dashed var(--border-strong); }
 </style>
