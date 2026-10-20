@@ -39,7 +39,7 @@ const COVERAGE = [
 ]
 const manifest = { version: '2026.10.20', vocabularies: vocabs(), indicators: INDS } as unknown as Manifest
 const catalog = { manifest, coverage: COVERAGE }
-const idx = indexCoverage(COVERAGE, INDS)
+const idx = indexCoverage(COVERAGE)
 const spec = (o: Partial<ReportSpec>): ReportSpec => ({ ...DEFAULT_SPEC, ...o })
 const ids = (xs: { id: string }[]) => xs.map(x => x.id)
 

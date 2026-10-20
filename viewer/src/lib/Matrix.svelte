@@ -1,11 +1,13 @@
 <script lang="ts">
-  // the Matrix: places grouped by collection against indicators grouped by the chosen vocabulary. `axes` says which
-  // runs down the rows: places (the default) or indicators. it scrolls inside its own box, with the first column and
-  // the header rows sticky in both orientations. every place and indicator header has a remove button (`onhide`).
+  // the Matrix: places grouped by their gazetteer collection against indicators grouped by the chosen vocabulary. `axes`
+  // says which runs down the rows: indicators (the default, places across) or places. it scrolls inside its own box,
+  // with the first column and the header rows sticky in both orientations. every place and indicator header has a
+  // remove button (`onhide`); every place group says how many of its places are computed and links to the gazetteer.
   import { tick } from 'svelte'
   import { Icon } from '../../../src/icons/index.ts'
+  import { gazetteerHref } from './data.ts'
   import type { Catalog, Indicator, VocabId } from './data.ts'
-  import { cellModel, pickRow } from './matrix.ts'
+  import { cellModel, computedOf, pickRow, shortPlaceName } from './matrix.ts'
   import type { ColumnGroup, CoverageIndex, Place, RowGroup } from './matrix.ts'
   import type { Axes, Depth } from './hash.ts'
   import { badgeUrl } from './delivery.ts'
@@ -21,6 +23,8 @@
     depth: Depth
     axes?: Axes
     titles: (coll: string) => string
+    /** a group's number of places in the gazetteer (null until layers.json has loaded) */
+    totals?: (coll: string) => number | null
     open: { place: string; indicator: string } | null
     onopen: (placeId: string, indicator: string) => void
     /** remove a place or an indicator from the display */
@@ -28,20 +32,22 @@
     /** the href of a place's view */
     placeHref: (placeId: string, coll: string) => string
   }
-  let { catalog, idx, cols, rows, vocab, depth, axes = 'places', titles, open, onopen, onhide, placeHref }: Props = $props()
+  let { catalog, idx, cols, rows, vocab, depth, axes = 'indicators', titles, totals = () => null, open, onopen, onhide, placeHref }: Props = $props()
 
   const flat = $derived(cols.flatMap(g => g.indicators))
   const flatPlaces = $derived(rows.flatMap(g => g.places))
-  const flipped = $derived(axes === 'indicators')
+  const indRows = $derived(axes === 'indicators')
   // the cells are the same in both orientations; only the loop order differs
-  const width = $derived((flipped ? flatPlaces.length : flat.length) + 1)
+  const width = $derived((indRows ? flatPlaces.length : flat.length) + 1)
+  // a group's places that have coverage (not only those on display) of the gazetteer's places in it
+  const computed = $derived(new Map(idx.colls.map(c => [c, idx.places.filter(p => p.coll === c).length])))
   const base = import.meta.env.BASE_URL
   let missingBadge = $state<Record<string, boolean>>({})
   let box = $state<HTMLDivElement>()
 
   const model = (ind: Indicator, p: Place) => cellModel(ind, p, pickRow(idx, p.id, ind))
   const isOpen = (ind: Indicator, p: Place) => open?.place === p.id && open?.indicator === ind.id
-  const emptyWhy = $derived(flatPlaces.length === 0 ? 'No place matches. Clear the search or pick other collections.' : 'No indicator is shown. Add one from the menu.')
+  const emptyWhy = $derived(flatPlaces.length === 0 ? 'No place matches. Clear the search or pick other place groups.' : 'No indicator has a value for these places. Turn on "Show indicators without values here" or pick other place groups.')
 
   // removing a header drops the button the keyboard is on: put focus on the next remove button of the same kind
   async function hide(kind: 'place' | 'indicator', id: string) {
@@ -61,9 +67,17 @@
 {/snippet}
 
 {#snippet placeHead(p: Place)}
-  <a class="pn" href={placeHref(p.id, p.coll)} data-place={p.id} title="Open the place view of {p.name}">{p.name}</a>
+  <a class="pn" href={placeHref(p.id, p.coll)} data-place={p.id} title="{p.name} ({p.id}): open the place view" aria-label="{p.name}, {p.id}: open the place view">{shortPlaceName(p.name)}</a>
   <span class="pid">{p.id}</span>
   {@render remove('place', p.id, p.name)}
+{/snippet}
+
+{#snippet groupHead(coll: string)}
+  <span class="gh gp">
+    <span class="gt">{titles(coll)}</span>
+    <span class="gn">{computedOf(computed.get(coll) ?? 0, totals(coll))} computed ·
+      <a class="gz" href={gazetteerHref(coll)} target="_blank" rel="noopener">in the gazetteer<Icon name="ui-external" size={12} /><span class="mbon-sr-only"> (opens in a new tab)</span></a></span>
+  </span>
 {/snippet}
 
 {#snippet indHead(ind: Indicator, glyph: ReturnType<typeof asIcon>)}
@@ -87,14 +101,14 @@
 <!-- the headers hold a link and a remove button per place or indicator, so the cells sit far down the Tab order: a skip
      button, shown on focus, goes straight to the first cell -->
 <button type="button" class="skip" onclick={() => box?.querySelector<HTMLButtonElement>('button.cell')?.focus()}>Skip to the first cell</button>
-<div class="box" role="region" aria-label={flipped ? 'Indicators by places' : 'Places by indicators'} tabindex="-1" bind:this={box}>
-  <table class="matrix" class:flipped>
+<div class="box" role="region" aria-label={indRows ? 'Indicators by places' : 'Places by indicators'} tabindex="-1" bind:this={box}>
+  <table class="matrix" class:indrows={indRows}>
     <thead>
       <tr class="groups">
-        <th class="rowh corner" scope="col" rowspan="2"><span class="mbon-label">{flipped ? 'Indicator' : 'Place'}</span></th>
-        {#if flipped}
+        <th class="rowh corner" scope="col" rowspan="2"><span class="mbon-label">{indRows ? 'Indicator' : 'Place'}</span></th>
+        {#if indRows}
           {#each rows as g (g.coll)}
-            <th scope="colgroup" colspan={g.places.length} class="group"><span class="gh"><span class="mbon-label">{titles(g.coll)} · {g.places.length}</span></span></th>
+            <th scope="colgroup" colspan={g.places.length} class="group">{@render groupHead(g.coll)}</th>
           {/each}
         {:else}
           {#each cols as g (g.term.id)}
@@ -103,7 +117,7 @@
         {/if}
       </tr>
       <tr class="heads">
-        {#if flipped}
+        {#if indRows}
           {#each flatPlaces as p (p.id)}
             <th scope="col" class="colh">{@render placeHead(p)}</th>
           {/each}
@@ -117,14 +131,14 @@
       </tr>
     </thead>
     <tbody>
-      {#if flipped}
+      {#if indRows}
         {#each cols as g (g.term.id)}
           <tr class="band"><th colspan={width} scope="colgroup">{@render termHead(g)}</th></tr>
           {#each g.indicators as ind (ind.id)}
             <tr>
               <th class="rowh ind" scope="row" title={ind.title}>{@render indHead(ind, asIcon(g.term.glyph))}</th>
               {#each flatPlaces as p (p.id)}
-                <td><Cell {ind} place={p} model={model(ind, p)} {depth} open={isOpen(ind, p)} {onopen} /></td>
+                <td><Cell {ind} place={p} model={model(ind, p)} {depth} groupTitle={titles(p.coll)} open={isOpen(ind, p)} {onopen} /></td>
               {/each}
             </tr>
           {/each}
@@ -132,13 +146,13 @@
       {:else}
         {#each rows as g (g.coll)}
           <tr class="band">
-            <th colspan={width} scope="colgroup"><span class="collname mbon-label">{titles(g.coll)} · {g.places.length}</span></th>
+            <th colspan={width} scope="colgroup">{@render groupHead(g.coll)}</th>
           </tr>
           {#each g.places as p (p.id)}
             <tr>
               <th class="rowh" scope="row">{@render placeHead(p)}</th>
               {#each flat as ind (ind.id)}
-                <td><Cell {ind} place={p} model={model(ind, p)} {depth} open={isOpen(ind, p)} {onopen} /></td>
+                <td><Cell {ind} place={p} model={model(ind, p)} {depth} groupTitle={titles(p.coll)} open={isOpen(ind, p)} {onopen} /></td>
               {/each}
             </tr>
           {/each}
@@ -154,7 +168,7 @@
 <style>
   .box {
     --place-w: 13.5rem;
-    --grp-h: 3.25rem;
+    --grp-h: 4.5rem;
     overflow: auto;
     max-height: min(72dvh, 52rem);
     min-height: 12rem;
@@ -200,8 +214,13 @@
   .pn:hover { color: var(--link); text-decoration-color: currentColor; }
   .pid { display: block; margin-top: 2px; font: var(--fw-regular) 0.6875rem / 1.3 var(--font-mono); color: var(--text-body); overflow-wrap: anywhere; }
   tr.band th { position: sticky; left: 0; background: var(--bg-tint); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); }
-  tr.band .gh, .collname { position: sticky; left: var(--space-3); }
-  .collname { display: inline-block; }
+  tr.band .gh { position: sticky; left: var(--space-3); }
+  /* a place group's head: its title, then "n of N computed" and the gazetteer link; wraps in a one-column group */
+  .gp { display: block; width: max-content; max-width: min(100%, 24rem); white-space: normal; }
+  .gt { display: block; font: var(--fw-semibold) var(--text-sm) / 1.2 var(--font-sans); }
+  .gn { display: block; margin-top: 2px; font: var(--type-small); font-size: 0.75rem; line-height: 1.3; color: var(--text-body); }
+  .gz { white-space: nowrap; }
+  .gz :global(svg) { vertical-align: -1px; margin-left: 2px; }
 
   /* the remove button sits in the top right corner of its header, out of the flow so it never shifts the layout; shown
      on hover or focus, always on touch screens */
@@ -234,9 +253,9 @@
     .box { --place-w: 8.75rem; max-height: 68dvh; }
     td { min-width: 8.75rem; width: 8.75rem; }
     .pid { display: none; }
-    table.flipped .pid { display: block; }
+    table.indrows .pid { display: block; }
     .gh { left: calc(var(--place-w) + var(--space-2)); }
     th.colh, th.rowh { padding-left: var(--space-2); }
-    tr.band .gh, .collname { left: var(--space-2); }
+    tr.band .gh { left: var(--space-2); }
   }
 </style>

@@ -57,7 +57,7 @@ WHERE time_grain = 'year' ORDER BY place_id, time;
 | `fixtures/ecoidx/` | R | runs ecoidx `PlotTimeSeries()` on the CCIEA example data: the cross-check for `iea-sd` |
 | `brand/` | Python, Node | icon pipeline (MDI by export name + generated glyphs + traced GOOS EOV glyphs), themes, favicons |
 | `assets/goos-eov/` | PNG, WebP | the GOOS EOV badges, unmodified (see its `SOURCE.md`) |
-| `viewer/` | Svelte 5 + Vite | the Matrix view on `indicators.json` + `coverage.parquet`, with `@marinebon/ui`; flip it with `#axes=t`, remove places or indicators with the x on a header (`xp=`, `xi=`), add more indicators from the Add or restore menu (`ai=`) |
+| `viewer/` | Svelte 5 + Vite | the Matrix view on `indicators.json` + `coverage.parquet`, with `@marinebon/ui`; places as rows with `#axes=p`, remove places or indicators with the x on a header (`xp=`, `xi=`), add more indicators from the Add or restore menu (`ai=`) |
 | `catalog/` | (git-ignored) | build output, published to `s3://oceanmetrics.io-public/indicators/` |
 
 ## Commands
@@ -74,7 +74,7 @@ uv run om-ind sdg --values ../places/proto/eez_indicators/data/values.json --out
 uv run om-ind eco-indicators --out catalog   # noaa-onms/eco-indicators at the latest commit of data/copernicus.csv (--ref <sha> pins one)
 uv run om-ind obis --out catalog             # the latest obis-h3 release's place_exact layer (--release v20261012 pins one)
 uv run om-ind manifest --out catalog         # catalog/indicators.json
-npm run coverage:build -- catalog            # catalog/coverage.parquet (statuses from src/status)
+npm run coverage:build -- catalog            # catalog/coverage.parquet (statuses from src/status; place_coll from the gazetteer index, see `--gazetteer-index`, `--layers`)
 uv run om-ind validate catalog               # every values file and coverage.parquet against the schemas
 
 npm run dev                                  # the viewer on http://localhost:5181/, reading catalog/
@@ -88,6 +88,22 @@ npm run icons:sheet                          # contact sheet screenshots -> docs
 node brand/build-favicons.mjs                # brand/favicons/{oceanmetrics,mbon}/ incl. head.html to paste verbatim
 Rscript fixtures/ecoidx/build_iea_sd_fixtures.R ~/Github/noaa-iea/ecoidx   # the iea-sd cross-check
 ```
+
+## Matrix view
+
+Indicators are the rows and places the columns. Places are grouped by their **home gazetteer collection** (`place_coll` in
+`coverage.parquet`: the first of the place's collections in the gazetteer's `layers.json` order, else the values `coll`;
+build flags `--gazetteer-index <file|URL|none>` and `--layers <file|URL|none>`, `OM_OFFLINE=1` uses the cached copies
+under `cache/gazetteer/`). A place in two values collections (Pitcairn's EEZ: `places` and `mr_eez`) is one place; each
+cell reads the values file of its own coverage row. Each group says how many of its places are computed of the
+gazetteer's total and links to it. Opens on the sanctuaries; the other groups are chips. An indicator with no value for
+any place on display is hidden.
+Hash keys: `colls` (comma list of groups; none = the sanctuaries, every group while searching), `q`, `vocab`, `leads`,
+`depth`, `cell` (an open drawer: `place|indicator`), `axes=p` (places as rows; the old `axes=t` reads as the default),
+`empty=1` (show the indicators without values), `xp` and `xi` (removed places and indicators), `ai` (added indicators).
+A cell is a value with its status and trend glyphs, **not computed yet** (open it: compute it now in erddap-places, or
+ask for it by a prefilled issue), **no data here** (the indicator has a values file for this place's collection, with
+nothing for the place), or a dash (**not offered** for this kind of place).
 
 ## Report view
 

@@ -1,6 +1,6 @@
 // the Matrix's selection as a report spec ("Report" button of the Matrix toolbar). the Matrix keeps what it shows as
 // collection chips, a search, removed places and indicators, and the leads-only switch; the report keeps rules.
-import { DEFAULT_SPEC, matchIndicators } from '../../../../src/report/spec.ts'
+import { DEFAULT_SPEC, expandPlaces, matchIndicators } from '../../../../src/report/spec.ts'
 import type { ReportSpec } from '../../../../src/report/spec.ts'
 import type { Indicator } from '../data.ts'
 import type { ViewState } from '../hash.ts'
@@ -23,6 +23,13 @@ export function matrixToSpec(view: MatrixSelection, ctx: { idx: CoverageIndex; i
   const places: ReportSpec['places'] = searched
     ? { include: shown.length ? shown.map(p => p.id) : ['none'], exclude: [], context: false }
     : { include: view.colls.length ? view.colls.map(c => `coll:${c}`) : ['*'], exclude: [...new Set(view.hidePlaces)], context: false }
+  // `coll:<slug>` also matches a place read from a values collection of that name (an old link's meaning), so a place the
+  // Matrix groups elsewhere (Pitcairn: under mr_eez, with rows in `places`) is excluded when it is not on display
+  if (!searched) {
+    const on = new Set(shown.map(p => p.id))
+    const stray = expandPlaces(places, ctx.idx.places).map(p => p.id).filter(id => !on.has(id))
+    places.exclude = [...new Set([...places.exclude, ...stray])]
+  }
   const series = [...new Set(ctx.indicators.map(i => i.series))]
   const include = view.leads ? ['*', ...view.addInds] : series.map(s => `series:${s}:*`)
   const held = new Set(include.flatMap(r => matchIndicators(r, ctx.indicators)).map(i => i.id))

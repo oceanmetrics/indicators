@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { CoverageRow } from '../../../src/coverage/build.ts'
 import type { Indicator, Vocab, VocabId } from './data.ts'
 import {
-  addableIndicators, cellAria, cellModel, classText, groupColumns, groupRows, hiddenPlaces, indexCoverage, matrixStats, orderColls, pickRow, valueText,
+  addableIndicators, cellAria, computedOf, cellModel, classText, groupColumns, groupRows, hiddenPlaces, indexCoverage, matrixStats, orderGroups, pickRow,
+  shortPlaceName, shownGroups, valueText, valuesCollOf, withValues,
 } from './matrix.ts'
 
 // small synthetic manifest and coverage: one rule per test, exact outputs
@@ -86,7 +87,33 @@ describe('cellModel', () => {
   it('no values for the collection and another producer: not applicable', () => {
     const sdg = ind({ id: 'sdg', producer: { name: 'places/proto/eez_indicators' }, collections: [{ coll: 'mr_eez', places: 1, rows: 1, path: 'p' }] })
     const m = cellModel(sdg, place, null)
-    expect([m.kind, m.stateIcon]).toEqual(['na', 'cell-na'])
+    expect([m.kind, m.stateIcon]).toEqual(['na', null])
+  })
+  it('a place held by two values collections has no data when either has values for the indicator, else on the fly', () => {
+    // Pitcairn: grouped under mr_eez, rows in both places and mr_eez
+    const pitcairn = { id: 'MRGID:8439', name: 'Pitcairn', coll: 'mr_eez', valuesColls: ['mr_eez', 'places'] }
+    expect(cellModel(sst, pitcairn, null).kind).toBe('nodata')   // sst has values in `places`, which holds Pitcairn
+    const sdg = ind({ id: 'sdg', producer: { name: 'other' }, collections: [{ coll: 'mr_eez', places: 1, rows: 1, path: 'p' }] })
+    expect(cellModel(sdg, pitcairn, null).kind).toBe('nodata')
+    expect(cellModel(sdg, { ...pitcairn, valuesColls: ['places'] }, null).kind).toBe('na')
+  })
+  it('the group is not the values collection: a reserve grouped under its gazetteer collection has no values in `places`', () => {
+    const nerrs = { id: 'NERRS:WEL', name: 'Wells', coll: 'noaa_nerrs', valuesColls: ['noaa_nerrs'] }
+    expect(cellModel(sst, nerrs, null).kind).toBe('live')   // sst has values in `places`, not in noaa_nerrs
+  })
+})
+
+describe('valuesCollOf: the values file comes from the coverage row, never from the group', () => {
+  const sst = ind({ id: 'sst', collections: [{ coll: 'places', places: 2, rows: 4, path: 'a' }, { coll: 'noaa_nerrs', places: 1, rows: 2, path: 'b' }] })
+  const pitcairn = { id: 'MRGID:8439', name: 'Pitcairn', coll: 'mr_eez', valuesColls: ['mr_eez', 'places'] }
+  it("the row's coll wins", () => {
+    expect(valuesCollOf(sst, pitcairn, row({ coll: 'places' }))).toBe('places')
+  })
+  it('without a row, the first collection holding the place that has values for the indicator', () => {
+    expect(valuesCollOf(sst, pitcairn, null)).toBe('places')
+  })
+  it('a place without valuesColls reads its group', () => {
+    expect(valuesCollOf(sst, { id: 'x', name: 'x', coll: 'noaa_nerrs' }, null)).toBe('noaa_nerrs')
   })
 })
 
@@ -103,10 +130,12 @@ describe('words', () => {
     expect(cellAria(sst, place, m)).toBe('Alpha, SST: 26.0 °C in 2020; above its own record; trend up.')
   })
   it('the aria label of every empty state names the state', () => {
-    expect(cellAria(sst, place, cellModel(sst, place, null))).toBe('Alpha, SST: no data.')
-    expect(cellAria(sst, { ...place, coll: 'mr_eez' }, cellModel(sst, { ...place, coll: 'mr_eez' }, null))).toBe('Alpha, SST: not computed yet; can be computed on the fly.')
+    expect(cellAria(sst, place, cellModel(sst, place, null))).toBe('Alpha, SST: no data here.')
+    expect(cellAria(sst, place, cellModel(sst, place, row({ last_value: null, why: 'gap' })))).toBe('Alpha, SST: no data here (gap).')
+    const eez = { ...place, coll: 'mr_eez', valuesColls: ['mr_eez'] }
+    expect(cellAria(sst, eez, cellModel(sst, eez, null))).toBe('Alpha, SST: not computed yet; open it to compute it or ask for it.')
     const sdg = ind({ id: 'sdg', short: 'SDG', producer: { name: 'other' }, collections: [] })
-    expect(cellAria(sdg, place, cellModel(sdg, place, null))).toBe('Alpha, SDG: not applicable.')
+    expect(cellAria(sdg, place, cellModel(sdg, place, null), 'National Marine Sanctuaries')).toBe('Alpha: SDG is not offered for National Marine Sanctuaries.')
   })
 })
 
@@ -187,7 +216,7 @@ describe('groupRows with hide', () => {
     row({ place_id: 'MRGID:9', place_name: 'Zed EEZ', coll: 'mr_eez' }),
   ])
   it('drops hidden places and a collection left empty', () => {
-    expect(groupRows(idx, [], '', ['NMS:A']).map(g => [g.coll, g.places.map(p => p.id)])).toEqual([['mr_eez', ['MRGID:9']], ['places', ['NMS:B']]])
+    expect(groupRows(idx, [], '', ['NMS:A']).map(g => [g.coll, g.places.map(p => p.id)])).toEqual([['places', ['NMS:B']], ['mr_eez', ['MRGID:9']]])
     expect(groupRows(idx, [], '', ['MRGID:9']).map(g => g.coll)).toEqual(['places'])
   })
 })
@@ -208,8 +237,8 @@ describe('groupRows', () => {
     row({ place_id: 'NMS:B', place_name: 'Bravo' }), row({ place_id: 'NMS:A', place_name: 'Alpha' }),
     row({ place_id: 'MRGID:9', place_name: 'Zed EEZ', coll: 'mr_eez' }),
   ]
-  const idx = indexCoverage(rows, [ind({ id: 'x' }), ind({ id: 'y', collections: [{ coll: 'mr_eez', places: 1, rows: 1, path: 'p' }] })])
-  it('collections follow the manifest order and places sort by name', () => {
+  const idx = indexCoverage(rows)
+  it('groups follow the group order (sanctuaries first) and places sort by name', () => {
     expect(groupRows(idx, [], '').map(g => [g.coll, g.places.map(p => p.name)])).toEqual([['places', ['Alpha', 'Bravo']], ['mr_eez', ['Zed EEZ']]])
   })
   it('chips filter to the chosen collections; none chosen means all', () => {
@@ -220,9 +249,102 @@ describe('groupRows', () => {
     expect(groupRows(idx, [], 'mrgid:9').map(g => g.coll)).toEqual(['mr_eez'])
     expect(groupRows(idx, [], 'nothing')).toEqual([])
   })
-  it('orderColls: manifest order first, unknown collections after, alphabetically', () => {
-    expect(orderColls(['b_unknown', 'mr_eez', 'places', 'a_unknown'], [ind({ id: 'x' }), ind({ id: 'y', collections: [{ coll: 'mr_eez', places: 1, rows: 1, path: 'p' }] })]))
-      .toEqual(['places', 'mr_eez', 'a_unknown', 'b_unknown'])
+  it('orderGroups: the group order first, unknown groups after, alphabetically', () => {
+    expect(orderGroups(['b_unknown', 'mr_eez', 'places', 'noaa_nerrs', 'a_unknown', 'noaa_sanctuaries'])).toEqual(['noaa_sanctuaries', 'places', 'noaa_nerrs', 'mr_eez', 'a_unknown', 'b_unknown'])
+  })
+})
+
+describe('place groups: place_coll, not the values collection', () => {
+  // Pitcairn has rows in two values collections and one home; a coverage table without place_coll groups by coll
+  const rows = [
+    row({ place_id: 'MRGID:8439', place_name: 'Pitcairn', coll: 'places', place_coll: 'mr_eez', indicator: 'sst', last_value: 25 }),
+    row({ place_id: 'MRGID:8439', place_name: 'Pitcairn', coll: 'mr_eez', place_coll: 'mr_eez', indicator: 'obis', last_value: 9 }),
+    row({ place_id: 'NERRS:WEL', place_name: 'Wells', coll: 'noaa_nerrs', place_coll: 'noaa_nerrs', indicator: 'sst', last_value: 11 }),
+    row({ place_id: 'NMS:A', place_name: 'Alpha', coll: 'places', place_coll: 'places', indicator: 'sst', last_value: 26 }),
+  ]
+  const idx = indexCoverage(rows)
+  it('one place per id, in its home group, with every values collection that holds it', () => {
+    expect(idx.places.map(p => [p.id, p.coll, p.valuesColls])).toEqual([
+      ['MRGID:8439', 'mr_eez', ['mr_eez', 'places']], ['NERRS:WEL', 'noaa_nerrs', ['noaa_nerrs']], ['NMS:A', 'places', ['places']],
+    ])
+    expect(idx.colls).toEqual(['places', 'noaa_nerrs', 'mr_eez'])
+  })
+  it('a cell reads the row of whichever values collection has it (the index is keyed by place and indicator)', () => {
+    const sst = ind({ id: 'sst' }), obis = ind({ id: 'obis', collections: [{ coll: 'mr_eez', places: 1, rows: 1, path: 'p' }] })
+    expect(pickRow(idx, 'MRGID:8439', sst)?.coll).toBe('places')
+    expect(pickRow(idx, 'MRGID:8439', obis)?.coll).toBe('mr_eez')
+  })
+  it('a coverage table built before place_coll groups by coll', () => {
+    const old = indexCoverage([row({ place_id: 'NMS:A', coll: 'places' }), row({ place_id: 'MRGID:9', coll: 'mr_eez' })])
+    expect(old.places.map(p => [p.id, p.coll])).toEqual([['NMS:A', 'places'], ['MRGID:9', 'mr_eez']])
+  })
+  it('groupRows lists a place once, in its home group', () => {
+    expect(groupRows(idx, [], '').map(g => [g.coll, g.places.map(p => p.id)])).toEqual([['places', ['NMS:A']], ['noaa_nerrs', ['NERRS:WEL']], ['mr_eez', ['MRGID:8439']]])
+  })
+})
+
+describe('shownGroups: the sanctuaries by default', () => {
+  const avail = ['places', 'noaa_nerrs', 'mr_eez']
+  it('none asked: the default groups that have places', () => {
+    expect(shownGroups(avail, [], '')).toEqual(['places'])
+    expect(shownGroups(['noaa_sanctuaries', 'places', 'mr_eez'], [], '')).toEqual(['noaa_sanctuaries', 'places'])
+  })
+  it('none asked and no default group in the catalog: every group', () => {
+    expect(shownGroups(['noaa_nerrs', 'mr_eez'], [], '')).toEqual(['noaa_nerrs', 'mr_eez'])
+  })
+  it('a search with none asked looks in every group', () => {
+    expect(shownGroups(avail, [], 'wel')).toEqual(avail)
+    expect(shownGroups(avail, [], '  ')).toEqual(['places'])
+  })
+  it('the groups asked for win', () => {
+    expect(shownGroups(avail, ['mr_eez', 'places'], 'wel')).toEqual(['mr_eez', 'places'])
+  })
+})
+
+describe('withValues: an indicator with no value for any place on display is hidden', () => {
+  const a = ind({ id: 'a' }), b = ind({ id: 'b', category: { onms: 'drivers' } }), c = ind({ id: 'c', category: { onms: 'drivers' } })
+  const idx = indexCoverage([
+    row({ place_id: 'NMS:A', indicator: 'a' }), row({ place_id: 'NMS:A', indicator: 'b', last_value: null, why: 'gap' }),
+    row({ place_id: 'NMS:B', place_name: 'B', indicator: 'c', coll: 'mr_eez' }),
+  ])
+  const cols = groupColumns([a, b, c], vocabs(), 'onms', false)
+  const ids = (g: ReturnType<typeof withValues>) => g.map(x => [x.term.id, x.indicators.map(i => i.id)])
+  it('keeps only the indicators some displayed place has a value for; a group left empty goes', () => {
+    expect(ids(withValues(cols, groupRows(idx, ['places'], ''), idx))).toEqual([['water-quality', ['a']]])
+    expect(ids(withValues(cols, groupRows(idx, [], ''), idx))).toEqual([['drivers', ['c']], ['water-quality', ['a']]])
+  })
+  it('keep holds what the reader added by hand', () => {
+    expect(ids(withValues(cols, groupRows(idx, ['places'], ''), idx, ['b']))).toEqual([['drivers', ['b']], ['water-quality', ['a']]])
+  })
+  it('no place on display: nothing has a value', () => {
+    expect(withValues(cols, [], idx)).toEqual([])
+  })
+})
+
+describe('computedOf', () => {
+  it('says computed of the gazetteer total, or the count alone before layers.json has loaded', () => {
+    expect(computedOf(1, 30)).toBe('1 of 30')
+    expect(computedOf(19, null)).toBe('19')
+  })
+})
+
+describe('shortPlaceName', () => {
+  it.each([
+    ['Florida Keys National Marine Sanctuary', 'Florida Keys'],
+    ["Gray's Reef National Marine Sanctuary", "Gray's Reef"],
+    ['Mallows Bay-Potomac River National Marine Sanctuary', 'Mallows Bay-Potomac River'],
+    ['National Marine Sanctuary of American Samoa', 'American Samoa'],
+    ['Papahānaumokuākea Marine National Monument', 'Papahānaumokuākea MNM'],
+    ['British Exclusive Economic Zone (Pitcairn)', 'British EEZ (Pitcairn)'],
+    ['Monégasque Exclusive Economic Zone', 'Monégasque EEZ'],
+    ['Wells National Estuarine Research Reserve', 'Wells'],
+    ['Channel Islands National Marine Sanctuary - Santa Barbara Section', 'Channel Islands - Santa Barbara Section'],
+    ['Tortugas Ecological Reserve', 'Tortugas Ecological Reserve'],
+    ['Wells', 'Wells'],
+    ['High Seas', 'High Seas'],
+  ])('%s is %s', (name, short) => { expect(shortPlaceName(name)).toBe(short) })
+  it('a name that would come out empty is kept whole', () => {
+    expect(shortPlaceName(' National Marine Sanctuary')).toBe(' National Marine Sanctuary')
   })
 })
 

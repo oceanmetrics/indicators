@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { absoluteBase, collTitle, layerTitles, loadCatalog, normalizeRow, resolveDataBase } from './data.ts'
+import { absoluteBase, collTitle, gazetteerHref, gazetteerPlaceHref, loadCatalog, normalizeRow, parseLayers, resolveDataBase } from './data.ts'
 
 describe('resolveDataBase', () => {
   it('?data= wins and always ends in a slash', () => {
@@ -17,18 +17,31 @@ describe('resolveDataBase', () => {
 })
 
 describe('collection titles', () => {
-  it('the short built-in name wins, then the gazetteer title, then the slug', () => {
-    const g = layerTitles({ layers: [{ slug: 'mr_eez', title: 'Marine Regions EEZ' }, { slug: 'x', collection: 'noaa_sanctuaries', title: 'NOAA sanctuaries' }, { slug: 'no_title' }] })
-    expect(g).toEqual({ mr_eez: 'Marine Regions EEZ', noaa_sanctuaries: 'NOAA sanctuaries' })
+  const g = parseLayers({ layers: [
+    { slug: 'mr_eez', title: 'Marine Regions EEZ', n: 285 }, { slug: 'x', collection: 'noaa_nerrs', title: 'NOAA National Estuarine Research Reserves', n: 30 },
+    { slug: 'no_title' }, { slug: 'boem_wind_leases', title: 'BOEM offshore wind lease outlines', n: 52 },
+  ] })
+  it('the short group title wins, then the gazetteer title, then the slug', () => {
     expect(collTitle('mr_eez', g)).toBe('Exclusive Economic Zones')
     expect(collTitle('mr_high_seas')).toBe('High seas')
-    expect(collTitle('noaa_sanctuaries', g)).toBe('NOAA sanctuaries')
-    expect(collTitle('places', g)).toBe('Sanctuaries and other places')
+    expect(collTitle('noaa_nerrs', g)).toBe('National Estuarine Research Reserves')
+    expect(collTitle('noaa_sanctuaries')).toBe('National Marine Sanctuaries')
+    expect(collTitle('places')).toBe('Sanctuaries and Tortugas reserve')
+    expect(collTitle('boem_wind_leases', g)).toBe('BOEM offshore wind lease outlines')
     expect(collTitle('mystery', g)).toBe('mystery')
   })
-  it('unreadable layers.json gives no titles', () => {
-    expect(layerTitles(null)).toEqual({})
-    expect(layerTitles({ layers: 'nope' })).toEqual({})
+  it('layers.json gives the title and the number of places of each collection', () => {
+    expect(g.noaa_nerrs).toEqual({ title: 'NOAA National Estuarine Research Reserves', n: 30 })
+    expect(g.no_title).toEqual({ title: 'no_title', n: null })
+  })
+  it('unreadable layers.json gives no layers', () => {
+    expect(parseLayers(null)).toEqual({})
+    expect(parseLayers({ layers: 'nope' })).toEqual({})
+  })
+  it('links to the gazetteer: a collection, and a place in it with its colons kept', () => {
+    expect(gazetteerHref('noaa_nerrs')).toBe('https://oceanmetrics.io/places/?layers=noaa_nerrs')
+    expect(gazetteerPlaceHref('noaa_nerrs', 'NERRS:WEL')).toBe('https://oceanmetrics.io/places/?layers=noaa_nerrs&place=NERRS:WEL')
+    expect(gazetteerPlaceHref('boem_wind_leases', 'BOEM:OCS-A 0506')).toBe('https://oceanmetrics.io/places/?layers=boem_wind_leases&place=BOEM:OCS-A%200506')
   })
 })
 

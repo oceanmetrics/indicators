@@ -1,18 +1,21 @@
 <script lang="ts">
-  // the Matrix's controls: collections and a search over place names, the vocabulary the columns group by, the
-  // leads-only toggle, the flip of rows and columns, the depth switch, and the "Add or restore" menu for what was
-  // removed from the display or lies beyond the leads. all state lives in `view` (the URL hash).
+  // the Matrix's controls: place groups (gazetteer collections, each with its computed of total) and a search over place
+  // names, the vocabulary the indicators group by, the leads-only and show-empty toggles, the swap of rows and columns,
+  // the depth switch, and the "Add or restore" menu for what was removed from the display or lies beyond the leads.
+  // all state lives in `view` (the URL hash).
   import { Button, Toggle } from '@marinebon/ui'
   import { Icon } from '../../../src/icons/index.ts'
   import type { Indicator, VocabId } from './data.ts'
   import { DEPTHS } from './hash.ts'
   import type { Depth, ViewState } from './hash.ts'
-  import { addableIndicators } from './matrix.ts'
+  import { addableIndicators, computedOf } from './matrix.ts'
   import type { Place } from './matrix.ts'
 
   interface Props {
     view: ViewState
-    colls: { id: string; title: string; places: number }[]
+    colls: { id: string; title: string; computed: number; total: number | null }[]
+    /** the groups on display (view.colls, or the default when none is asked for) */
+    groups: string[]
     onchange: (patch: Partial<ViewState>) => void
     /** the manifest's indicators, and the ids on display now */
     indicators?: Indicator[]
@@ -22,7 +25,7 @@
     /** the Report view opened with what the Matrix shows now (matrixToSpec) */
     reportHref?: string
   }
-  let { view, colls, onchange, indicators = [], shown = new Set(), removedPlaces = [], reportHref = '' }: Props = $props()
+  let { view, colls, groups, onchange, indicators = [], shown = new Set(), removedPlaces = [], reportHref = '' }: Props = $props()
 
   const VOCABS: { id: VocabId; label: string }[] = [
     { id: 'onms', label: 'ONMS sections' },
@@ -35,8 +38,11 @@
     dive: { label: 'Diver', icon: 'depth-dive', note: 'Adds the values file and the status method. Open a cell for the configuration and a query.' },
   }
 
-  const toggleColl = (id: string) =>
-    onchange({ colls: view.colls.includes(id) ? view.colls.filter(c => c !== id) : [...view.colls, id] })
+  // the groups on display are the starting point; the last one cannot be switched off (no groups = the default again)
+  function toggleColl(id: string) {
+    const next = groups.includes(id) ? groups.filter(c => c !== id) : [...groups, id]
+    if (next.length) onchange({ colls: next })
+  }
 
   // ---- add or restore ----
   let menuOpen = $state(false)
@@ -62,11 +68,11 @@
 
 <section class="controls" aria-label="Matrix controls">
   <div class="group" role="group" aria-label="Places">
-    <span class="mbon-label">Places</span>
+    <span class="mbon-label">Place groups</span>
     <div class="row">
       {#each colls as c (c.id)}
-        <Button variant="quiet" size="sm" pressed={view.colls.includes(c.id)} onclick={() => toggleColl(c.id)}>
-          {c.title} <span class="n">{c.places}</span>
+        <Button variant="quiet" size="sm" pressed={groups.includes(c.id)} onclick={() => toggleColl(c.id)}>
+          {c.title} <span class="n">{computedOf(c.computed, c.total)}</span>
         </Button>
       {/each}
       <label class="search">
@@ -84,8 +90,9 @@
         <Button variant="quiet" size="sm" pressed={view.vocab === v.id} onclick={() => onchange({ vocab: v.id })}>{v.label}</Button>
       {/each}
       <Toggle checked={view.leads} label="Leads only" onchange={(v: boolean) => onchange({ leads: v })} />
-      <Button variant="quiet" size="sm" pressed={view.axes === 'indicators'} onclick={() => onchange({ axes: view.axes === 'indicators' ? 'places' : 'indicators' })}>
-        Indicators as rows
+      <Toggle checked={view.showEmpty} label="Show indicators without values here" onchange={(v: boolean) => onchange({ showEmpty: v })} />
+      <Button variant="quiet" size="sm" pressed={view.axes === 'places'} onclick={() => onchange({ axes: view.axes === 'places' ? 'indicators' : 'places' })}>
+        Places as rows
       </Button>
     </div>
   </div>

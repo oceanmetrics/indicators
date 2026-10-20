@@ -75,21 +75,43 @@ describe('the Place view hash', () => {
     expect(matrixHref(null, { vocab: 'eov', depth: 'dive', coll: 'places' })).toBe('#colls=places&vocab=eov&depth=dive')
     expect(matrixHref(place, { vocab: 'onms', depth: 'swim', coll: null })).toBe('#')
   })
+  it('matrixHref with a cell reopens the drawer on it, from the state it came from or from a cold permalink', () => {
+    const cell = { place: 'NMS:CINMS', indicator: 'erddap:dhw_5km:CRW_SST:mean' }
+    const came: ViewState = { ...DEFAULT_STATE, colls: ['mr_eez'], axes: 'places' }
+    expect(matrixHref(came, { vocab: 'onms', depth: 'swim', coll: 'places' }, cell)).toBe('#colls=mr_eez&cell=NMS:CINMS|erddap:dhw_5km:CRW_SST:mean&axes=p')
+    expect(matrixHref(null, { vocab: 'onms', depth: 'swim', coll: 'places' }, cell)).toBe('#colls=places&cell=NMS:CINMS|erddap:dhw_5km:CRW_SST:mean')
+  })
 })
 
 
 describe('the Matrix edit keys (flip, remove, add)', () => {
-  it('writes axes, xp, xi and ai after the older keys, and round-trips them', () => {
-    const s: ViewState = { ...DEFAULT_STATE, colls: ['places'], axes: 'indicators', hidePlaces: ['NMS:TBNMS', 'NMS:LONMS'], hideInds: ['sdg:ER_MRN_MPA'], addInds: ['erddap:dhw_5km:CRW_DHW:mean'] }
-    expect(serializeHash(s)).toBe('colls=places&axes=t&xp=NMS:TBNMS,NMS:LONMS&xi=sdg:ER_MRN_MPA&ai=erddap:dhw_5km:CRW_DHW:mean')
+  it('writes axes, empty, xp, xi and ai after the older keys, and round-trips them', () => {
+    const s: ViewState = { ...DEFAULT_STATE, colls: ['noaa_nerrs'], axes: 'places', showEmpty: true, hidePlaces: ['NMS:TBNMS', 'NMS:LONMS'], hideInds: ['sdg:ER_MRN_MPA'], addInds: ['erddap:dhw_5km:CRW_DHW:mean'] }
+    expect(serializeHash(s)).toBe('colls=noaa_nerrs&axes=p&empty=1&xp=NMS:TBNMS,NMS:LONMS&xi=sdg:ER_MRN_MPA&ai=erddap:dhw_5km:CRW_DHW:mean')
     expect(parseHash('#' + serializeHash(s))).toEqual(s)
   })
-  it('places in rows is the default and leaves axes out; an unknown axes value is the default', () => {
-    expect(serializeHash({ ...DEFAULT_STATE, axes: 'places' })).toBe('')
-    expect(parseHash('#axes=sideways').axes).toBe('places')
+  it('indicators in rows is the default and leaves axes out; an unknown axes value is the default', () => {
+    expect(DEFAULT_STATE.axes).toBe('indicators')
+    expect(serializeHash({ ...DEFAULT_STATE, axes: 'indicators' })).toBe('')
+    expect(parseHash('#axes=sideways').axes).toBe('indicators')
+    expect(parseHash('#axes=p').axes).toBe('places')
+  })
+  it('the old axes=t (the flipped matrix) reads as the default and is dropped on the next write', () => {
+    const old = parseHash('#colls=places&axes=t&xp=NMS:TBNMS')
+    expect(old.axes).toBe('indicators')
+    expect(serializeHash(old)).toBe('colls=places&xp=NMS:TBNMS')
+  })
+  it('empty=1 shows the indicators without values; it is absent by default and for any other value', () => {
+    expect(parseHash('#empty=1').showEmpty).toBe(true)
+    expect(parseHash('#empty=0').showEmpty).toBe(false)
+    expect(parseHash('').showEmpty).toBe(false)
+    expect(serializeHash({ ...DEFAULT_STATE, showEmpty: false })).toBe('')
+  })
+  it('the old colls= of a values collection (colls=places,mr_eez) still reads as groups', () => {
+    expect(parseHash('#colls=places,mr_eez').colls).toEqual(['places', 'mr_eez'])
   })
   it('the edit keys do not leak into a Place or a Map hash', () => {
-    const edits = { axes: 'indicators' as const, hidePlaces: ['a:b'], hideInds: ['c:d'], addInds: ['e:f'] }
+    const edits = { axes: 'places' as const, showEmpty: true, hidePlaces: ['a:b'], hideInds: ['c:d'], addInds: ['e:f'] }
     expect(serializeHash({ ...DEFAULT_STATE, ...edits, view: 'place', place: 'NMS:CINMS' })).toBe('view=place&place=NMS:CINMS')
     expect(serializeHash({ ...DEFAULT_STATE, ...edits, view: 'map', ind: 'x:y' })).toBe('view=map&ind=x:y')
   })

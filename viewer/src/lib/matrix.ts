@@ -5,41 +5,85 @@ import { fmt, periodLabel } from '../../../src/status/index.ts'
 import type { Grain, Status, Trend } from '../../../src/status/index.ts'
 import { shownGrainOrder } from '../../../src/coverage/build.ts'
 import type { CoverageRow } from '../../../src/coverage/build.ts'
+import { DEFAULT_GROUPS, GROUP_ORDER } from './data.ts'
 import type { Indicator, Term, VocabId, Vocab } from './data.ts'
 
+/**
+ * a place. `coll` is its group: its home gazetteer collection (coverage `place_coll`, else the values collection).
+ * `valuesColls` are the values collections that hold rows of it (a place can be in two: Pitcairn's EEZ is in `places`
+ * and `mr_eez`); a values file is read from the coverage row of the indicator, never from the group.
+ */
 export interface Place {
   id: string
   name: string
   coll: string
+  valuesColls?: string[]
 }
+
+/** the values collections that hold rows of a place */
+export const valuesCollsOf = (p: Place): string[] => (p.valuesColls?.length ? p.valuesColls : [p.coll])
 
 export interface CoverageIndex {
   rows: Map<string, Map<Grain, CoverageRow>>
   places: Place[]
-  /** the collections that have coverage, in the order of `orderColls` */
+  /** the groups that have coverage, in the order of `orderGroups` */
   colls: string[]
 }
 
 const key = (placeId: string, indicator: string) => `${placeId}\u0000${indicator}`
 
-/** collections in the order the manifest first lists them (the sanctuaries before the EEZs), then alphabetically */
-export function orderColls(colls: Iterable<string>, indicators: Indicator[]): string[] {
-  const rank = new Map<string, number>()
-  for (const ind of indicators) for (const c of ind.collections) if (!rank.has(c.coll)) rank.set(c.coll, rank.size)
+/** groups in the order the Matrix lists them (GROUP_ORDER: sanctuaries first), then unknown ones alphabetically */
+export function orderGroups(colls: Iterable<string>): string[] {
+  const rank = new Map(GROUP_ORDER.map((c, n) => [c, n]))
   return [...new Set(colls)].sort((a, b) => (rank.get(a) ?? 1e9) - (rank.get(b) ?? 1e9) || a.localeCompare(b))
 }
 
-export function indexCoverage(rows: CoverageRow[], indicators: Indicator[] = []): CoverageIndex {
+/** one place per place_id however many values collections hold it; its group is the first row's `place_coll ?? coll` */
+export function indexCoverage(rows: CoverageRow[]): CoverageIndex {
   const byKey = new Map<string, Map<Grain, CoverageRow>>()
   const places = new Map<string, Place>()
   for (const r of rows) {
     const k = key(r.place_id, r.indicator)
     if (!byKey.has(k)) byKey.set(k, new Map())
     byKey.get(k)!.set(r.time_grain, r)
-    if (!places.has(r.place_id)) places.set(r.place_id, { id: r.place_id, name: r.place_name || r.place_id, coll: r.coll })
+    const have = places.get(r.place_id)
+    if (!have) places.set(r.place_id, { id: r.place_id, name: r.place_name || r.place_id, coll: r.place_coll || r.coll, valuesColls: [r.coll] })
+    else if (!have.valuesColls!.includes(r.coll)) have.valuesColls!.push(r.coll)
   }
   const list = [...places.values()]
-  return { rows: byKey, places: list, colls: orderColls(list.map(p => p.coll), indicators) }
+  for (const p of list) p.valuesColls!.sort()
+  return { rows: byKey, places: list, colls: orderGroups(list.map(p => p.coll)) }
+}
+
+/**
+ * the groups the Matrix shows: the ones asked for (`colls`); none asked and a search typed = every group (a search
+ * finds a place wherever it is); none asked = the default groups that have places (the sanctuaries), else every group.
+ */
+export function shownGroups(available: string[], colls: string[], q: string): string[] {
+  if (colls.length) return colls
+  if (q.trim()) return available
+  const dflt = available.filter(c => DEFAULT_GROUPS.includes(c))
+  return dflt.length ? dflt : available
+}
+
+/** "19 of 20" (computed of the gazetteer's total), or just "19" while layers.json has not loaded */
+export const computedOf = (computed: number, total: number | null) => (total == null ? String(computed) : `${computed} of ${total}`)
+
+/**
+ * a place's short name for a column header: "Florida Keys National Marine Sanctuary" is "Florida Keys", "National
+ * Marine Sanctuary of American Samoa" is "American Samoa", "... Marine National Monument" is "... MNM",
+ * "... Exclusive Economic Zone" is "... EEZ", "... National Estuarine Research Reserve" drops the suffix. the full
+ * name stays in the header's title and accessible name; a name that would come out empty is kept whole.
+ */
+export function shortPlaceName(name: string): string {
+  const short = name
+    .replace(/^National Marine Sanctuary of /, '')
+    .replace(/ National Marine Sanctuary(?= - |$)/, '')
+    .replace(/ National Estuarine Research Reserve(?= - |$)/, '')
+    .replace(/ Marine National Monument(?= - |$)/, ' MNM')
+    .replace(/ Exclusive Economic Zone\b/, ' EEZ')
+    .trim()
+  return short || name
 }
 
 /**
@@ -78,10 +122,18 @@ export interface CellModel {
   reason: string | null
 }
 
-/** does the manifest list values for this indicator in the place's collection? */
-export const hasValues = (ind: Indicator, coll: string) => ind.collections.some(c => c.coll === coll)
+/** does the manifest list values for this indicator in a values collection that holds the place? */
+export const hasValues = (ind: Indicator, place: Place) => valuesCollsOf(place).some(v => ind.collections.some(c => c.coll === v))
 
-/** the producer that can compute an indicator in the browser later (erddap-places) */
+/**
+ * the values collection to read for a place and indicator: the coverage row's, else the first collection holding the
+ * place that has values for the indicator, else the group
+ */
+export function valuesCollOf(ind: Indicator, place: Place, row: Pick<CoverageRow, 'coll'> | null): string {
+  return row?.coll ?? valuesCollsOf(place).find(v => ind.collections.some(c => c.coll === v)) ?? place.coll
+}
+
+/** the producer that can compute an indicator in the browser (erddap-places) */
 export const isLiveProducer = (ind: Indicator) => ind.producer.name === 'erddap-places'
 
 export function cellModel(ind: Indicator, place: Place, row: CoverageRow | null): CellModel {
@@ -97,9 +149,9 @@ export function cellModel(ind: Indicator, place: Place, row: CoverageRow | null)
       reason: null,
     }
   }
-  if (hasValues(ind, place.coll)) return { kind: 'nodata', row, statusIcon: null, trendIcon: null, stateIcon: 'cell-na', reason: row?.why ?? null }
+  if (hasValues(ind, place)) return { kind: 'nodata', row, statusIcon: null, trendIcon: null, stateIcon: 'cell-na', reason: row?.why ?? null }
   if (isLiveProducer(ind)) return { kind: 'live', row, statusIcon: null, trendIcon: null, stateIcon: 'cell-live', reason: null }
-  return { kind: 'na', row, statusIcon: null, trendIcon: null, stateIcon: 'cell-na', reason: null }
+  return { kind: 'na', row, statusIcon: null, trendIcon: null, stateIcon: null, reason: null }
 }
 
 // ---- words ----
@@ -129,8 +181,14 @@ export function periodText(row: CoverageRow): string {
   return row.last_time ? periodLabel(row.last_time, row.time_grain) : ''
 }
 
-/** the button's accessible name: place, indicator, value and status in words, so nothing depends on colour */
-export function cellAria(ind: Indicator, place: Place, m: CellModel): string {
+/** what an empty cell says: it is not computed yet (but can be), has no data here, or is not offered for this kind of place */
+export const STATE_WORDS = { live: 'not computed yet', nodata: 'no data here', na: '\u2014' } as const
+
+/**
+ * the button's accessible name: place, indicator, value and status in words, so nothing depends on colour.
+ * `groupTitle` is the place's group, for a cell the indicator is not offered for.
+ */
+export function cellAria(ind: Indicator, place: Place, m: CellModel, groupTitle = place.coll): string {
   const head = `${place.name}, ${ind.short}`
   const r = m.row
   switch (m.kind) {
@@ -140,9 +198,9 @@ export function cellAria(ind: Indicator, place: Place, m: CellModel): string {
       return `${head}: ${valueText(ind, r!)} in ${periodText(r!)}; ${status}; ${trend}.`
     }
     case 'class': return `${head}: ${classText(ind, r!)} of the area in ${periodText(r!)}; categorical, no status.`
-    case 'nodata': return `${head}: no data${m.reason ? ` (${m.reason})` : ''}.`
-    case 'live': return `${head}: not computed yet; can be computed on the fly.`
-    default: return `${head}: not applicable.`
+    case 'nodata': return `${head}: ${STATE_WORDS.nodata}${m.reason ? ` (${m.reason})` : ''}.`
+    case 'live': return `${head}: ${STATE_WORDS.live}; open it to compute it or ask for it.`
+    default: return `${place.name}: ${ind.short} is not offered for ${groupTitle}.`
   }
 }
 
@@ -183,6 +241,17 @@ export function groupColumns(
     if (inGroup.length) groups.push({ term, indicators: inGroup })
   }
   return groups
+}
+
+/**
+ * the indicators with no value for any place on display are left out (a column of empty cells says nothing); ids in
+ * `keep` stay (what the reader added by hand). groups left empty are dropped.
+ */
+export function withValues(cols: ColumnGroup[], rows: RowGroup[], idx: CoverageIndex, keep: Iterable<string> = []): ColumnGroup[] {
+  const kept = new Set(keep)
+  const places = rows.flatMap(g => g.places)
+  const has = (ind: Indicator) => kept.has(ind.id) || places.some(p => pickRow(idx, p.id, ind)?.last_value != null)
+  return cols.map(g => ({ term: g.term, indicators: g.indicators.filter(has) })).filter(g => g.indicators.length > 0)
 }
 
 export interface RowGroup {

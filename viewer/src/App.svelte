@@ -2,12 +2,12 @@
   import { onMount, tick } from 'svelte'
   import { Button, Header, Notice } from '@marinebon/ui'
   import { Icon } from '../../src/icons/index.ts'
-  import { loadCatalog, loadLayerTitles, resolveDataBase, collTitle } from './lib/data.ts'
-  import type { Catalog, Indicator } from './lib/data.ts'
+  import { loadCatalog, loadLayers, resolveDataBase, collTitle } from './lib/data.ts'
+  import type { Catalog, Indicator, Layers } from './lib/data.ts'
   import { DEFAULT_STATE, mapHref, matrixHref, parseHash, placeHref, reportHref, serializeHash } from './lib/hash.ts'
   import { DEFAULT_SPEC } from '../../src/report/spec.ts'
   import type { ViewState } from './lib/hash.ts'
-  import { cellModel, groupColumns, groupRows, hiddenPlaces, indexCoverage, matrixStats, pickRow } from './lib/matrix.ts'
+  import { cellModel, groupColumns, groupRows, hiddenPlaces, indexCoverage, matrixStats, pickRow, shownGroups, withValues } from './lib/matrix.ts'
   import { producerCredits } from './lib/delivery.ts'
   import { APP_NAME, TAGLINE, pageTitle } from './lib/brand/brand.ts'
   import type { Brand } from './lib/brand/brand.ts'
@@ -27,7 +27,7 @@
   let phase = $state<'loading' | 'done' | 'error'>('loading')
   let error = $state('')
   let catalog = $state.raw<Catalog | null>(null)
-  let gazetteer = $state<Record<string, string>>({})
+  let layers = $state<Layers>({})
   let loadMs = $state<number | null>(null)
   let view = $state<ViewState>(parseHash(typeof location !== 'undefined' ? location.hash : ''))
 
@@ -55,24 +55,30 @@
   let placeT0 = $state(0)
   let placeMs = $state<number | null>(null)
 
-  const title = (coll: string) => collTitle(coll, gazetteer)
+  const title = (coll: string) => collTitle(coll, layers)
+  const total = (coll: string) => layers[coll]?.n ?? null
   const patch = (p: Partial<ViewState>) => { view = { ...view, ...p } }
 
   // ---- derived tables ----
-  const idx = $derived(catalog ? indexCoverage(catalog.coverage, catalog.manifest.indicators) : null)
-  const cols = $derived(catalog
+  const idx = $derived(catalog ? indexCoverage(catalog.coverage) : null)
+  // the groups on display: those asked for, else the sanctuaries (every group while searching)
+  const groups = $derived(idx ? shownGroups(idx.colls, view.colls, view.q) : [])
+  const allCols = $derived(catalog
     ? groupColumns(catalog.manifest.indicators, catalog.manifest.vocabularies, view.vocab, view.leads, { add: view.addInds, hide: view.hideInds })
     : [])
-  const rows = $derived(idx ? groupRows(idx, view.colls, view.q, view.hidePlaces) : [])
+  const rows = $derived(idx ? groupRows(idx, groups, view.q, view.hidePlaces) : [])
+  // an indicator with no value for any place on display is hidden, unless the reader asks for it or added it by hand
+  const cols = $derived(idx && !view.showEmpty ? withValues(allCols, rows, idx, view.addInds) : allCols)
+  const nHidden = $derived(allCols.reduce((n, g) => n + g.indicators.length, 0) - cols.reduce((n, g) => n + g.indicators.length, 0))
   const shown = $derived(new Set(cols.flatMap(g => g.indicators.map(i => i.id))))
   const removedPlaces = $derived(idx ? hiddenPlaces(idx, view.hidePlaces) : [])
   const stats = $derived(idx ? matrixStats(rows, cols, idx) : null)
   const collChips = $derived(
-    idx ? idx.colls.map(c => ({ id: c, title: title(c), places: idx.places.filter(p => p.coll === c).length })) : [],
+    idx ? idx.colls.map(c => ({ id: c, title: title(c), computed: idx.places.filter(p => p.coll === c).length, total: total(c) })) : [],
   )
   const credits = $derived(catalog ? producerCredits(catalog.manifest) : [])
   // "Report" in the Matrix toolbar: what the Matrix shows now, as a report spec
-  const matrixReportHref = $derived(catalog && idx && view.view === 'matrix' ? reportHref(view, matrixToSpec(view, { idx, indicators: catalog.manifest.indicators })) : '')
+  const matrixReportHref = $derived(catalog && idx && view.view === 'matrix' ? reportHref(view, matrixToSpec({ ...view, colls: groups }, { idx, indicators: catalog.manifest.indicators })) : '')
   const opened = $derived.by(() => {
     if (!catalog || !idx || !view.cell) return null
     const ind: Indicator | undefined = catalog.manifest.indicators.find(i => i.id === view.cell!.indicator)
@@ -106,14 +112,14 @@
   }
 
   // ---- the page title: "<view> · Ocean Metrics Indicators" (or "· MBON") ----
-  const placeName = $derived(catalog && view.view === 'place' ? placeCoverage(catalog.coverage, view.place ?? '', view.coll).place?.name ?? view.place : null)
+  const placeName = $derived(catalog && view.view === 'place' ? placeCoverage(catalog.coverage, view.place ?? '').place?.name ?? view.place : null)
   $effect(() => { document.title = pageTitle(brand, view.view === 'place' ? (placeName ?? 'Place') : view.view === 'map' ? 'Map' : view.view === 'report' ? (view.spec.title ?? 'Report') : 'Matrix') })
   $effect(() => {
     if (view.view === 'place' && !PlaceView) import('./lib/PlaceView.svelte').then(m => { PlaceView = m.default })
     if (view.view === 'map' && !MapView) import('./lib/map/MapView.svelte').then(m => { MapView = m.default })
     if (view.view === 'report' && !ReportView) import('./lib/report/ReportView.svelte').then(m => { ReportView = m.default })
   })
-  const backHref = $derived(matrixHref(cameFrom, { vocab: view.vocab, depth: view.depth, coll: catalog && view.place ? placeCoverage(catalog.coverage, view.place, view.coll).place?.coll ?? null : null }))
+  const backHref = $derived(matrixHref(cameFrom, { vocab: view.vocab, depth: view.depth, coll: catalog && view.place ? placeCoverage(catalog.coverage, view.place).place?.coll ?? null : null }))
   const linkToPlace = (placeId: string, coll: string) => placeHref(view, placeId, coll)
 
   // ---- removing from the display ----
@@ -141,7 +147,7 @@
       catalog = await loadCatalog(resolveDataBase(location.search, import.meta.env.DEV))
       loadMs = Math.round(performance.now() - t0)
       phase = 'done'
-      loadLayerTitles().then(t => { gazetteer = t })
+      loadLayers().then(l => { layers = l })
     } catch (e) {
       error = e instanceof Error ? e.message : String(e)
       phase = 'error'
@@ -195,17 +201,18 @@
         <p class="status" role="status">Loading the report…</p>
       {/if}
     {:else if catalog && idx}
-      <Toolbar view={view} colls={collChips} onchange={patch} indicators={catalog.manifest.indicators} {shown} {removedPlaces} reportHref={matrixReportHref} />
+      <Toolbar view={view} colls={collChips} {groups} onchange={patch} indicators={catalog.manifest.indicators} {shown} {removedPlaces} reportHref={matrixReportHref} />
       <p class="summary" role="status" aria-live="polite">
         <Icon name="view-matrix" size={18} />
         <span>
           {stats?.places} places × {stats?.indicators} indicators ·
-          {stats?.withValue} of {stats?.cells} cells have a value · {stats?.withStatus} have a status
+          {stats?.withValue} of {stats?.cells} cells have a value · {stats?.withStatus} have a status{#if nHidden}
+          · {nHidden} {nHidden === 1 ? 'indicator' : 'indicators'} hidden: no value here{/if}
         </span>
       </p>
-      <Matrix {catalog} {idx} {cols} {rows} vocab={view.vocab} depth={view.depth} axes={view.axes} titles={title} open={view.cell} onopen={open}
-        onhide={hide} placeHref={linkToPlace} />
       <MatrixLegend vocab={view.vocab} />
+      <Matrix {catalog} {idx} {cols} {rows} vocab={view.vocab} depth={view.depth} axes={view.axes} titles={title} totals={total} open={view.cell} onopen={open}
+        onhide={hide} placeHref={linkToPlace} />
     {/if}
   </div>
 </main>

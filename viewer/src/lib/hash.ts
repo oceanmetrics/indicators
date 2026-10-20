@@ -1,10 +1,13 @@
 // the URL hash is the view's state, so every view is a permalink. keys: view (matrix | place | map; the matrix is the
 // default and leaves it out), and per view:
-// - Matrix: colls (comma list of collections), q (place search), vocab, leads, depth, cell (an open drawer:
-//   place_id|indicator), axes=t (indicators in rows, places in columns), xp and xi (places and indicators removed from
-//   the display), ai (indicators added beyond the leads).
-// - Place: place (a place_id), coll (its collection, only to tell apart a place_id that lives in two), method
-//   (iea-sd | names-pct | values: overrides every continuous card's status method), ind (an indicator to scroll to).
+// - Matrix: colls (comma list of place groups: gazetteer collections; none = the sanctuaries), q (place search), vocab,
+//   leads, depth, cell (an open drawer: place_id|indicator), axes=p (places in rows; absent = indicators in rows,
+//   places in columns; the old axes=t means the default and is dropped on the next write), empty=1 (also the
+//   indicators with no value for any place on display), xp and xi (places and indicators removed from the display),
+//   ai (indicators added beyond the leads).
+// - Place: place (a place_id), coll (its group; kept for old links, the place is found by its id), method
+//   (iea-sd | names-pct | values: overrides every continuous card's status method), ind (the indicator opened: its card
+//   comes first).
 // - Map: ind (the indicator), coll (the collection), color (value | departure | status | trend | record | class |
 //   share), t (the period shown: "2024", "2024-07"; none = the latest), cls (the class of `share`), grain (year |
 //   decade | month: the grain read; the indicator's status grain when absent), method.
@@ -21,7 +24,7 @@ export type Depth = 'skim' | 'swim' | 'dive'
 export const DEPTHS: Depth[] = ['skim', 'swim', 'dive']
 export type ViewKind = 'matrix' | 'place' | 'map' | 'report'
 export const METHOD_IDS: MethodId[] = ['iea-sd', 'names-pct', 'values']
-/** what the Matrix's rows are: places (the default) or indicators */
+/** what the Matrix's rows are: indicators (the default, places in columns) or places */
 export type Axes = 'places' | 'indicators'
 /** what the Map colours each place by */
 export type MapColor = 'value' | 'departure' | 'status' | 'trend' | 'record' | 'class' | 'share'
@@ -41,6 +44,8 @@ export interface ViewState {
   method: MethodId | null
   ind: string | null
   axes: Axes
+  /** also show the indicators with no value for any place on display */
+  showEmpty: boolean
   hidePlaces: string[]
   hideInds: string[]
   addInds: string[]
@@ -56,7 +61,7 @@ export interface ViewState {
 export const DEFAULT_STATE: ViewState = {
   view: 'matrix', colls: [], q: '', vocab: 'onms', leads: true, depth: 'swim', cell: null,
   place: null, coll: null, method: null, ind: null,
-  axes: 'places', hidePlaces: [], hideInds: [], addInds: [], color: null, t: null, cls: null, grain: null, spec: DEFAULT_SPEC,
+  axes: 'indicators', showEmpty: false, hidePlaces: [], hideInds: [], addInds: [], color: null, t: null, cls: null, grain: null, spec: DEFAULT_SPEC,
 }
 
 // keep the readable characters of ids (NMS:FKNMS, erddap:dhw_5km:CRW_SST:mean, a|b) out of percent-encoding
@@ -92,7 +97,9 @@ export function parseHash(hash: string): ViewState {
     coll: kv.get('coll') || null,
     method: METHOD_IDS.includes(method as MethodId) ? (method as MethodId) : null,
     ind: kv.get('ind') || null,
-    axes: kv.get('axes') === 't' ? 'indicators' : 'places',
+    // axes=t (before 2026-10-20) was the flipped matrix, which is now the default
+    axes: kv.get('axes') === 'p' ? 'places' : 'indicators',
+    showEmpty: kv.get('empty') === '1',
     hidePlaces: list('xp'),
     hideInds: list('xi'),
     addInds: list('ai'),
@@ -146,7 +153,8 @@ export function serializeHash(s: ViewState): string {
   if (!s.leads) parts.push('leads=0')
   if (s.depth !== DEFAULT_STATE.depth) parts.push('depth=' + s.depth)
   if (s.cell) parts.push('cell=' + enc(s.cell.place) + '|' + enc(s.cell.indicator))
-  if (s.axes === 'indicators') parts.push('axes=t')
+  if (s.axes === 'places') parts.push('axes=p')
+  if (s.showEmpty) parts.push('empty=1')
   if (s.hidePlaces.length) parts.push('xp=' + s.hidePlaces.map(enc).join(','))
   if (s.hideInds.length) parts.push('xi=' + s.hideInds.map(enc).join(','))
   if (s.addInds.length) parts.push('ai=' + s.addInds.map(enc).join(','))
@@ -170,11 +178,12 @@ export function placeHref(from: Pick<ViewState, 'vocab' | 'depth' | 'method'>, p
 
 /**
  * the href of "Back to the matrix": the Matrix state the reader came from when this session has it, else (a cold
- * permalink) the default matrix narrowed to the place's collection with the vocabulary and detail it is shown in.
+ * permalink) the default matrix narrowed to the place's group with the vocabulary and detail it is shown in. `cell`
+ * reopens the drawer on that cell, and focus returns to it.
  */
-export function matrixHref(came: ViewState | null, place: { vocab: VocabId; depth: Depth; coll: string | null }): string {
+export function matrixHref(came: ViewState | null, place: { vocab: VocabId; depth: Depth; coll: string | null }, cell: ViewState['cell'] = null): string {
   const s = came && came.view === 'matrix'
     ? came
     : { ...DEFAULT_STATE, colls: place.coll ? [place.coll] : [], vocab: place.vocab, depth: place.depth }
-  return '#' + serializeHash(s)
+  return '#' + serializeHash(cell ? { ...s, cell } : s)
 }

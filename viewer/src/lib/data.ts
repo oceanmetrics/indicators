@@ -120,35 +120,65 @@ export async function loadCatalog(base: string, fetchFn: typeof fetch = fetch): 
   return { base: abs, manifest, coverage: rows.map(normalizeRow) }
 }
 
-/** short built-in names for the collections the matrix knows; the gazetteer's layer titles are long ("... (200 NM)") and fill in the rest */
-export const COLL_FALLBACK: Record<string, string> = {
-  places: 'Sanctuaries and other places',
+/**
+ * short titles for the gazetteer collections places are grouped by (a place's `place_coll`); the gazetteer's own layer
+ * titles are long ("... (200 NM)") and fill in the rest. `places` is the gazetteer's collection of the 20 places
+ * erddap-places precomputes (18 sanctuaries, the Tortugas Ecological Reserve and Pitcairn's EEZ, which the index also
+ * lists under mr_eez and the grouping takes from there).
+ */
+export const GROUP_TITLES: Record<string, string> = {
+  noaa_sanctuaries: 'National Marine Sanctuaries',
+  places: 'Sanctuaries and Tortugas reserve',
+  noaa_nerrs: 'National Estuarine Research Reserves',
+  noaa_marine_monuments: 'Marine National Monuments',
   mr_eez: 'Exclusive Economic Zones',
   mr_high_seas: 'High seas',
+  mpa_inventory: 'Marine protected areas (NOAA inventory)',
+  protectedseas_mpa: 'Marine protected areas (ProtectedSeas)',
 }
-export const LAYERS_URL = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer/index/layers.json'
+/** the groups in the order the Matrix lists them: sanctuaries first, then the other protected areas, then the Marine Regions ones */
+export const GROUP_ORDER = ['noaa_sanctuaries', 'places', 'noaa_nerrs', 'noaa_marine_monuments', 'mpa_inventory', 'protectedseas_mpa', 'mr_eez', 'mr_high_seas']
+/** the groups the Matrix opens with (those that have computed places): the sanctuaries */
+export const DEFAULT_GROUPS = ['noaa_sanctuaries', 'places']
 
-/** gazetteer layers.json -> { slug: title }; anything unreadable gives {} */
-export function layerTitles(json: unknown): Record<string, string> {
-  const out: Record<string, string> = {}
-  const layers = (json as { layers?: { slug?: string; collection?: string; title?: string }[] } | null)?.layers
+export const LAYERS_URL = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer/index/layers.json'
+export const GAZETTEER_URL = 'https://oceanmetrics.io/places/'
+
+/** a gazetteer collection: its title and its number of places */
+export interface Layer {
+  title: string
+  n: number | null
+}
+export type Layers = Record<string, Layer>
+
+/** gazetteer layers.json -> { slug: { title, n } }; anything unreadable gives {} */
+export function parseLayers(json: unknown): Layers {
+  const out: Layers = {}
+  const layers = (json as { layers?: { slug?: string; collection?: string; title?: string; n?: number }[] } | null)?.layers
   if (!Array.isArray(layers)) return out
   for (const l of layers) {
     const slug = l.collection ?? l.slug
-    if (slug && l.title) out[slug] = l.title
+    if (slug) out[slug] = { title: l.title ?? slug, n: typeof l.n === 'number' ? l.n : null }
   }
   return out
 }
 
-export function collTitle(coll: string, gazetteer: Record<string, string> = {}): string {
-  return COLL_FALLBACK[coll] ?? gazetteer[coll] ?? coll
+/** a group's short title, else the gazetteer's title, else the slug */
+export function collTitle(coll: string, layers: Layers = {}): string {
+  return GROUP_TITLES[coll] ?? layers[coll]?.title ?? coll
 }
 
-/** optional: the gazetteer's layer titles; a network failure is not an error */
-export async function loadLayerTitles(fetchFn: typeof fetch = fetch): Promise<Record<string, string>> {
+/** a collection in the gazetteer's places browser */
+export const gazetteerHref = (coll: string) => `${GAZETTEER_URL}?layers=${encodeURIComponent(coll)}`
+/** a place in the gazetteer's places browser (the ids keep their colons, as the browser writes them) */
+export const gazetteerPlaceHref = (coll: string, placeId: string) =>
+  `${gazetteerHref(coll)}&place=${encodeURIComponent(placeId).replace(/%3A/gi, ':')}`
+
+/** optional: the gazetteer's layers (titles and counts); a network failure is not an error */
+export async function loadLayers(fetchFn: typeof fetch = fetch): Promise<Layers> {
   try {
     const r = await fetchFn(LAYERS_URL)
-    return r.ok ? layerTitles(await r.json()) : {}
+    return r.ok ? parseLayers(await r.json()) : {}
   } catch {
     return {}
   }

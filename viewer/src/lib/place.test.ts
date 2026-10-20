@@ -20,21 +20,19 @@ const VALS = [10, 12, 10, 12, 10, 12, 10, 12, 10, 12, 20, 20, 20, 20, 20]
 
 describe('a place’s coverage', () => {
   const cov = (o: Partial<CoverageRow>) => ({ place_id: 'P:1', place_name: 'Place One', coll: 'places', indicator: 'x:y', time_grain: 'year', ...o }) as CoverageRow
-  it('takes the rows of the place and, without coll, the first collection', () => {
-    const r = placeCoverage([cov({}), cov({ place_id: 'Q:2' }), cov({ coll: 'mr_eez', indicator: 'z:w' })], 'P:1')
-    expect(r.place).toEqual({ id: 'P:1', name: 'Place One', coll: 'places' })
-    expect(r.colls).toEqual(['places', 'mr_eez'])
-    expect(r.rows).toHaveLength(1)
+  it('takes every row of the place, from every values collection that holds it: one place, grouped by place_coll', () => {
+    const r = placeCoverage([cov({ place_coll: 'mr_eez' }), cov({ place_id: 'Q:2' }), cov({ coll: 'mr_eez', place_coll: 'mr_eez', indicator: 'z:w' })], 'P:1')
+    expect(r.place).toEqual({ id: 'P:1', name: 'Place One', coll: 'mr_eez', valuesColls: ['mr_eez', 'places'] })
+    expect(r.colls).toEqual(['mr_eez', 'places'])
+    expect(r.rows.map(x => x.indicator)).toEqual(['x:y', 'z:w'])
   })
-  it('coll picks the collection of a place_id that lives in two; an unknown coll falls back; an unknown place is null', () => {
-    const all = [cov({}), cov({ coll: 'mr_eez', indicator: 'z:w' })]
-    expect(placeCoverage(all, 'P:1', 'mr_eez').rows.map(r => r.indicator)).toEqual(['z:w'])
-    expect(placeCoverage(all, 'P:1', 'nope').place?.coll).toBe('places')
-    expect(placeCoverage(all, 'NOPE:1').place).toBeNull()
+  it('without place_coll (an older coverage table) the group is the values collection; an unknown place is null', () => {
+    expect(placeCoverage([cov({})], 'P:1').place?.coll).toBe('places')
+    expect(placeCoverage([cov({})], 'NOPE:1')).toEqual({ place: null, colls: [], rows: [] })
   })
   it('the covered indicators are those with a coverage row, in manifest order', () => {
     const inds = [ind({ id: 'a:1' }), ind({ id: 'b:2' }), ind({ id: 'c:3' })]
-    const idx = indexCoverage([cov({ indicator: 'c:3' }), cov({ indicator: 'a:1' })], inds)
+    const idx = indexCoverage([cov({ indicator: 'c:3' }), cov({ indicator: 'a:1' })])
     expect(coveredIndicators(idx, 'P:1', inds).map(i => i.id)).toEqual(['a:1', 'c:3'])
   })
 })

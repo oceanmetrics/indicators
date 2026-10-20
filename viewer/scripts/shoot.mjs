@@ -1,4 +1,4 @@
-// screenshots with the real catalog: the Matrix (matrix_<brand>_<theme>[_390].png, the flipped matrix matrix_*_flipped*,
+// screenshots with the real catalog: the Matrix (matrix_<brand>_<theme>[_390].png, places as rows matrix_*_placerows*,
 // the Add or restore menu matrix_*_addmenu, the drawer), the Place view (place_<place>_<brand>_<theme>[_390].png), the
 // Map view (map_<indicator>_<color>_<theme>[_390].png), the Report view (report_*: the Scorecard, the Cards report, the
 // open builder over budget, the print preview) and the embed route (embed_*).
@@ -64,10 +64,10 @@ const SHOTS = [
   ['place_FKNMS_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PLACE_PHONE, FKNMS],
   ['place_eez_oceanmetrics_light', 'oceanmetrics', 'light', PLACE, 'view=place&place=MRGID:8371'],
   ['place_FKNMS_oceanmetrics_light_eov', 'oceanmetrics', 'light', PLACE, FKNMS + '&vocab=eov'],
-  // the flipped matrix: indicators in rows, places in columns
-  ['matrix_oceanmetrics_light_flipped', 'oceanmetrics', 'light', DESKTOP, 'axes=t'],
-  ['matrix_oceanmetrics_dark_flipped', 'oceanmetrics', 'dark', DESKTOP, 'axes=t'],
-  ['matrix_oceanmetrics_light_flipped_390', 'oceanmetrics', 'light', PHONE, 'axes=t'],
+  // places as rows (the default is indicators in rows, places in columns)
+  ['matrix_oceanmetrics_light_placerows', 'oceanmetrics', 'light', DESKTOP, 'axes=p'],
+  ['matrix_oceanmetrics_dark_placerows', 'oceanmetrics', 'dark', DESKTOP, 'axes=p'],
+  ['matrix_oceanmetrics_light_placerows_390', 'oceanmetrics', 'light', PHONE, 'axes=p'],
   // the Add or restore menu open, with a place and an indicator removed
   ['matrix_oceanmetrics_light_addmenu', 'oceanmetrics', 'light', DESKTOP, REMOVED, openMenu],
   ['map_sst_status_oceanmetrics_light', 'oceanmetrics', 'light', MAP, SST + '&color=status'],

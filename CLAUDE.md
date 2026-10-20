@@ -21,7 +21,7 @@ npm run check                                     # svelte-check + tsc
 npm run dev                                       # viewer on http://localhost:5181/ (reads catalog/)
 node viewer/scripts/shoot.mjs [--only <name>]     # screenshots -> docs/shots/; look at them
 node viewer/scripts/shoot.mjs --url https://oceanmetrics.io/indicators/ --out docs/shots/live   # the deployed site
-node viewer/scripts/keys.mjs [--url <site>]       # keyboard: cell -> drawer -> Esc -> focus back; place link -> Place view; flipped matrix (#axes=t) cell round trip, remove button -> xp=/xi=
+node viewer/scripts/keys.mjs [--url <site>]       # keyboard: cell -> drawer -> Esc -> focus back; place link -> Place view; default matrix (indicators in rows) cell round trip, places-as-rows (#axes=p), remove button -> xp=/xi=
 npm run icons:paths && npm run icons:build && npm run icons:sheet   # after any change to brand/ sources
 Rscript fixtures/ecoidx/build_iea_sd_fixtures.R ~/Github/noaa-iea/ecoidx   # regenerate the iea-sd cross-check
 ```
@@ -51,6 +51,12 @@ indicators.json + coverage.parquet ──► viewer/ (imports src/status/, src/i
   itself with 1 SD rather than its departure from the long-term mean (`R/plot.R:167-168`), and its +/− captions are
   reversed. The recent window is the last `recent` rows of the series (NA rows count), the SD is the sample SD, a
   change of exactly 1 SD is not a change.
+- **Places are grouped by `place_coll`** (the home gazetteer collection, written by the coverage builder from the
+  gazetteer index and `layers.json`), never by the values `coll`. The values file of a cell always comes from its
+  coverage row's `coll` (`valuesCollOf()`): Pitcairn's EEZ is one place with rows in `places` and `mr_eez`. In the
+  gazetteer index the `NMS:*` sanctuaries and `PSGID:939` live only in the `places` collection (the `noaa_sanctuaries`
+  collection holds `ONMS:*` ids), so the default group is `DEFAULT_GROUPS` in `viewer/src/lib/data.ts`. Matrix hash keys:
+  `colls`, `q`, `vocab`, `leads`, `depth`, `cell`, `axes=p`, `empty=1`, `xp`, `xi`, `ai` (README "Matrix view").
 - **The Map view** (`viewer/src/lib/map/`): classes, legends and the table come from `classes.ts` (status and trend
   only through `src/status`); reference collections (Marine Regions `mr_*`) are drawn by Marine Regions' own WMS
   (`wms.ts`: an SLD plus `ENV`, one request per tile) and never from geometry we host.

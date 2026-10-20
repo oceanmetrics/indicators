@@ -23,14 +23,14 @@ export const METHOD_NOTES: Record<MethodId, string> = {
 
 // ---- a place's coverage ----
 
-/** a place's coverage rows. `coll` picks one when the place_id has rows in two collections; the first otherwise */
-export function placeCoverage(all: CoverageRow[], placeId: string, coll?: string | null) {
-  const mine = all.filter(r => r.place_id === placeId)
-  const colls = [...new Set(mine.map(r => r.coll))]
-  const chosen = coll && colls.includes(coll) ? coll : colls[0] ?? null
-  const rows = mine.filter(r => r.coll === chosen)
-  const place: Place | null = rows.length ? { id: placeId, name: rows[0].place_name || placeId, coll: rows[0].coll } : null
-  return { place, colls, rows }
+/**
+ * a place's coverage rows, from every values collection that holds it (Pitcairn's EEZ is in `places` and `mr_eez`: one
+ * place). the place's `coll` is its group, its home gazetteer collection; `colls` are the values collections.
+ */
+export function placeCoverage(all: CoverageRow[], placeId: string) {
+  const rows = all.filter(r => r.place_id === placeId)
+  const place: Place | null = rows.length ? indexCoverage(rows).places[0] : null
+  return { place, colls: place?.valuesColls ?? [], rows }
 }
 
 /** the indicators with coverage for the place, in manifest order */

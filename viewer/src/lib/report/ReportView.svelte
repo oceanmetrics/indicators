@@ -11,7 +11,7 @@
   import { downloadBlob } from '../download.ts'
   import { placeHref, reportHref } from '../hash.ts'
   import type { Depth, ViewState } from '../hash.ts'
-  import { indexCoverage } from '../matrix.ts'
+  import { indexCoverage, valuesCollsOf } from '../matrix.ts'
   import CopyButton from '../CopyButton.svelte'
   import { availablePresets, PRESETS } from './presets.ts'
   import { buildReport, reportTitle, requestHref, summaryLine } from './report.ts'
@@ -30,7 +30,7 @@
   let { catalog, view, titles, onpatch }: Props = $props()
 
   const spec = $derived(view.spec)
-  const idx = $derived(indexCoverage(catalog.coverage, catalog.manifest.indicators))
+  const idx = $derived(indexCoverage(catalog.coverage))
   const model = $derived(buildReport(catalog, idx, spec, view.vocab))
   const info = $derived(LAYOUTS[spec.layout])
   const title = $derived(reportTitle(spec))
@@ -94,7 +94,7 @@
     close()
   }
   const dataLinks = $derived(model.indicators.flatMap(i => i.collections
-    .filter(c => model.places.some(p => p.coll === c.coll))
+    .filter(c => model.places.some(p => valuesCollsOf(p).includes(c.coll)))
     .map(c => ({ key: i.id + c.coll, label: `${i.short} (${c.coll})`, href: catalog.base + c.path }))))
 
   // the cards of every category are mounted first and given a moment to load their values, then the browser prints

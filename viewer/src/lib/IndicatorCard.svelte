@@ -14,7 +14,7 @@
   import { GOOS_CREDIT, STATUS_NOTE } from './credits.ts'
   import { downloadBlob } from './download.ts'
   import type { Depth } from './hash.ts'
-  import { STATUS_WORDS, TREND_WORDS } from './matrix.ts'
+  import { STATUS_WORDS, TREND_WORDS, valuesCollOf } from './matrix.ts'
   import type { Place } from './matrix.ts'
   import { cardModel, defaultMethod, fileName, METHOD_IDS, METHOD_NOTES, placeCitation, placeCsv } from './place.ts'
   import type { CardOptions } from './place.ts'
@@ -60,7 +60,7 @@
   let tries = $state(0)
   let badgeOk = $state(true)
 
-  const url = $derived(valuesUrl(catalog.base, ind, place.coll))
+  const url = $derived(valuesUrl(catalog.base, ind, valuesCollOf(ind, place, cov)))
   $effect(() => {
     void tries
     const u = url
@@ -186,7 +186,7 @@
 
       <details class="four">
         <summary><span class="mbon-label">Dataset · place · method · delivery</span></summary>
-        <Elements {catalog} {ind} {place} {collTitle} row={model.stat} {depth} method={model.method} grain={model.grain ?? ind.status_grain} />
+        <Elements {catalog} {ind} {place} {collTitle} valuesColl={cov?.coll ?? null} row={model.stat} {depth} method={model.method} grain={model.grain ?? ind.status_grain} />
       </details>
       {/if}
 

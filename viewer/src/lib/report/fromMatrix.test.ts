@@ -13,7 +13,7 @@ const place = (place_id: string, place_name: string, coll: string) => ({ place_i
 const IDX = indexCoverage([
   place('NMS:A', 'Alpha', 'places'), place('NMS:B', 'Bravo', 'places'), place('NMS:C', 'Charlie', 'places'), place('NMS:D', 'Delta', 'places'),
   place('MRGID:1', 'Zed EEZ', 'mr_eez'),
-], INDS)
+])
 const view = { colls: [] as string[], q: '', hidePlaces: [] as string[], hideInds: [] as string[], addInds: [] as string[], leads: true }
 const ctx = { idx: IDX, indicators: INDS }
 
@@ -24,6 +24,16 @@ describe('the Matrix as a report spec', () => {
   it('chosen collections become `coll:` rules, removed places become excludes', () => {
     const s = matrixToSpec({ ...view, colls: ['places', 'mr_eez'], hidePlaces: ['NMS:B'] }, ctx)
     expect(s.places).toEqual({ include: ['coll:places', 'coll:mr_eez'], exclude: ['NMS:B'], context: false })
+  })
+  it('a `coll:` rule also matches a values collection, so a place grouped elsewhere is excluded when it is not on display', () => {
+    // Pitcairn is grouped under mr_eez but has rows in `places`: `coll:places` would bring it along
+    const pit = (indicator: string, coll: string) => ({ place_id: 'MRGID:8439', place_name: 'Pitcairn', coll, place_coll: 'mr_eez', indicator, time_grain: 'year' }) as unknown as CoverageRow
+    const idx = indexCoverage([place('NMS:A', 'Alpha', 'places'), pit('sst:a', 'places'), pit('sdg:a', 'mr_eez')])
+    const s = matrixToSpec({ ...view, colls: ['places'] }, { idx, indicators: INDS })
+    expect(s.places).toEqual({ include: ['coll:places'], exclude: ['MRGID:8439'], context: false })
+    expect(expandPlaces(s.places, idx.places).map(p => p.id)).toEqual(['NMS:A'])
+    // both groups on display: nothing to exclude
+    expect(matrixToSpec({ ...view, colls: ['places', 'mr_eez'] }, { idx, indicators: INDS }).places.exclude).toEqual([])
   })
   it('leads-only on: `*` plus the indicators added beyond the leads, less the removed leads', () => {
     const s = matrixToSpec({ ...view, addInds: ['sst:b'], hideInds: ['npp:a'] }, ctx)

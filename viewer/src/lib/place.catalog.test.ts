@@ -62,7 +62,7 @@ describe.skipIf(!have)('the Place view on the real catalog', () => {
   it('FKNMS has a card for every indicator the matrix has a cell for, each with a sentence, in every vocabulary', () => {
     const { place, rows } = placeCoverage(cov, 'NMS:FKNMS')
     expect(place?.name).toContain('Florida Keys')
-    const idx = indexCoverage(rows, manifest.indicators)
+    const idx = indexCoverage(rows)
     const covered = manifest.indicators.filter(i => idx.rows.has(`${place!.id}\u0000${i.id}`))
     expect(covered.length).toBeGreaterThanOrEqual(15)
     for (const v of VOCAB_IDS) {

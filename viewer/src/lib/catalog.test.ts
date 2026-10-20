@@ -17,7 +17,7 @@ describe.skipIf(!have)('the real catalog', async () => {
   const manifest = (have ? JSON.parse(readFileSync(resolve(DIR, 'indicators.json'), 'utf8')) : { indicators: [] }) as Manifest
   const buf = have ? readFileSync(resolve(DIR, 'coverage.parquet')) : null
   const rows = buf ? (await parquetReadObjects({ file: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer })).map(normalizeRow) : []
-  const idx = indexCoverage(rows, manifest.indicators)
+  const idx = indexCoverage(rows)
   const ids = new Set(manifest.indicators.map(i => i.id))
 
   it('every coverage indicator is in the manifest', () => {

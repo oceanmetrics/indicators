@@ -5,9 +5,11 @@
   import { Icon } from '../../../src/icons/index.ts'
   import { fmt, spanLabel } from '../../../src/status/index.ts'
   import type { Grain } from '../../../src/status/index.ts'
+  import { gazetteerPlaceHref } from './data.ts'
   import type { Catalog, Indicator } from './data.ts'
   import { datasetLink, duckdbSnippet, licenceText, valuesUrl } from './delivery.ts'
   import type { Depth } from './hash.ts'
+  import { valuesCollOf } from './matrix.ts'
   import type { Place } from './matrix.ts'
   import type { StatLike } from './place.ts'
   import CopyButton from './CopyButton.svelte'
@@ -17,6 +19,8 @@
     ind: Indicator
     place: Place
     collTitle: string
+    /** the values collection the numbers were read from (the coverage row's); the place's own when absent */
+    valuesColl?: string | null
     row: StatLike | null
     depth: Depth
     /** the status method shown; the manifest's by default */
@@ -24,9 +28,9 @@
     /** the grain the status is at; the manifest's by default */
     grain?: Grain
   }
-  let { catalog, ind, place, collTitle, row, depth, method = ind.status_method, grain = ind.status_grain }: Props = $props()
+  let { catalog, ind, place, collTitle, valuesColl = null, row, depth, method = ind.status_method, grain = ind.status_grain }: Props = $props()
 
-  const url = $derived(valuesUrl(catalog.base, ind, place.coll))
+  const url = $derived(valuesUrl(catalog.base, ind, valuesColl ?? valuesCollOf(ind, place, null)))
   const hasStatus = $derived(!!row?.status)
   const dec = $derived(ind.decimals ?? 2)
   const longTerm = $derived.by(() => {
@@ -59,7 +63,8 @@
     <h3 class="k"><Icon name="el-place" size={18} />Place</h3>
     <p class="main">{place.name}</p>
     <p class="small"><code>{place.id}</code></p>
-    <p class="small">Collection: {collTitle} (<code>{place.coll}</code>)</p>
+    <p class="small">Group: {collTitle} (<code>{place.coll}</code>) ·
+      <a href={gazetteerPlaceHref(place.coll, place.id)} target="_blank" rel="noopener">in the gazetteer <Icon name="ui-external" size={14} /><span class="mbon-sr-only"> (opens in a new tab)</span></a></p>
   </article>
 
   <article class="el method">

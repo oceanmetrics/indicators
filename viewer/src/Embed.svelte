@@ -39,9 +39,9 @@
   let settled = $state(false)
 
   const ind = $derived<Indicator | undefined>(catalog && want ? catalog.manifest.indicators.find(i => i.id === want!.indicator) : undefined)
-  const found = $derived(catalog && want ? placeCoverage(catalog.coverage, want.place, want.coll) : null)
+  const found = $derived(catalog && want ? placeCoverage(catalog.coverage, want.place) : null)
   const place = $derived(found?.place ?? null)
-  const idx = $derived(catalog && found ? indexCoverage(found.rows, catalog.manifest.indicators) : null)
+  const idx = $derived(catalog && found ? indexCoverage(found.rows) : null)
   const term = $derived(catalog && ind && want ? catalog.manifest.vocabularies[want.vocab].terms.find(t => t.id === ind.category[want!.vocab]) ?? { id: 'other', label: 'Other' } : null)
   const missing = $derived(mapView ? '' : !want ? 'Name a card as #card=<place_id>|<indicator>, for example #card=NMS:CINMS|erddap:dhw_5km:CRW_SST:mean.'
     : catalog && !ind ? `No indicator ${want.indicator} in this catalog.`

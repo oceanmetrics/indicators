@@ -35,9 +35,9 @@
   ]
   const base = import.meta.env.BASE_URL
 
-  const found = $derived(placeCoverage(catalog.coverage, view.place ?? '', view.coll))
+  const found = $derived(placeCoverage(catalog.coverage, view.place ?? ''))
   const place = $derived(found.place)
-  const idx = $derived(indexCoverage(found.rows, catalog.manifest.indicators))
+  const idx = $derived(indexCoverage(found.rows))
   const covered = $derived(place ? coveredIndicators(idx, place.id, catalog.manifest.indicators) : [])
   const groups = $derived(groupCards(covered, catalog.manifest.vocabularies, view.vocab))
   const leadCount = $derived(groups.reduce((n, g) => n + g.series.length, 0))

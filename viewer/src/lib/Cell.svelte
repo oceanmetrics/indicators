@@ -1,9 +1,11 @@
 <script lang="ts">
   // one matrix cell: a button that opens the drawer. skimmer = glyphs + value, swimmer = + sparkline, diver = + the
   // values file and the status method in mono. its accessible name says place, indicator, value and status in words.
+  // the empty states read differently: "not computed yet" (inviting: it can be computed), "no data here" (with the reason),
+  // and a quiet dash (the indicator is not offered for this kind of place).
   import { Icon } from '../../../src/icons/index.ts'
   import type { Indicator } from './data.ts'
-  import { classText, cellAria, STATUS_WORDS, TREND_WORDS, periodText, valueText } from './matrix.ts'
+  import { classText, cellAria, STATE_WORDS, STATUS_WORDS, TREND_WORDS, periodText, valueText, valuesCollOf } from './matrix.ts'
   import type { CellModel, Place } from './matrix.ts'
   import type { Depth } from './hash.ts'
   import Spark from './Spark.svelte'
@@ -13,16 +15,19 @@
     place: Place
     model: CellModel
     depth: Depth
+    /** the place's group title, for the name of a cell the indicator is not offered for */
+    groupTitle?: string
     open: boolean
     onopen: (placeId: string, indicator: string) => void
   }
-  let { ind, place, model, depth, open, onopen }: Props = $props()
+  let { ind, place, model, depth, groupTitle = place.coll, open, onopen }: Props = $props()
 
   const row = $derived(model.row)
   const statusWord = $derived(model.statusIcon ? STATUS_WORDS[model.statusIcon.slice(3) as keyof typeof STATUS_WORDS] : '')
   const file = $derived.by(() => {
-    // the row's own collection: a place can have rows in two (a sanctuary or an EEZ in both erddap-places and SDG files)
-    const c = ind.collections.find(x => x.coll === (row?.coll ?? place.coll))
+    // the values collection of the row, never the group: a place can have rows in two (Pitcairn: erddap-places and OBIS files)
+    const vc = valuesCollOf(ind, place, row)
+    const c = ind.collections.find(x => x.coll === vc)
     return c ? c.path.split('/').slice(-2).join('/') : null
   })
 </script>
@@ -34,7 +39,7 @@
   data-kind={model.kind}
   data-place={place.id}
   data-ind={ind.id}
-  aria-label={cellAria(ind, place, model)}
+  aria-label={cellAria(ind, place, model, groupTitle)}
   aria-haspopup="dialog"
   onclick={() => onopen(place.id, ind.id)}
 >
@@ -52,8 +57,11 @@
   {:else if model.stateIcon}
     <span class="top">
       <span class="g state" data-state={model.kind}><Icon name={model.stateIcon} size={18} /></span>
-      <span class="w">{model.kind === 'live' ? 'on the fly' : model.kind === 'nodata' ? 'no data' : 'not applicable'}</span>
+      <span class="w">{STATE_WORDS[model.kind === 'live' ? 'live' : 'nodata']}</span>
     </span>
+    {#if model.kind === 'nodata' && model.reason}<span class="meta">{model.reason}</span>{/if}
+  {:else}
+    <span class="dash" aria-hidden="true">{STATE_WORDS.na}</span>
   {/if}
   {#if depth === 'dive'}
     <span class="mono" title={file ?? ''}>
@@ -86,6 +94,11 @@
   .tr { color: var(--text-body); }
   .state { color: var(--text-body); }
   .state[data-state='live'] { color: var(--link); }
+  .cell[data-kind='live'] { background: var(--bg-tint); }
+  .cell[data-kind='live'] .w { color: var(--link); }
+  .cell[data-kind='live']:hover, .cell[data-kind='live'].open { background: var(--selected-bg); }
+  .cell[data-kind='na'] { min-height: 2.5rem; }
+  .dash { color: var(--text-body); }
   .v { font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; white-space: nowrap; margin-left: var(--space-1); }
   .v.cls { margin-left: 0; white-space: normal; line-height: 1.25; }
   .w { color: var(--text-body); }
