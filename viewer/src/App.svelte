@@ -4,15 +4,16 @@
   import { Icon } from '../../src/icons/index.ts'
   import { loadCatalog, loadLayers, resolveDataBase, collTitle } from './lib/data.ts'
   import type { Catalog, Indicator, Layers } from './lib/data.ts'
-  import { DEFAULT_STATE, groupHref, mapHref, mapToMatrixHref, matrixHref, matrixToMapHref, parseHash, placeHref, placeToMapHref, reportHref, serializeHash } from './lib/hash.ts'
-  import { DEFAULT_SPEC } from '../../src/report/spec.ts'
+  import { carryOver, DEFAULT_STATE, groupHref, mapToMatrixHref, matrixHref, matrixToMapHref, parseHash, placeHref, placeToMapHref, serializeHash } from './lib/hash.ts'
   import type { ViewState } from './lib/hash.ts'
-  import { cellModel, groupColumns, groupRows, indexCoverage, matrixStats, pickRow, shownGroups, withValues } from './lib/matrix.ts'
+  import { expandIndicators, expandPlaces } from '../../src/report/spec.ts'
+  import { cellModel, groupColumns, indexCoverage, matrixStats, pickRow, selectionRows, withValues } from './lib/matrix.ts'
   import { producerCredits } from './lib/delivery.ts'
   import { APP_NAME, TAGLINE, pageTitle } from './lib/brand/brand.ts'
   import type { Brand } from './lib/brand/brand.ts'
   import OmHeader from './lib/brand/OmHeader.svelte'
   import AppFooter from './lib/AppFooter.svelte'
+  import SelectBar from './lib/SelectBar.svelte'
   import Toolbar from './lib/Toolbar.svelte'
   import Matrix from './lib/Matrix.svelte'
   import MatrixLegend from './lib/MatrixLegend.svelte'
@@ -20,12 +21,14 @@
   import ViewNav from './lib/ViewNav.svelte'
   import { placeCoverage } from './lib/place.ts'
   import { computedGroups } from './lib/nextSteps.ts'
-  import { leadForGroup } from './lib/map/pick.ts'
-  import { matrixToSpec } from './lib/report/fromMatrix.ts'
+  import { loadGazetteerPlaces, placeUniverse, selectionNeedsGazetteer } from './lib/gazetteerPlaces.ts'
+  import type { GazetteerPlaces } from './lib/gazetteerPlaces.ts'
+  import { groupSelection, includeIndicator, includePlace, namedIndicators, selectionOf, withSelection } from './lib/selection.ts'
   import { SOURCE_HREF } from './lib/credits.ts'
 
   let { brand }: { brand: Brand } = $props()
 
+  let selectBar = $state<{ showIndicators: () => void } | undefined>()
   let phase = $state<'loading' | 'done' | 'error'>('loading')
   let error = $state('')
   let catalog = $state.raw<Catalog | null>(null)
@@ -50,28 +53,31 @@
     else if (view.view === 'map') lastMap = view
     else if (view.view === 'report') lastReport = view
   })
-  // the view switch carries the context: Matrix -> Map opens the group and the indicator of the last opened cell, Map -> Matrix the
-  // Map's group (and the cell of the selected place), Place -> Map the place's group and opened indicator with the place selected
+  // the view switch carries the selection and the shared keys into the view it opens (each view keeps its own keys as it was left);
+  // Matrix -> Map opens the indicator and place of the last opened cell, Map -> Matrix the Map's indicator and selected place as a
+  // cell, Place -> Map the place and the indicator opened, with both in the selection
   let lastCell = $state.raw<{ place: string; indicator: string } | null>(null)
   $effect(() => { if (view.view === 'matrix' && view.cell) lastCell = view.cell })
-  const firstLead = (group: string) => (catalog ? leadForGroup(catalog.manifest.indicators, catalog.coverage, group)?.id ?? null : null)
-  const placeOf = (id: string) => idx?.places.find(p => p.id === id) ?? null
-  const navMatrix = $derived(
-    view.view === 'map' ? mapToMatrixHref(view, view.coll, view.ind, view.place)
-      : '#' + serializeHash(lastMatrix ?? { ...DEFAULT_STATE, vocab: view.vocab, depth: view.depth }),
-  )
-  const navReport = $derived(lastReport ? '#' + serializeHash(lastReport) : reportHref(view, DEFAULT_SPEC))
+  const carry = (target: ViewState | null, fallback: ViewState) => '#' + serializeHash(carryOver(target ?? fallback, view))
+  const navMatrix = $derived(view.view === 'map' ? mapToMatrixHref(view, view.ind, view.place) : carry(lastMatrix, DEFAULT_STATE))
+  const navReport = $derived(carry(lastReport, { ...DEFAULT_STATE, view: 'report' }))
   const navMap = $derived.by(() => {
     if (view.view === 'matrix') {
-      const p = lastCell ? placeOf(lastCell.place) : null
-      return matrixToMapHref(view, groups, lastCell && p ? { indicator: lastCell.indicator, group: p.coll } : null, firstLead)
+      const c = lastCell
+      return matrixToMapHref(view, c && displayed.some(p => p.id === c.place) && selected.some(i => i.id === c.indicator) ? c : null)
     }
-    if (view.view === 'place') {
-      const p = view.place ? placeOf(view.place) : null
-      if (p) return placeToMapHref(view, p, view.ind, firstLead)
-    }
-    return lastMap ? '#' + serializeHash(lastMap) : mapHref(view, null)
+    if (view.view === 'place' && view.place) return placeToMapHref(inSelection(view.place, view.ind), view.place, view.ind)
+    return carry(lastMap, { ...DEFAULT_STATE, view: 'map' })
   })
+  // the state with a place and an indicator in its selection (a place of another group, an indicator that is not a lead: a link to them adds them)
+  function inSelection(placeId: string, indicator: string | null): ViewState {
+    const place = universe.find(p => p.id === placeId)
+    const ind = indicator ? catalog?.manifest.indicators.find(i => i.id === indicator) : null
+    return withSelection(view, {
+      places: place ? includePlace(view.spec.places, place, sets) : view.spec.places,
+      indicators: ind && catalog ? includeIndicator(view.spec.indicators, ind, catalog.manifest.indicators) : view.spec.indicators,
+    })
+  }
   // when the Place view was entered (0 on a cold page), and how long its lead cards took
   let placeT0 = $state(0)
   let placeMs = $state<number | null>(null)
@@ -80,27 +86,35 @@
   const total = (coll: string) => layers[coll]?.n ?? null
   const patch = (p: Partial<ViewState>) => { view = { ...view, ...p } }
 
-  // ---- derived tables ----
+  // ---- the selection: places and indicators as rules (the hash's pi, px, ii, ix) expanded against this catalog ----
+  const sets = $derived(catalog?.manifest.place_sets ?? [])
   const idx = $derived(catalog ? indexCoverage(catalog.coverage) : null)
-  // the groups on display: those asked for, else the sanctuaries (every group while searching)
-  const groups = $derived(idx ? shownGroups(idx.colls, view.colls, view.q, catalog?.manifest.place_sets) : [])
-  const allCols = $derived(catalog
-    ? groupColumns(catalog.manifest.indicators, catalog.manifest.vocabularies, view.vocab, view.leads, { add: view.addInds, hide: view.hideInds })
-    : [])
-  const rows = $derived(idx ? groupRows(idx, groups, view.q, view.hidePlaces) : [])
-  // an indicator with no value for any place on display is hidden, unless the reader asks for it or added it by hand
-  const cols = $derived(idx && !view.showEmpty ? withValues(allCols, rows, idx, view.addInds) : allCols)
+  // the gazetteer's places (the whole gazetteer in the place picker, rows for places no one has computed) are read the first
+  // time the selection or the picker needs them, never for the default selection
+  let gaz = $state.raw<GazetteerPlaces | null>(null)
+  let gazLoading = $state(false)
+  let gazFailed = false
+  async function readGazetteer() {
+    if (gaz || gazLoading || gazFailed) return
+    gazLoading = true
+    try { gaz = await loadGazetteerPlaces() } catch { gazFailed = true } finally { gazLoading = false }
+  }
+  $effect(() => { if (idx && view.view !== 'place' && selectionNeedsGazetteer(view.spec.places, idx, layers, sets)) void readGazetteer() })
+  const universe = $derived(idx ? placeUniverse(idx, gaz, layers) : [])
+  const chosen = $derived(expandPlaces(view.spec.places, universe, sets))
+  const selected = $derived(catalog ? expandIndicators(view.spec.indicators, catalog.manifest.indicators) : [])
+  const rows = $derived(idx ? selectionRows(chosen, idx, view.q) : [])
+  const allCols = $derived(catalog ? groupColumns(selected, catalog.manifest.vocabularies, view.vocab) : [])
+  // an indicator with no value for any place on display is hidden, unless the reader asks for it or named it by hand
+  const cols = $derived(idx && !view.showEmpty ? withValues(allCols, rows, idx, namedIndicators(view.spec.indicators)) : allCols)
   const nHidden = $derived(allCols.reduce((n, g) => n + g.indicators.length, 0) - cols.reduce((n, g) => n + g.indicators.length, 0))
-  const shown = $derived(new Set(cols.flatMap(g => g.indicators.map(i => i.id))))
   const displayed = $derived(rows.flatMap(g => g.places))
   const stats = $derived(idx ? matrixStats(rows, cols, idx) : null)
   const credits = $derived(catalog ? producerCredits(catalog.manifest) : [])
-  // "Report" in the Matrix toolbar: what the Matrix shows now, as a report spec
-  const matrixReportHref = $derived(catalog && idx && view.view === 'matrix' ? reportHref(view, matrixToSpec({ ...view, colls: groups }, { idx, indicators: catalog.manifest.indicators })) : '')
   const opened = $derived.by(() => {
     if (!catalog || !idx || !view.cell) return null
     const ind: Indicator | undefined = catalog.manifest.indicators.find(i => i.id === view.cell!.indicator)
-    const place = idx.places.find(p => p.id === view.cell!.place)
+    const place = displayed.find(p => p.id === view.cell!.place) ?? universe.find(p => p.id === view.cell!.place)
     return ind && place ? { ind, place, model: cellModel(ind, place, pickRow(idx, place.id, ind)) } : null
   })
 
@@ -131,27 +145,30 @@
   }
 
   // ---- the page title: "<view> · Ocean Metrics Indicators" (or "· MBON") ----
-  const placeName = $derived(catalog && view.view === 'place' ? placeCoverage(catalog.coverage, view.place ?? '').place?.name ?? view.place : null)
+  const placeName = $derived(catalog && view.view === 'place' ? placeCoverage(catalog.coverage, view.place ?? '').place?.name ?? universe.find(p => p.id === view.place)?.name ?? view.place : null)
   $effect(() => { document.title = pageTitle(brand, view.view === 'place' ? (placeName ?? 'Place') : view.view === 'map' ? 'Map' : view.view === 'report' ? (view.spec.title ?? 'Report') : 'Matrix') })
   $effect(() => {
     if (view.view === 'place' && !PlaceView) import('./lib/PlaceView.svelte').then(m => { PlaceView = m.default })
     if (view.view === 'map' && !MapView) import('./lib/map/MapView.svelte').then(m => { MapView = m.default })
     if (view.view === 'report' && !ReportView) import('./lib/report/ReportView.svelte').then(m => { ReportView = m.default })
   })
-  // "Matrix" in the Place view's breadcrumb: back to the Matrix the reader came from, with the drawer open on the cell they opened this place from
-  const backHref = $derived(matrixHref(
-    cameFrom,
-    { vocab: view.vocab, depth: view.depth, coll: catalog && view.place ? placeCoverage(catalog.coverage, view.place).place?.coll ?? null : null },
-    view.place && view.ind ? { place: view.place, indicator: view.ind } : null,
-  ))
+  // "Matrix" in the Place view's breadcrumb: back to the Matrix the reader came from, with the drawer open on the cell they opened this place from.
+  // the Place view carries the selection; on a cold permalink whose selection does not hold the place, the Matrix opens on the place's group
+  const backState = $derived.by(() => {
+    const p = view.place ? universe.find(x => x.id === view.place) : null
+    const coll = p?.coll ?? view.coll
+    if (cameFrom || !coll || (p && expandPlaces(view.spec.places, [p], sets).length)) return view
+    return withSelection(view, { places: groupSelection(selectionOf(view), coll).places })
+  })
+  const backHref = $derived(matrixHref(cameFrom, backState, view.place && view.ind ? { place: view.place, indicator: view.ind } : null))
   const linkToPlace = (placeId: string, coll: string) => placeHref(view, placeId, coll)
 
-  // ---- removing from the display ----
-  // an indicator added beyond the leads is taken back out of the additions; any other goes on the removed list
-  function hide(kind: 'place' | 'indicator', id: string) {
-    if (kind === 'place') patch({ hidePlaces: [...new Set([...view.hidePlaces, id])] })
-    else if (view.addInds.includes(id)) patch({ addInds: view.addInds.filter(x => x !== id) })
-    else patch({ hideInds: [...new Set([...view.hideInds, id])] })
+  // ---- removing from the display: a place goes in px, an indicator in ix (or out of the rules that hold it) ----
+  // (the toggling rules load with the first removal, as with the pickers' ticks)
+  async function hide(kind: 'place' | 'indicator', id: string) {
+    const { toggleIndicator, togglePlace } = await import('./lib/report/tree.ts')
+    if (kind === 'place') patch({ spec: withSelection(view, { places: togglePlace(view.spec.places, universe, id, false, sets) }).spec })
+    else if (catalog) patch({ spec: withSelection(view, { indicators: toggleIndicator(view.spec.indicators, catalog.manifest.indicators, id, false) }).spec })
   }
 
   // ---- the drawer ----
@@ -201,6 +218,10 @@
 <main class="lens" data-state={phase} data-brand={brand}>
   <div class="wrap">
     <h1 class="mbon-sr-only">{APP_NAME}: {view.view === 'place' ? `${placeName} (place view)` : view.view === 'map' ? 'map of one indicator' : view.view === 'report' ? 'report' : 'places by indicators'}</h1>
+    {#if catalog && idx && view.view !== 'place'}
+      <SelectBar bind:this={selectBar} {view} {catalog} {idx} {layers} {universe} places={chosen} indicators={selected} gazetteer={gaz != null} loading={gazLoading}
+        ongazetteer={readGazetteer} onchange={patch} />
+    {/if}
     {#if catalog}<ViewNav current={view.view} matrixHref={navMatrix} mapHref={navMap} reportHref={navReport} {placeName} />{/if}
     {#if phase === 'loading'}
       <p class="status" role="status">Loading the manifest and the coverage table…</p>
@@ -214,24 +235,24 @@
       {/if}
     {:else if catalog && view.view === 'map'}
       {#if MapView}
-        <MapView {catalog} {view} titles={title} {idx} {layers} onpatch={patch} />
+        <MapView {catalog} {view} titles={title} {idx} {layers} {universe} onpatch={patch} onother={() => selectBar?.showIndicators()} />
       {:else}
         <p class="status" role="status">Loading the map…</p>
       {/if}
     {:else if catalog && view.view === 'report'}
       {#if ReportView}
-        <ReportView {catalog} {view} titles={title} {layers} onpatch={patch} />
+        <ReportView {catalog} {view} titles={title} {layers} axes={view.axes} onpatch={patch} />
       {:else}
         <p class="status" role="status">Loading the report…</p>
       {/if}
     {:else if catalog && idx}
-      <Toolbar {view} {idx} {layers} {groups} sets={catalog.manifest.place_sets} onchange={patch} indicators={catalog.manifest.indicators} vocabs={catalog.manifest.vocabularies} {shown} {displayed} reportHref={matrixReportHref} />
+      <Toolbar {view} onchange={patch} />
       <p class="summary" role="status" aria-live="polite">
         <Icon name="view-matrix" size={18} />
         <span>
-          {stats?.places} places × {stats?.indicators} indicators ·
+          {stats?.places} {stats?.places === 1 ? 'place' : 'places'} × {stats?.indicators} {stats?.indicators === 1 ? 'indicator' : 'indicators'} on display ·
           {stats?.withValue} of {stats?.cells} cells have a value · {stats?.withStatus} have a status{#if nHidden}
-          · {nHidden} {nHidden === 1 ? 'indicator' : 'indicators'} hidden: no value here{/if}
+          {' '}· {nHidden} {nHidden === 1 ? 'indicator' : 'indicators'} hidden: no value for these places (turn on "Show indicators without values here"){/if}
         </span>
       </p>
       <MatrixLegend vocab={view.vocab} />
@@ -244,7 +265,7 @@
 <AppFooter {brand} {credits} version={catalog?.manifest.version ?? '…'} {loadMs} {placeMs} />
 
 {#if opened && catalog && view.view === 'matrix'}
-  <Drawer {catalog} ind={opened.ind} place={opened.place} model={opened.model} depth={view.depth} vocab={view.vocab}
+  <Drawer {catalog} ind={opened.ind} place={opened.place} model={opened.model} depth={view.depth} vocab={view.vocab} carry={inSelection(opened.place.id, opened.ind.id)}
     collTitle={title(opened.place.coll)} groups={opened.model.kind === 'na' && idx ? computedGroups(idx, opened.ind) : []} titles={title}
     groupHref={c => groupHref(view, c)} onclose={close} />
 {/if}

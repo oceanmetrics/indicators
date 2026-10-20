@@ -28,7 +28,7 @@ describe('the report spec in a URL', () => {
   it('writes only what differs, in a fixed order, and round-trips', () => {
     const s: ReportSpec = {
       ...DEFAULT_SPEC,
-      places: { include: ['coll:places'], exclude: ['NMS:TBNMS'], context: true },
+      places: { include: ['coll:mr_eez'], exclude: ['NMS:TBNMS'], context: true },
       indicators: { include: ['cat:water-quality', 'series:obis-all'], exclude: ['obis:simpson'] },
       layout: 'scorecard',
       style: { status: 'names-pct', recent: 10, baseline: [1991, 2020] },
@@ -39,7 +39,7 @@ describe('the report spec in a URL', () => {
       title: 'Sanctuary condition',
     }
     expect(specParams(s)).toEqual([
-      ['pi', 'coll:places'], ['px', 'NMS:TBNMS'], ['ctx', '1'], ['ii', 'cat:water-quality,series:obis-all'], ['ix', 'obis:simpson'],
+      ['pi', 'coll:mr_eez'], ['px', 'NMS:TBNMS'], ['ctx', '1'], ['ii', 'cat:water-quality,series:obis-all'], ['ix', 'obis:simpson'],
       ['layout', 'scorecard'], ['status', 'names-pct'], ['recent', '10'], ['base', '1991-2020'], ['from', '1982'], ['to', '2020'],
       ['split', 'place'], ['ys', 'free'], ['asof', '2026.10.20'], ['title', 'Sanctuary condition'],
     ])
@@ -84,6 +84,10 @@ describe('expanding the rules', () => {
     expect(ids(matchIndicators('cat:living-resources', IND))).toEqual(['erddap:npp:mean', 'obis:species'])
     expect(ids(matchIndicators('cat:sea-surface-temperature', IND))).toEqual(['erddap:sst:mean'])
   })
+  it('all is every indicator, leads or not; an exclude still takes from it', () => {
+    expect(ids(matchIndicators('all', IND))).toEqual(ids(IND))
+    expect(ids(expandIndicators({ include: ['all'], exclude: ['series:obis-all:*', 'sdg:x'] }, IND))).toEqual(['erddap:sst:mean', 'erddap:oisst:mean', 'erddap:npp:mean'])
+  })
   it('series: is its lead, series:…:* every member, an id itself, an unknown rule nothing', () => {
     expect(ids(matchIndicators('series:sst', IND))).toEqual(['erddap:sst:mean'])
     expect(ids(matchIndicators('series:sst:*', IND))).toEqual(['erddap:sst:mean', 'erddap:oisst:mean'])
@@ -113,6 +117,27 @@ describe('expanding the rules', () => {
     expect(ids(matchPlaces('coll:mr_eez', pl))).toEqual(['MRGID:8439'])
     expect(ids(matchPlaces('coll:nope', pl))).toEqual([])
     expect(ids(matchPlaces('NMS:B', pl))).toEqual(['NMS:B'])
+  })
+  it('coll:<slug> is strict when a place has the slug as its group: a place only read from that values collection is not in it', () => {
+    // Pitcairn's EEZ has rows in the `places` values collection but belongs to the EEZs: the default selection (coll:places) is the sanctuaries
+    const pl = [
+      { id: 'NMS:A', coll: 'places', valuesColls: ['places'] },
+      { id: 'MRGID:8439', coll: 'mr_eez', valuesColls: ['mr_eez', 'places'] },
+    ]
+    expect(ids(matchPlaces('coll:places', pl))).toEqual(['NMS:A'])
+    expect(ids(expandPlaces(DEFAULT_SPEC.places, pl))).toEqual(['NMS:A'])
+  })
+  it('set:<id> is the places of the groups of the place set; an unknown set selects nothing', () => {
+    const sets = [{ id: 'political', groups: ['mr_eez', 'fao_high_seas'] }]
+    const pl = [{ id: 'MRGID:1', coll: 'mr_eez' }, { id: 'FAO:HS1', coll: 'fao_high_seas' }, { id: 'NMS:A', coll: 'places' }]
+    expect(ids(matchPlaces('set:political', pl, sets))).toEqual(['MRGID:1', 'FAO:HS1'])
+    expect(ids(expandPlaces({ include: ['set:political'], exclude: ['MRGID:1'], context: false }, pl, sets))).toEqual(['FAO:HS1'])
+    expect(matchPlaces('set:political', pl)).toEqual([])
+    expect(matchPlaces('set:nope', pl, sets)).toEqual([])
+  })
+  it('the default places are the sanctuaries (coll:places), written as nothing', () => {
+    expect(DEFAULT_SPEC.places.include).toEqual(['coll:places'])
+    expect(specParams({ ...DEFAULT_SPEC, places: { ...DEFAULT_SPEC.places, include: ['*'] } })).toEqual([['pi', '*']])
   })
   it('coverage counts the chosen places with a value, per indicator', () => {
     const rows = [

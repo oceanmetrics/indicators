@@ -6,7 +6,7 @@ import { parquetReadObjects } from 'hyparquet'
 import { describe, expect, it } from 'vitest'
 import { normalizeRow } from './data.ts'
 import type { Manifest } from './data.ts'
-import { cellAria, cellModel, groupColumns, groupRows, indexCoverage, matrixStats, pickRow } from './matrix.ts'
+import { cellAria, cellModel, groupColumns, indexCoverage, matrixStats, pickRow, selectionRows } from './matrix.ts'
 import { VOCAB_IDS } from './data.ts'
 
 const DIR = resolve(__dirname, '../../../catalog')
@@ -35,10 +35,10 @@ describe.skipIf(!have)('the real catalog', async () => {
   })
   it('every cell resolves to a state with an accessible name, in every vocabulary, leads or all', () => {
     for (const vocab of VOCAB_IDS) for (const leads of [true, false]) {
-      const cols = groupColumns(manifest.indicators, manifest.vocabularies, vocab, leads)
+      const cols = groupColumns(manifest.indicators.filter(i => !leads || i.lead), manifest.vocabularies, vocab)
       const inds = cols.flatMap(c => c.indicators)
       expect(inds.length).toBe(manifest.indicators.filter(i => !leads || i.lead).length)
-      for (const g of groupRows(idx, [], '')) for (const p of g.places) for (const ind of inds) {
+      for (const g of selectionRows(idx.places, idx, '')) for (const p of g.places) for (const ind of inds) {
         const m = cellModel(ind, p, pickRow(idx, p.id, ind))
         expect(['value', 'class', 'nodata', 'live', 'na']).toContain(m.kind)
         expect(cellAria(ind, p, m).length).toBeGreaterThan(10)
@@ -46,7 +46,7 @@ describe.skipIf(!have)('the real catalog', async () => {
     }
   }, 60_000)   // 110 indicators × ~300 places × 6 ways (OBIS made it ~10 s)
   it('the default matrix has the places and the cells with a status the coverage promises', () => {
-    const s = matrixStats(groupRows(idx, [], ''), groupColumns(manifest.indicators, manifest.vocabularies, 'onms', true), idx)
+    const s = matrixStats(selectionRows(idx.places, idx, ''), groupColumns(manifest.indicators.filter(i => i.lead), manifest.vocabularies, 'onms'), idx)
     expect(s.places).toBe(new Set(rows.map(r => r.place_id)).size)
     expect(s.withStatus).toBeGreaterThan(0)
     expect(s.withValue).toBeGreaterThanOrEqual(s.withStatus)

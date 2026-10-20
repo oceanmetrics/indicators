@@ -152,8 +152,6 @@ export const GROUP_TITLES: Record<string, string> = {
 }
 /** the groups in the order the Matrix lists them: sanctuaries first, then the other protected areas, then the Marine Regions ones */
 export const GROUP_ORDER = ['noaa_sanctuaries', 'places', 'noaa_nerrs', 'noaa_marine_monuments', 'mpa_inventory', 'protectedseas_mpa', 'mr_eez', 'fao_high_seas', 'mr_high_seas']
-/** the groups the Matrix opens with (those that have computed places): the sanctuaries */
-export const DEFAULT_GROUPS = ['places']
 
 export const LAYERS_URL = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer/index/layers.json'
 export const GAZETTEER_URL = 'https://oceanmetrics.io/places/'

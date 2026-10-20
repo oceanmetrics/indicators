@@ -1,8 +1,11 @@
 // the report spec (plan §6): chosen places × chosen indicators in a chosen layout. plain functions, no DOM, so the
 // viewer and the Node figure export (SanctuaryWatch, Phase 4) read a spec the same way.
-// - selections are rules, never expanded lists: `*`, `coll:<slug>`, `cat:<term>`, `series:<id>` (its lead),
-//   `series:<id>:*` (every member), or an id; each untick goes in `exclude`. a live report picks up what is
-//   published later; `as_of` (a manifest version) marks a frozen one.
+// - selections are rules, never expanded lists. places: `*`, `coll:<slug>`, `set:<id>` (a place set: its groups), or a
+//   place_id. indicators: `*` (each series' lead), `all` (every indicator), `cat:<term>`, `series:<id>` (its lead),
+//   `series:<id>:*` (every member), or an id. each untick goes in `exclude`. a live report picks up what is published
+//   later; `as_of` (a manifest version) marks a frozen one.
+// - the places and indicators of the spec ARE the selection of the whole viewer (the Matrix, Map, Report and Place views
+//   write the same pi, px, ii and ix keys); the other keys belong to the Report.
 // - in a URL the spec is flat, readable keys (`pi`, `px`, `ii`, `ix`, `ctx`, `layout`, `status`, `recent`, `base`,
 //   `grain`, `from`, `to`, `split`, `ys`, `asof`, `title`); defaults are left out, so the default spec writes nothing.
 // - `ys=free` gives each Small multiples panel its own y axis (the default is one axis shared by a row). `ctx` (context
@@ -35,7 +38,7 @@ export interface ReportSpec {
 }
 
 export const DEFAULT_SPEC: ReportSpec = {
-  places: { include: ['*'], exclude: [], context: false },
+  places: { include: ['coll:places'], exclude: [], context: false },
   indicators: { include: ['*'], exclude: [] },
   layout: 'cards',
   split: null,
@@ -149,6 +152,7 @@ export function seriesLeads<T extends IndicatorLike>(indicators: T[]): Map<strin
 /** the indicators one rule selects (in manifest order) */
 export function matchIndicators<T extends IndicatorLike>(rule: string, indicators: T[]): T[] {
   const leads = new Set(seriesLeads(indicators).values())
+  if (rule === 'all') return indicators
   if (rule === '*') return indicators.filter(i => leads.has(i))
   if (rule.startsWith('cat:')) {
     const term = rule.slice(4)
@@ -169,24 +173,36 @@ export function expandIndicators<T extends IndicatorLike>(sel: ReportSpec['indic
   return indicators.filter(i => inc.has(i) && !exc.has(i))
 }
 
+/** a place set, as the rules need it: `set:<id>` stands for its groups */
+export interface PlaceSetLike {
+  id: string
+  groups: readonly string[]
+}
+
 /**
- * the places one rule selects: `*`, `coll:<slug>`, or a place_id. `coll:<slug>` matches a place whose group (home
- * gazetteer collection) or any of its values collections is the slug, so a link written when places were grouped by
- * their values file (`coll:places`) still selects the same places.
+ * the places one rule selects: `*`, `coll:<slug>`, `set:<id>` (the groups of the place set, from `sets`; an unknown set
+ * selects nothing) or a place_id. `coll:<slug>` matches a place whose group (home gazetteer collection) is the slug; when no
+ * place has that group, it matches the places any of whose values collections is the slug, so a link written when places
+ * were grouped by their values file still selects the same places.
  */
-export function matchPlaces<P extends PlaceLike>(rule: string, places: P[]): P[] {
+export function matchPlaces<P extends PlaceLike>(rule: string, places: P[], sets: readonly PlaceSetLike[] = []): P[] {
   if (rule === '*') return places
+  if (rule.startsWith('set:')) {
+    const set = sets.find(s => `set:${s.id}` === rule)
+    return set ? places.filter(p => set.groups.includes(p.coll)) : []
+  }
   if (rule.startsWith('coll:')) {
     const slug = rule.slice(5)
-    return places.filter(p => p.coll === slug || (p.valuesColls ?? []).includes(slug))
+    if (places.some(p => p.coll === slug)) return places.filter(p => p.coll === slug)
+    return places.filter(p => (p.valuesColls ?? []).includes(slug))
   }
   return places.filter(p => p.id === rule)
 }
 
 /** include rules, then exclude rules, in the order of `places` (the caller sorts) */
-export function expandPlaces<P extends PlaceLike>(sel: ReportSpec['places'], places: P[]): P[] {
-  const inc = new Set(sel.include.flatMap(r => matchPlaces(r, places)))
-  const exc = new Set(sel.exclude.flatMap(r => matchPlaces(r, places)))
+export function expandPlaces<P extends PlaceLike>(sel: ReportSpec['places'], places: P[], sets: readonly PlaceSetLike[] = []): P[] {
+  const inc = new Set(sel.include.flatMap(r => matchPlaces(r, places, sets)))
+  const exc = new Set(sel.exclude.flatMap(r => matchPlaces(r, places, sets)))
   return places.filter(p => inc.has(p) && !exc.has(p))
 }
 

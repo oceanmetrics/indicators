@@ -32,11 +32,10 @@
     onempty?: (v: boolean) => void
     canShowEmpty?: boolean
     hintOf?: (ind: Indicator) => string
-    removed?: number
-    onrestore?: () => void
+    onother?: () => void
     close: () => void
   }
-  let { mode, indicators, vocabs, vocab, onvocab, chosen, idx, places, withValues: counted, nPlaces: counts, ontoggle, onchoose, leads = false, onleads, showEmpty = false, onempty, canShowEmpty = false, hintOf, removed = 0, onrestore, close }: Props = $props()
+  let { mode, indicators, vocabs, vocab, onvocab, chosen, idx, places, withValues: counted, nPlaces: counts, ontoggle, onchoose, leads = false, onleads, showEmpty = false, onempty, canShowEmpty = false, hintOf, onother, close }: Props = $props()
 
   let query = $state('')
   let root = $state<HTMLDivElement>()
@@ -45,7 +44,7 @@
   let localEmpty = $state(false)
   const empties = $derived(mode === 'multi' ? showEmpty : localEmpty)
   const withValues = $derived(counted ?? placesWithValue(idx!, places ?? [], indicators))
-  const nPlaces = $derived(places?.length ?? counts ?? 0)
+  const nPlaces = $derived(counts ?? places?.length ?? 0)
   const tree = $derived(buildIndicatorPickTree({
     indicators, vocab, terms: vocabs[vocab].terms, chosen, withValues, nPlaces, showEmpty: empties, query, hintOf,
   }))
@@ -74,9 +73,9 @@
       {/if}
     </div>
   </div>
-  <p class="om-note">{mode === 'multi' ? 'Counts are places with a value, of the places on display. A series ticks its lead; open it for the others.' : 'Choose an indicator.'}</p>
+  <p class="om-note">{mode === 'multi' ? 'Counts are places with a value, of the places chosen. A series ticks its lead; open it for the others.' : 'Choose an indicator of the selection.'}</p>
   <Tree nodes={tree} label="Indicators" ontoggle={pick} pick={mode === 'single'} expandAll={query.trim() !== ''} empty="No indicator matches." />
-  {#if removed && onrestore}
-    <Button variant="quiet" size="sm" onclick={onrestore}>Restore the {removed} removed {removed === 1 ? 'indicator' : 'indicators'}</Button>
+  {#if mode === 'single' && onother}
+    <Button variant="quiet" size="sm" onclick={() => { close(); onother?.() }}>Another indicator: choose from all of them…</Button>
   {/if}
 </div>

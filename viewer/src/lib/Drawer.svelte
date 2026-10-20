@@ -10,7 +10,7 @@
   import { configHash, configLines, badgeUrl } from './delivery.ts'
   import { EOV_GLYPH_CREDIT, GOOS_CREDIT, STATUS_NOTE } from './credits.ts'
   import { mapHref, placeHref } from './hash.ts'
-  import type { Depth } from './hash.ts'
+  import type { Carry, Depth } from './hash.ts'
   import { classText, STATUS_WORDS, TREND_WORDS, periodText, valueText, valuesCollOf } from './matrix.ts'
   import type { CellModel, Place } from './matrix.ts'
   import type { GroupCount } from './nextSteps.ts'
@@ -26,6 +26,8 @@
     model: CellModel
     depth: Depth
     vocab: VocabId
+    /** the state the drawer is opened from: its selection and shared keys go into the links to the Place and Map views */
+    carry: Carry
     /** the title of the place's group */
     collTitle: string
     /** the groups the indicator is computed for (for a cell it is not offered for), their titles and Matrix hrefs */
@@ -34,7 +36,7 @@
     groupHref?: (coll: string) => string
     onclose: () => void
   }
-  let { catalog, ind, place, model, depth, vocab, collTitle, groups = [], titles, groupHref, onclose }: Props = $props()
+  let { catalog, ind, place, model, depth, vocab, carry, collTitle, groups = [], titles, groupHref, onclose }: Props = $props()
 
   const row = $derived(model.row)
   const m = $derived(catalog.manifest)
@@ -89,10 +91,10 @@
     <NextSteps {ind} {place} kind={model.kind} reason={model.reason} groupTitle={collTitle} {groups} {titles} {groupHref} />
   {/if}
   <p class="toplace">
-    <a class="plink" href={placeHref({ vocab, depth, method: null }, place.id, place.coll, ind.id)}>
+    <a class="plink" href={placeHref(carry, place.id, place.coll, ind.id)}>
       <Icon name="view-place" size={16} />Open in place view <span class="mbon-sr-only">: {place.name}, {ind.short}</span>
     </a>
-    <a class="plink" href={mapHref({ vocab, depth, method: null }, ind.id, place.coll, null, place.id)}>
+    <a class="plink" href={mapHref(carry, ind.id, null, place.id)}>
       <Icon name="view-map" size={16} />Open in map view <span class="mbon-sr-only">: {ind.short}</span>
     </a>
   </p>

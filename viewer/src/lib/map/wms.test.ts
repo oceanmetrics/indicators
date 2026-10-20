@@ -1,6 +1,6 @@
 // the Marine Regions WMS requests: exact pieces, and the length of the biggest request (all 285 EEZs, five classes)
 import { describe, expect, it } from 'vitest'
-import { envString, infoUrl, layerName, mrgidOf, sldBody, wmsEndpoint, wmsTileUrl } from './wms.ts'
+import { MAX_ONLY, envString, infoUrl, layerName, mrgidOf, onlyMrgids, sldBody, wmsEndpoint, wmsTileUrl } from './wms.ts'
 
 const RASTER = {
   tiles: ['https://geo.vliz.be/geoserver/MarineRegions/gwc/service/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=eez&STYLE=&TILEMATRIXSET=EPSG:900913&TILEMATRIX=EPSG:900913:{z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png'],
@@ -104,5 +104,37 @@ describe('the SLD under a layer of ours (a place set)', () => {
   it('the tile URL carries it', () => {
     const url = wmsTileUrl(RASTER, [{ id: '8456', k: 0 }], COLORS.slice(0, 1), 'grey', LINE, 'mrgid', 'tint')
     expect(decodeURIComponent(url.split('SLD_BODY=')[1].split('&ENV=')[0])).toContain('<CssParameter name="fill">tint</CssParameter>')
+  })
+})
+
+describe('the SLD restricted to the places of the selection', () => {
+  const base = sldBody('eez', 'mrgid', ['red', 'blue'], 'grey', LINE)
+  const one = sldBody('eez', 'mrgid', ['red', 'blue'], 'grey', LINE, null, ['8456'])
+  const two = sldBody('eez', 'mrgid', ['red', 'blue'], 'grey', LINE, null, ['8456', '8493'])
+  it('without `only` the SLD is the whole-layer one, byte for byte', () => {
+    expect(sldBody('eez', 'mrgid', ['red', 'blue'], 'grey', LINE, null, null)).toBe(base)
+    expect(sldBody('eez', 'mrgid', ['red', 'blue'], 'grey', LINE, null, [])).toBe(base)
+    expect(base).toContain('<ElseFilter/>')
+  })
+  it('both rules are filtered to the ids; the else rule becomes an explicit "has an entry" rule', () => {
+    const eq = (id: string) => `<ogc:PropertyIsEqualTo><ogc:PropertyName>mrgid</ogc:PropertyName><ogc:Literal>${id}</ogc:Literal></ogc:PropertyIsEqualTo>`
+    expect(one).not.toContain('<ElseFilter/>')
+    const [, none, fill] = one.split('<Rule>')
+    expect(none).toContain(`<ogc:And><ogc:PropertyIsEqualTo><ogc:Function name="env">`)
+    expect(none).toContain(eq('8456') + '</ogc:And></ogc:Filter>')
+    expect(fill).toContain('<ogc:And><ogc:Not>')
+    expect(fill).toContain(eq('8456') + '</ogc:And></ogc:Filter>')
+    expect(two.split('<Rule>')[1]).toContain(`<ogc:Or>${eq('8456')}${eq('8493')}</ogc:Or>`)
+  })
+  it('onlyMrgids: the digits of the MRGID place ids; none when there are none, or too many for the request', () => {
+    expect(onlyMrgids(['MRGID:8456', 'NMS:A', 'MRGID:8493'])).toEqual(['8456', '8493'])
+    expect(onlyMrgids(['NMS:A'])).toBeNull()
+    expect(onlyMrgids(null)).toBeNull()
+    expect(onlyMrgids(Array.from({ length: MAX_ONLY }, (_, n) => `MRGID:${n}`))).toHaveLength(MAX_ONLY)
+    expect(onlyMrgids(Array.from({ length: MAX_ONLY + 1 }, (_, n) => `MRGID:${n}`))).toBeNull()
+  })
+  it('the tile URL carries it', () => {
+    const url = wmsTileUrl(RASTER, [{ id: '8456', k: 0 }], COLORS.slice(0, 1), 'grey', LINE, 'mrgid', null, ['8456'])
+    expect(decodeURIComponent(url.split('SLD_BODY=')[1].split('&ENV=')[0])).toContain('<ogc:Literal>8456</ogc:Literal></ogc:PropertyIsEqualTo></ogc:And>')
   })
 })

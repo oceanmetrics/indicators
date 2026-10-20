@@ -21,6 +21,8 @@ export interface MapOpts {
   group?: string | null
   /** several place groups (the groups of a place set): the colour scale and the legend run across all of them; wins over `group` */
   groups?: readonly string[] | null
+  /** the places of the selection (a group may be only partly chosen): a place that is not chosen is not mapped */
+  keep?: ((placeId: string, group: string) => boolean) | null
   color: MapColor | null
   /** the period shown ("2024", "2024-07"); null = each place's latest */
   t: string | null
@@ -279,7 +281,8 @@ function periodsOf(places: P[], grain: Grain): string[] {
  */
 export function mapModel(ind: Indicator, coverage: CoverageRow[], values: Map<string, PlaceRow[]> | null, opts: MapOpts): MapModel {
   const inGroup = (r: CoverageRow) => (opts.groups ? opts.groups.includes(r.place_coll ?? r.coll) : !opts.group || (r.place_coll ?? r.coll) === opts.group)
-  const mine = coverage.filter(r => r.indicator === ind.id && (!opts.coll || r.coll === opts.coll) && inGroup(r))
+  const kept = (r: CoverageRow) => !opts.keep || opts.keep(r.place_id, r.place_coll ?? r.coll)
+  const mine = coverage.filter(r => r.indicator === ind.id && (!opts.coll || r.coll === opts.coll) && inGroup(r) && kept(r))
   const grain = mapGrain(ind, mine, opts.grain ?? null)
   const byPlace = new Map<string, CoverageRow[]>()
   for (const r of mine) byPlace.set(r.place_id, [...(byPlace.get(r.place_id) ?? []), r])

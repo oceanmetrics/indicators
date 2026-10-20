@@ -10,10 +10,10 @@
   import { Icon } from '../../../../src/icons/index.ts'
   import { LAYOUTS, specId, specJson, specParams } from '../../../../src/report/spec.ts'
   import type { Fix, ReportSpec } from '../../../../src/report/spec.ts'
-  import type { Catalog, Layers, VocabId } from '../data.ts'
+  import type { Catalog, Layers } from '../data.ts'
   import { downloadBlob } from '../download.ts'
   import { placeHref, reportHref } from '../hash.ts'
-  import type { Depth, ViewState } from '../hash.ts'
+  import type { Axes, Depth, ViewState } from '../hash.ts'
   import { indexCoverage, pickRow, valuesCollsOf } from '../matrix.ts'
   import CopyButton from '../CopyButton.svelte'
   import { loadCells } from './cells.ts'
@@ -36,8 +36,9 @@
     titles: (coll: string) => string
     layers?: Layers
     onpatch: (p: Partial<ViewState>) => void
-    /** what the rows are in the Scorecard, Small multiples and Quad plot: indicators (the Matrix's default) or places */
-    axes?: 'places' | 'indicators'
+    /** the Matrix's orientation, shared with the Report: what the rows are in the Scorecard, Small multiples and Quad plot
+     *  (indicators, the Matrix's default, or places) */
+    axes?: Axes
   }
   let { catalog, view, titles, layers = {}, onpatch, axes = 'indicators' }: Props = $props()
 
@@ -59,7 +60,7 @@
 
   // ---- changes: the spec and the shared keys ----
   const setSpec = (s: ReportSpec) => onpatch({ spec: { ...s, depth: view.depth } })
-  function setView(p: { vocab?: VocabId; depth?: Depth }) {
+  function setView(p: { depth?: Depth }) {
     onpatch({ ...p, ...(p.depth ? { spec: { ...spec, depth: p.depth } } : {}) })
   }
   function fix(f: Fix) {
@@ -74,7 +75,7 @@
     if (started) return
     started = true
     if (specParams(spec).length === 0) {
-      const p = availablePresets(PRESETS, catalog.manifest.indicators, idx.places)[0]
+      const p = availablePresets(PRESETS, catalog.manifest.indicators, idx.places, catalog.manifest.place_sets ?? [])[0]
       if (p) setSpec(p.spec)
     } else if (!model.budget.ok) editing = true
   })
@@ -211,7 +212,7 @@
   </header>
 
   {#if editing}
-    <Builder {catalog} {idx} {spec} {model} vocab={view.vocab} depth={view.depth} {titles} {layers} {split} onspec={setSpec} onview={setView} onfix={fix}
+    <Builder {catalog} {idx} {spec} {model} depth={view.depth} {split} onspec={setSpec} onview={setView} onfix={fix}
       onunsplit={() => setSpec({ ...spec, split: null })} ondone={() => { editing = false; head?.focus({ preventScroll: true }) }} />
   {:else if !model.budget.ok || split}
     <Fixes layout={spec.layout} budget={model.budget} {split} onfix={fix} onunsplit={() => setSpec({ ...spec, split: null })} />
@@ -228,7 +229,7 @@
   {/if}
 
   {#if model.places.length === 0 || model.indicators.length === 0}
-    <Notice kind="warn">Nothing to show: no chosen place has a value for a chosen indicator. Open the builder to choose others.</Notice>
+    <Notice kind="warn">Nothing to show: no chosen place has a value for a chosen indicator. Choose others in the Select section above.</Notice>
   {:else if !showBody}
     <Notice kind="info">The report is too large for {info.title} as it is. Use one of the fixes above, or open the builder.</Notice>
   {/if}

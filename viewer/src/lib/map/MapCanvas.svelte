@@ -15,7 +15,7 @@
   import { DOT_IMAGE, classedIds, fillColorExpr, focusFilter, haloWidthExpr, lineColorExpr, lineWidthExpr, memberDotsLayer, onlyFilter } from './paint.ts'
   import { featureOf, partsKey, placeOf } from './parts.ts'
   import type { MapPart } from './parts.ts'
-  import { infoUrl, mrgidOf, wmsTileUrl } from './wms.ts'
+  import { infoUrl, mrgidOf, onlyMrgids, wmsTileUrl } from './wms.ts'
   import { boxCentre, globeZoom, isWorldScale, projectionSpec } from './frame.ts'
   import type { Proj } from './frame.ts'
   import type { WmsEntry } from './wms.ts'
@@ -290,7 +290,7 @@
     for (const [id, k] of part.classOf) { const mr = mrgidOf(id); if (mr) out.push({ id: mr, k }) }
     return out
   }
-  const wmsUrl = (part: MapPart) => wmsTileUrl(part.layer.raster!, wmsEntries(part), colors, none, line, 'mrgid', part.opaque ? nofill : null)
+  const wmsUrl = (part: MapPart) => wmsTileUrl(part.layer.raster!, wmsEntries(part), colors, none, line, 'mrgid', part.opaque ? nofill : null, onlyMrgids(part.only))
 
   function sync() {
     const m = map

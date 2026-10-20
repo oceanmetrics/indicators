@@ -10,7 +10,7 @@
   import type { Catalog, Indicator } from './lib/data.ts'
   import { appHome, parseEmbedHash } from './lib/embed.ts'
   import type { EmbedState } from './lib/embed.ts'
-  import { parseHash, placeHref, serializeHash } from './lib/hash.ts'
+  import { DEFAULT_STATE, parseHash, placeHref, serializeHash } from './lib/hash.ts'
   import type { ViewState } from './lib/hash.ts'
   import { indexCoverage, pickRow } from './lib/matrix.ts'
   import { placeCoverage } from './lib/place.ts'
@@ -53,7 +53,7 @@
     const names = [...new Set(ind.dataset.providers.filter(p => p.roles.some(r => r === 'producer' || r === 'licensor')).map(p => p.name))]
     return `Data: ${names.length ? names.join(', ') : ind.producer.name}. Licence: ${licenceText(ind)}. Values: Ocean Metrics Indicators.`
   })
-  const home = $derived(want && place ? appHome(location.href) + location.search + placeHref({ vocab: want.vocab, depth: want.depth, method: want.method }, place.id, place.coll, want.indicator) : '')
+  const home = $derived(want && place ? appHome(location.href) + location.search + placeHref({ ...DEFAULT_STATE, vocab: want.vocab, depth: want.depth, method: want.method }, place.id, place.coll, want.indicator) : '')
 
   async function drawn() {
     await tick()

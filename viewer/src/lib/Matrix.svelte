@@ -2,12 +2,15 @@
   // the Matrix: places grouped by their gazetteer collection against indicators grouped by the chosen vocabulary. `axes`
   // says which runs down the rows: indicators (the default, places across) or places. it scrolls inside its own box,
   // with the first column and the header rows sticky in both orientations. every place and indicator header has a
-  // remove button (`onhide`); every place group says how many of its places are computed and links to the gazetteer.
+  // remove button (`onhide`); every place group says how many of its places are computed, links to the gazetteer (a group nothing
+  // is computed for also links to a request) and, past 300 places, says it lists the first of them. a place no one has computed
+  // is a row (or column) of "not computed yet" cells with the ways forward.
   import { tick } from 'svelte'
   import { Icon } from '../../../src/icons/index.ts'
   import { gazetteerHref } from './data.ts'
   import type { Catalog, Indicator, VocabId } from './data.ts'
   import { cellModel, computedOf, pickRow, shortPlaceName } from './matrix.ts'
+  import { requestHref } from './nextSteps.ts'
   import type { ColumnGroup, CoverageIndex, Place, RowGroup } from './matrix.ts'
   import type { Axes, Depth } from './hash.ts'
   import { badgeUrl } from './delivery.ts'
@@ -28,7 +31,7 @@
     open: { place: string; indicator: string } | null
     onopen: (placeId: string, indicator: string) => void
     /** remove a place or an indicator from the display */
-    onhide: (kind: 'place' | 'indicator', id: string) => void
+    onhide: (kind: 'place' | 'indicator', id: string) => void | Promise<void>
     /** the href of a place's view */
     placeHref: (placeId: string, coll: string) => string
   }
@@ -47,13 +50,13 @@
 
   const model = (ind: Indicator, p: Place) => cellModel(ind, p, pickRow(idx, p.id, ind))
   const isOpen = (ind: Indicator, p: Place) => open?.place === p.id && open?.indicator === ind.id
-  const emptyWhy = $derived(flatPlaces.length === 0 ? 'No place matches. Clear the search or pick other place groups.' : 'No indicator has a value for these places. Turn on "Show indicators without values here" or pick other place groups.')
+  const emptyWhy = $derived(flatPlaces.length === 0 ? 'No place is chosen, or none matches the search. Choose places in the Select section above, or clear the search.' : 'No indicator is chosen. Choose indicators in the Select section above.')
 
   // removing a header drops the button the keyboard is on: put focus on the next remove button of the same kind
   async function hide(kind: 'place' | 'indicator', id: string) {
     const all = () => [...(box?.querySelectorAll<HTMLButtonElement>(`button.x[data-kind="${kind}"]`) ?? [])]
     const at = all().findIndex(b => b.dataset.id === id)
-    onhide(kind, id)
+    await onhide(kind, id)
     await tick()
     const left = all()
     ;(left[Math.min(at, left.length - 1)] ?? box)?.focus({ preventScroll: true })
@@ -72,11 +75,14 @@
   {@render remove('place', p.id, p.name)}
 {/snippet}
 
-{#snippet groupHead(coll: string)}
+{#snippet groupHead(g: RowGroup)}
+  {@const coll = g.coll}
   <span class="gh gp">
     <span class="gt">{titles(coll)}</span>
     <span class="gn">{computedOf(computed.get(coll) ?? 0, totals(coll))} computed ·
-      <a class="gz" href={gazetteerHref(coll)} target="_blank" rel="noopener">in the gazetteer<Icon name="ui-external" size={12} /><span class="mbon-sr-only"> (opens in a new tab)</span></a></span>
+      <a class="gz" href={gazetteerHref(coll)} target="_blank" rel="noopener">in the gazetteer<Icon name="ui-external" size={12} /><span class="mbon-sr-only"> (opens in a new tab)</span></a>
+      {#if !computed.get(coll)}· <a class="gz" href={requestHref({ collection: coll, collectionTitle: titles(coll) })} target="_blank" rel="noopener">ask for it<Icon name="ui-external" size={12} /><span class="mbon-sr-only"> (a pre-filled GitHub issue; opens in a new tab)</span></a>{/if}</span>
+    {#if g.total}<span class="gn">The first {g.places.length} of {g.total.toLocaleString('en-US')} places: search, or pick places in the Select section, to narrow it.</span>{/if}
   </span>
 {/snippet}
 
@@ -108,7 +114,7 @@
         <th class="rowh corner" scope="col" rowspan="2"><span class="mbon-label">{indRows ? 'Indicator' : 'Place'}</span></th>
         {#if indRows}
           {#each rows as g (g.coll)}
-            <th scope="colgroup" colspan={g.places.length} class="group">{@render groupHead(g.coll)}</th>
+            <th scope="colgroup" colspan={g.places.length} class="group">{@render groupHead(g)}</th>
           {/each}
         {:else}
           {#each cols as g (g.term.id)}
@@ -146,7 +152,7 @@
       {:else}
         {#each rows as g (g.coll)}
           <tr class="band">
-            <th colspan={width} scope="colgroup">{@render groupHead(g.coll)}</th>
+            <th colspan={width} scope="colgroup">{@render groupHead(g)}</th>
           </tr>
           {#each g.places as p (p.id)}
             <tr>
@@ -201,7 +207,7 @@
   .ind .t { display: flex; align-items: flex-start; gap: var(--space-1); font: var(--fw-semibold) var(--text-sm) / 1.2 var(--font-sans); color: var(--text-strong); }
   .ind .t :global(svg) { margin-top: 1px; color: var(--label-color); flex: none; }
   .ind .u { display: block; margin-top: 2px; font: var(--fw-regular) 0.6875rem / 1.3 var(--font-mono); color: var(--text-body); }
-  .pn { display: block; font: var(--fw-medium) var(--text-sm) / 1.25 var(--font-sans); color: var(--text-strong); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+  .pn { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; font: var(--fw-medium) var(--text-sm) / 1.25 var(--font-sans); color: var(--text-strong); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
   .pn:hover { color: var(--link); text-decoration-color: currentColor; }
   .pid { display: block; margin-top: 2px; font: var(--fw-regular) 0.6875rem / 1.3 var(--font-mono); color: var(--text-body); overflow-wrap: anywhere; }
   tr.band .gh { position: sticky; left: var(--space-3); }

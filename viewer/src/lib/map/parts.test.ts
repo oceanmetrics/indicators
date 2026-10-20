@@ -91,6 +91,34 @@ describe('the parts of a place set', () => {
   })
 })
 
+describe('a group chosen in part is a part restricted to its chosen places', () => {
+  it('a vector part draws only the chosen places; a whole group draws every feature', () => {
+    const items2 = [item('NERRS:WEL', 'noaa_nerrs', 1), item('NERRS:ACE', 'noaa_nerrs', 2)]
+    const pl = [place('NERRS:WEL', 'noaa_nerrs'), place('NERRS:ACE', 'noaa_nerrs'), place('NERRS:X', 'noaa_nerrs')]
+    expect(buildParts([{ group: 'noaa_nerrs', only: ['NERRS:WEL', 'NERRS:X'] }], all, items2, pl).parts[0].only).toEqual(['NERRS:WEL', 'NERRS:X'])
+    expect(buildParts([{ group: 'noaa_nerrs', only: null }], all, items2, pl).parts[0].only).toBeNull()
+    expect(buildParts(['noaa_nerrs'], all, items2, pl).parts[0].only).toBeNull()
+  })
+  it('a reference part is restricted the same way (the SLD filters to those places)', () => {
+    const p = buildParts([{ group: 'mr_eez', only: ['MRGID:8456'] }], all, items, places).parts[0]
+    expect([p.kind, p.only]).toEqual(['raster', ['MRGID:8456']])
+  })
+  it('a derived group draws only the chosen pieces', () => {
+    const fao = buildParts([{ group: 'fao_high_seas', only: ['FAOHS:21'] }], all, items, places).parts[0]
+    expect(fao.only).toEqual(['FAO:21'])
+  })
+  it('a different set of chosen places rebuilds the layers (the filter is set when they are made); the same places in another order do not', () => {
+    const a = buildParts([{ group: 'noaa_nerrs', only: ['NERRS:WEL', 'NERRS:ACE'] }], all, [], []).parts
+    const b = buildParts([{ group: 'noaa_nerrs', only: ['NERRS:ACE', 'NERRS:WEL'] }], all, [], []).parts
+    const c = buildParts([{ group: 'noaa_nerrs', only: ['NERRS:WEL'] }], all, [], []).parts
+    const whole = buildParts(['noaa_nerrs'], all, [], []).parts
+    expect(partsKey(a)).toBe(partsKey(b))
+    expect(partsKey(a)).not.toBe(partsKey(c))
+    expect(partsKey(whole)).toBe('noaa_nerrs:vector:noaa_nerrs')
+    expect(partsKey(a)).not.toBe(partsKey(whole))
+  })
+})
+
 describe('part order, key and extent', () => {
   it('orderParts keeps the vector order and puts reference parts last', () => {
     expect(orderParts([{ kind: 'raster', n: 1 }, { kind: 'vector', n: 2 }, { kind: 'raster', n: 3 }, { kind: 'vector', n: 4 }]).map(p => p.n)).toEqual([2, 4, 1, 3])
@@ -99,7 +127,7 @@ describe('part order, key and extent', () => {
     const a = buildParts(['mr_eez', 'fao_high_seas'], all, items, places).parts
     const b = buildParts(['mr_eez', 'fao_high_seas'], all, items.map(i => ({ ...i, k: 1 })), places).parts
     expect(partsKey(a)).toBe(partsKey(b))
-    expect(partsKey(a)).toBe('fao_high_seas:vector:fao_major_areas|mr_eez:raster:mr_eez')
+    expect(partsKey(a)).toMatch(/^fao_high_seas:vector:fao_major_areas:\d+-[0-9a-f]+\|mr_eez:raster:mr_eez$/)   // a derived part carries its pieces
     expect(partsKey(buildParts(['mr_eez'], all, items, places).parts)).not.toBe(partsKey(a))
   })
   it('the extent is the union of the groups’ own, with latitudes held inside the Mercator range', () => {

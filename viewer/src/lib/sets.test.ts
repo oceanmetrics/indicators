@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PlaceSet } from './data.ts'
 import { collTitle } from './data.ts'
-import { availableSets, expandGroups, findSet, groupsOf, isSetRef, setRef } from './sets.ts'
+import { expandGroups, findSet, isSetRef, setRef } from './sets.ts'
 
 const political: PlaceSet = { id: 'political', title: 'Ocean by jurisdiction', groups: ['mr_eez', 'fao_high_seas'], note: 'n' }
 const other: PlaceSet = { id: 'wide', title: 'Wide', groups: ['fao_high_seas', 'places'] }
@@ -35,20 +35,6 @@ describe('expandGroups', () => {
   it('old links, which name groups only, expand to themselves', () => {
     expect(expandGroups(['places', 'mr_eez'], sets)).toEqual(['places', 'mr_eez'])
     expect(expandGroups(['places', 'mr_eez'], [])).toEqual(['places', 'mr_eez'])
-  })
-})
-
-describe('the groups with computed places', () => {
-  it('groupsOf keeps the groups of a reference that have computed places, in the set order', () => {
-    expect(groupsOf('set:political', sets, ['fao_high_seas', 'places', 'mr_eez'])).toEqual(['mr_eez', 'fao_high_seas'])
-    expect(groupsOf('set:political', sets, ['mr_eez'])).toEqual(['mr_eez'])
-    expect(groupsOf('places', sets, ['places'])).toEqual(['places'])
-    expect(groupsOf('places', sets, [])).toEqual([])
-  })
-  it('availableSets lists the sets with at least one computed group, in the manifest order', () => {
-    expect(availableSets(sets, ['places']).map(s => s.id)).toEqual(['wide'])
-    expect(availableSets(sets, ['mr_eez', 'places']).map(s => s.id)).toEqual(['political', 'wide'])
-    expect(availableSets(sets, ['noaa_nerrs'])).toEqual([])
   })
 })
 

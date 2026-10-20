@@ -58,7 +58,7 @@ WHERE time_grain = 'year' ORDER BY place_id, time;
 | `fixtures/ecoidx/` | R | runs ecoidx `PlotTimeSeries()` on the CCIEA example data: the cross-check for `iea-sd` |
 | `brand/` | Python, Node | icon pipeline (MDI by export name + generated glyphs + traced GOOS EOV glyphs), themes, favicons |
 | `assets/goos-eov/` | PNG, WebP | the GOOS EOV badges, unmodified (see its `SOURCE.md`) |
-| `viewer/` | Svelte 5 + Vite | the Matrix view on `indicators.json` + `coverage.parquet`, with `@marinebon/ui`; two pickers (places, indicators) choose what the Matrix, Map, Place and Report views show; places as rows with `#axes=p`, remove places or indicators with the x on a header (`xp=`, `xi=`) and tick them back in a picker |
+| `viewer/` | Svelte 5 + Vite | the Matrix view on `indicators.json` + `coverage.parquet`, with `@marinebon/ui`; one selection (the Select section: places, indicators) shared by the Matrix, Map and Report views; places as rows with `#axes=p`, remove places or indicators with the x on a header (`px=`, `ix=`) and tick them back in a picker |
 | `catalog/` | (git-ignored) | build output, published to `s3://oceanmetrics.io-public/indicators/` |
 
 ## Commands
@@ -102,32 +102,42 @@ Indicators are the rows and places the columns. Places are grouped by their **ho
 build flags `--gazetteer-index <file|URL|none>` and `--layers <file|URL|none>`, `OM_OFFLINE=1` uses the cached copies
 under `cache/gazetteer/`). A place in two values collections (e.g. a requested place also in a precomputed set) is one place; each
 cell reads the values file of its own coverage row. Each group says how many of its places are computed of the
-gazetteer's total and links to it. Opens on the National Marine Sanctuaries (the `places` collection: the `NMS:*` ids; `noaa_sanctuaries` holds the ONMS section ids, another id space); the other groups are chips. An indicator with no value for
-any place on display is hidden.
+gazetteer's total and links to it (a group nothing is computed for also links to a request, and a group of more than 300 places lists the
+first 300 and says how to narrow it). Opens on the National Marine Sanctuaries (the `places` collection: the `NMS:*` ids; `noaa_sanctuaries` holds the ONMS section ids, another id space). An indicator with no value for
+any place on display is hidden, unless none has a value (places no one has computed yet: all stay, so each empty cell can be asked for).
 A place of a **derived** gazetteer layer (the high seas by FAO area, `fao_high_seas`, which has no geometry of its own) also carries `display_id` in `coverage.parquet`: its index `source_id` (`FAO:21`), the id of the feature of the layer that draws it (`fao_major_areas`); null for any other place.
-Hash keys: `colls` (comma list of groups, or `set:<id>` for the groups of a place set; none = the sanctuaries, every group while searching), `q` (a place search kept from old
-links; the toolbar shows it as a chip), `vocab`, `leads`, `depth`, `cell` (an open drawer: `place|indicator`), `axes=p` (places as rows;
-the old `axes=t` reads as the default), `empty=1` (show the indicators without values), `xp` and `xi` (removed places and indicators),
-`ai` (added indicators).
 
-**The two pickers** (`viewer/src/lib/pick/`, one component each for every view; their rules are in `places.ts` / `placesTree.ts` and
+**The selection** is one object, shared by the Matrix, Map, Report and Place views, chosen in the **Select section** above the view tabs (every view
+but the Place view's body; the Place view carries it in its hash and its links). It is the report spec's own `places` and `indicators` rules
+(`src/report/spec.ts`; `viewer/src/lib/selection.ts`), written as hash keys:
+- `pi` / `px`: the places included and excluded: `coll:<slug>` (a gazetteer collection), `set:<id>` (a place set: its groups), a place id, or `*`
+  (every computed place). Default `coll:places` (the sanctuaries), written as nothing.
+- `ii` / `ix`: the indicators included and excluded: `*` (each series' lead; the default, written as nothing), `all` (every indicator),
+  `cat:<term>`, `series:<id>` (its lead), `series:<id>:*`, or an id.
+- shared by every view: `vocab`, `depth`, `axes=p` (places as rows; the old `axes=t` reads as the default), `empty=1` (show the indicators without values).
+- Matrix only: `q` (a place search that narrows the selection; the toolbar shows it as a chip) and `cell` (an open drawer: `place|indicator`).
+- **Old links still open on the same places and indicators** (read when the hash is parsed, dropped on the next write): `colls=a,b` is `pi=coll:a,coll:b`
+  (`set:` stays), `xp` is `px`, `xi` is `ix`, `ai` joins `ii` beside `*`, `leads=0` is `ii=all`, and a Map link's `coll=<slug>` is `pi=coll:<slug>`
+  with its `ind` joined to `ii`. A Report link's `pi=*` keeps meaning every place.
+
+**The Select section** (`SelectBar.svelte`) holds the two pickers and a line of what is chosen ("National Marine Sanctuaries · 18 places × 24 indicators").
+The pickers (`viewer/src/lib/pick/`, one component each for every view; their rules are in `places.ts` / `placesTree.ts` and
 `indicators.ts` / `indicatorsTree.ts`, tested; the panels load on the first open). Each is a button that says what is selected
-("National Marine Sanctuaries · 19 places", "11 indicators · ONMS sections · leads only") and opens a popover (a full-width sheet
-at 600 px and below; Esc closes it and focus returns to the button, Tab stays inside, arrow keys move through the list).
-- **Places** (`multi` in the Matrix and the Report builder, `group` in the Map, `place` in the Place view): a search over the computed
-  places (name and id), every group with computed places as a tick tree (groups, then places) with "n of N" computed of the gazetteer's
-  total and its "in the gazetteer" link, and **Not computed yet**: every polygon collection of the gazetteer with no computed place,
-  each with its gazetteer link and a request link (the indicator-request issue form with `collection` only; a maintainer reviews).
-  In the Matrix a group ticked on shows it (`colls`), a place unticked is removed (`xp`).
-- **Indicators** (`multi` in the Matrix, `single` in the Map and the Place view): a search, the vocabulary switch (ONMS, NaMES, GOOS EOVs),
-  the leads and "show indicators without values here" switches, and the tree category -> series -> indicator with how many of the places
-  on display have a value. In the Matrix a tick is `xi` (removed) or `ai` (added beyond the leads). The Report builder keeps its own
-  indicator tree, which writes rules rather than ids.
+and opens a popover (a full-width sheet at 600 px and below; Esc closes it and focus returns to the button, Tab stays inside, arrow keys move through the list). A tick is a change of the rules (`report/tree.ts`).
+- **Places** (`multi` in the Select section, `place` in the Place view): a search, the place sets, and **every polygon collection of the gazetteer**
+  (`layers.json`; lines and points are not offered), computed or not, as a tick tree (set or group, then places) with "n of N computed" and the
+  "in the gazetteer" link. A place set shows a line of what it combines. The places of a collection nothing is computed for come from the
+  gazetteer's index (`index/places_index.parquet`, 5 MB: only `place_id`, `name` and `collection` are read, by range requests, in
+  `gazetteerPlaces.ts`), the first time such a group is opened, chosen or searched; the default selection never reads it. A place with no value is a
+  row (or column) of "not computed yet" cells with the ways forward below. A group longer than 300 places lists the first 300.
+- **Indicators** (`multi` in the Select section, `single` in the Map and the Place view): a search, the vocabulary switch (ONMS, NaMES, GOOS EOVs),
+  the "Leads only" switch (`all` against `*`) and "show indicators without values here" switch, and the tree category -> series -> indicator,
+  tri-state at each level, with how many of the places chosen have a value. A series ticks its lead; open it for the others.
 
-**Context carried between views:** Matrix -> Map opens the group of the last opened cell and that cell's indicator (else the first
-group on display and its first lead with values); Map -> Matrix opens the Map's group with the drawer on the cell of the selected
-place; Place -> Map opens the place's group and the opened indicator with the place selected (`hash.ts`: `matrixToMapHref`,
-`mapToMatrixHref`, `placeToMapHref`).
+**Context carried between views:** every link to another view carries the selection and the shared keys (`hash.ts`: `carryOver`); each view keeps its
+own keys as it was left. Matrix -> Map opens the indicator and place of the last opened cell; Map -> Matrix opens the drawer on the cell of the
+selected place; Place -> Map opens the opened indicator with the place selected, both added to the selection when it lacks them
+(`matrixToMapHref`, `mapToMatrixHref`, `placeToMapHref`).
 A cell is a value with its status and trend glyphs, **not computed yet** (open it: compute it now in erddap-places, or
 ask for it by a prefilled issue), **no data here** (the indicator has a values file for this place's collection, with
 nothing for the place), or a dash (**not offered** for this kind of place).
@@ -142,11 +152,9 @@ opened" (its card, or a "not computed yet" card with the same ways forward), the
 
 ## Report view
 
-`#view=report` lays out chosen places x chosen indicators; the spec (`src/report/spec.ts`: rules such as `coll:places`,
-`cat:water-quality`, `series:sst:*`, with each untick in an exclude list) is in the URL hash, so every report is a
-permalink, and `report.json` (Export menu) is the same spec. **Edit** opens the builder: a preset, two trees of tri-state
-checkboxes (places by collection, indicators by category then series; Tab to a box, Space toggles it, the counts are
-places with a value of the places chosen), the layout with its panel budget and, over budget, the fixes (switch layout,
+`#view=report` lays out the selection (the places and indicators of the Select section: the same rows as the Matrix, in its
+orientation); the spec (`src/report/spec.ts`) is in the URL hash, so every report is a permalink, and `report.json` (Export menu)
+is the same spec. **Edit** opens the builder: a preset ("Start from" sets the shared selection, the layout and the title), the layout with its panel budget and, over budget, the fixes (switch layout,
 split into sections, collapse series to leads), the status method, recent window, baseline and years. The **Context
 region** switch is disabled and says what it waits on (the gazetteer recording which places lie inside which); `ctx=1` in
 a link is still read. Every layout is drawn (`viewer/src/lib/report/`, the layouts in `layouts/`), at the skimmer,
@@ -166,8 +174,8 @@ Every layout but the Map sheet has a collapsible **locator map** on top: the cho
 gazetteer's tiles hold their geometry, the map framed to them (a Marine Regions EEZ is drawn by the publisher's WMS and has
 no geometry of ours to frame, so the map keeps its group's extent); the place names show on hover and are listed under it.
 The report's maps (and the Map view) frame places the short way round the globe (`unionBoxes()` in `viewer/src/lib/map/bounds.ts`: the Pacific sanctuaries are one box of about 134 degrees centred on the Pacific, not the world), never draw the world twice side by side (MapLibre's world copies are off while the world is narrower than the frame, and a view over the antimeridian keeps them but may not zoom out past one world across the frame), and on the globe a world-scale frame opens on the whole sphere (`globeZoom()` in `viewer/src/lib/map/frame.ts`, from MapLibre's camera model). In the Quad plot, labels are placed by `placeLabels()` so that none overlaps a point's glyph or another label: the nearest free spot among 16 directions at growing distances, a leader line from the point when the label stands off, and a note under the plot when there is no room (the table carries every label). Maps are printed as a picture of themselves, drawn in the light theme when the job starts from Export, Print (Ctrl-P without
-it prints the last picture, in the theme on screen). The MapLibre chunk loads when a map is first shown. The Matrix toolbar's **Report**
-button opens the builder with what the Matrix shows. Cells with no value are listed under the report with a prefilled
+it prints the last picture, in the theme on screen). The MapLibre chunk loads when a map is first shown. The Report shows the places and indicators of the selection
+that have a value; cells with no value are listed under the report with a prefilled
 GitHub issue. Print (Export, Print) hides the app chrome, prints the title, permalink and report id, and uses the light theme.
 
 **Export, SanctuaryWatch bundle** builds `sanctuarywatch_<place or report id>.zip` in the browser (a store-only ZIP writer,
@@ -194,20 +202,20 @@ back to the Place view; `?theme=` and `?brand=` work as in the app, and `main.em
 
 ## Map view
 
-`#view=map` colours one indicator over one **place group** (a gazetteer collection: a place's home collection, `place_coll`): by its
+`#view=map` colours one indicator over **the places of the selection** (the Select section above the tabs): by its
 value (five quantile classes), its departure from the place's own mean (in SD), its status or trend (iea-sd or names-pct, computed by
 `src/status` as of the period shown), the length of its record, or, for a categorical indicator, its largest class or the share of
-one class. A slider walks the periods. Hash keys: `ind`, `coll` (the group; an old link's values collection still resolves to the
-group holding most of its places), `place` (the place selected), `color` (`value|departure|status|trend|record|class|share`), `t`
+one class. A slider walks the periods. Hash keys: `ind` (the indicator: the hash's when it is in the selection, else the first selected one with
+values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` (the place selected), `color` (`value|departure|status|trend|record|class|share`), `t`
 (`2024` or `2024-07`; none = each place's latest), `cls` (the class `share` maps), `grain`, `proj` (`globe`; absent = the flat map) and `method`.
+- **Every group of the selection is a layered part** of the map, as a place set is (see below): `viewer/src/lib/map/selection.ts` turns the rules into groups; a group chosen in part
+  (places picked by id, or some taken away) is drawn restricted to its chosen places (a vector filter; for a Marine Regions group an SLD filter on the
+  MRGIDs, up to 120 of them: past that the whole group is drawn). Excluded places are not drawn and not in the legend or the table.
+- **The indicator chooser** lists the indicators of the selection that have values here, with how many of the places; "Another indicator" opens the
+  indicator picker of the Select section.
 - **Globe and full screen** (the buttons on the map frame, `MapFrameControls.svelte`; rules in `frame.ts`): Flat / Globe sets MapLibre's `globe` projection (`proj=globe` in the hash, honoured by the embed too); every layer kind draws on it: the gazetteer PMTiles, the derived FAO layer, the Marine Regions WMS tiles and the hollow circles. A `--map-sea` colour (the themes) fills what the basemap tiles do not cover (the Arctic cap). **Full screen** uses the Fullscreen API on the wrapper that holds the map, its credit line and the side column (legend, selected place), not MapLibre's control, which takes the canvas alone: the side column floats over the map on the raised `--overlay-*` surface (under the map on a phone). Where the element API is missing (iPhone Safari), the wrapper is expanded to a fixed full-viewport box instead. The button says what it does (Full screen / Exit full screen); Esc and the button leave, and focus stays on the button.
-- **Place sets** (`config/place_sets.yml`, the manifest's `place_sets`; `viewer/src/lib/sets.ts`): a named list of place groups offered as one choice above the groups, in the place picker (Matrix: a tick that ticks all its groups; Map: one choice) and in a link as `set:<id>` (`coll=set:political` on the Map, `colls=set:political` in the Matrix; a link that names groups reads as before). `political` is **Ocean by jurisdiction**: the EEZs (`mr_eez`) and the high seas by FAO major fishing area (`fao_high_seas`), which together cover the ocean. A record on a shared boundary counts in each place, so place totals are never summed. An `ecological` set (MEOW and PPOW) waits on UNEP-WCMC's permission and has no data here. The Map draws a set by layering its groups, the vector and derived groups first and the reference (WMS) groups on top (`viewer/src/lib/map/parts.ts`), with one legend, one table and one colour scale across all their places; a click answers from the top group down, so an EEZ over a high-seas piece is the EEZ, and open sea is the piece.
+- **Place sets** (`config/place_sets.yml`, the manifest's `place_sets`; `viewer/src/lib/sets.ts`): a named list of place groups offered as one choice above the groups, with a line of what it combines, in the place picker (a tick: the rule `set:<id>`) and in a link as `pi=set:political` (the old `coll=set:political` on the Map and `colls=set:political` in the Matrix read as the same). `political` is **Ocean by jurisdiction**: the EEZs (`mr_eez`) and the high seas by FAO major fishing area (`fao_high_seas`), which together cover the ocean. A record on a shared boundary counts in each place, so place totals are never summed. An `ecological` set (MEOW and PPOW) waits on UNEP-WCMC's permission and has no data here. The Map draws a set by layering its groups, the vector and derived groups first and the reference (WMS) groups on top (`viewer/src/lib/map/parts.ts`), with one legend, one table and one colour scale across all their places; a click answers from the top group down, so an EEZ over a high-seas piece is the EEZ, and open sea is the piece.
 - **Derived groups:** a gazetteer layer with `kind: "derived"` (layers.json `display: {via, id_from}`) is drawn as the features of its `via` layer (`fao_major_areas`, PMTiles) whose `place_id` is a place's `display_id`; only those features are drawn, each coloured by the value of its place, and a click selects the place, not the FAO area. An FAO polygon covers its EEZs too: it is drawn under the EEZ WMS, and under a set the WMS fills every EEZ opaque (the places with no class in the no-data tint), so only each area's high-seas part shows. We host no geometry of the Marine Regions layers; the FAO major areas are the gazetteer's own PMTiles.
-- **Group picker:** every group with computed places, those with values for the indicator shown first (with how many), the others
-  marked "no values for <indicator>". Choosing one of those switches to that group's own lead (the sea surface temperature when it has
-  it) and says so above the map ("SST is not computed for National Estuarine Research Reserves; showing Precipitation (NASA IMERG).").
-  The indicator picker lists, per indicator, the groups that have values. The OBIS indicators are one choice (OBIS biodiversity) with a
-  metric and an EOV switch.
 - **Geometry** is the group's gazetteer collection: vector collections (`places`, `noaa_nerrs`) from the gazetteer's PMTiles, reference
   collections (`mr_eez`) by Marine Regions' own WMS (one request per tile, an SLD plus `ENV`; no Marine Regions geometry is hosted by
   us). Values are read from every values file of the indicator that holds places of the group.
@@ -225,7 +233,7 @@ group holding most of its places), `place` (the place selected), `color` (`value
 - one map: `embed/#view=map&…` with the Map view's keys, for example the live CoastWatch OBIS for the MBON tools page:
 
 ```html
-<iframe src="https://oceanmetrics.io/indicators/embed/?brand=mbon#view=map&ind=obis:species&coll=set:political&grain=decade"
+<iframe src="https://oceanmetrics.io/indicators/embed/?brand=mbon#view=map&ind=obis:species&pi=set:political&grain=decade"
   title="OBIS species richness by EEZ and high-seas area (Ocean Metrics Indicators)" width="100%" height="900" style="border:0"></iframe>
 ```
 
@@ -297,7 +305,7 @@ People" (PPG-26-197).
 `node scripts/size-budget.mjs` after `npm run build`, in gzip: entry JS ≤ 110 kB, all JS except the map chunk ≤ 200 kB,
 the map chunk (MapLibre, pmtiles and the map components) ≤ 330 kB, CSS except the map's ≤ 15 kB, the map's CSS ≤ 15 kB.
 At the first deploy (2026-10-20) the entry was 86.5 kB and the CSS 6.7 kB. The map chunk has its own budget because
-MapLibre is about 230 kB gzip and is loaded only when the Map view is opened. With the two pickers (2026-10-20) the entry is 107.0 kB and the CSS 14.98 kB (107.6 and 15.0 with the place sets: their code is the Map's or lives in the lazy panels, and their rules reuse `om-*` classes): the picker panels and their rules load on the first open, and rules that several components repeated live once in `viewer/src/app.css` as `om-*` classes (gzip is per file, so each copy cost bytes). Nothing was raised for the pickers. With the globe and full screen (2026-10-20) the entry is 108.1 kB (the hash key, three icons and the overlay tokens, which live in the inlined theme files) and the CSS 14.99 kB: the `--map-sea` and `--overlay-*` tokens and the Menu rule are in `brand/themes/*.css` (inlined in the JS), not in the entry CSS. Nothing was raised. Raise a budget only with the reason here.
+MapLibre is about 230 kB gzip and is loaded only when the Map view is opened. With the two pickers (2026-10-20) the entry is 107.0 kB and the CSS 14.98 kB (107.6 and 15.0 with the place sets: their code is the Map's or lives in the lazy panels, and their rules reuse `om-*` classes): the picker panels and their rules load on the first open, and rules that several components repeated live once in `viewer/src/app.css` as `om-*` classes (gzip is per file, so each copy cost bytes). Nothing was raised for the pickers. With the globe and full screen (2026-10-20) the entry is 108.1 kB (the hash key, three icons and the overlay tokens, which live in the inlined theme files) and the CSS 14.99 kB: the `--map-sea` and `--overlay-*` tokens and the Menu rule are in `brand/themes/*.css` (inlined in the JS), not in the entry CSS. Nothing was raised. With the shared selection and the Select section (2026-10-20) the entry was 109.7 kB and the CSS 14.9 kB before the merge with the globe and the report layouts (the toggling rules of `report/tree.ts` load with the first tick or removal, the gazetteer's index loader and the picker panels on first use; the Tree's look-alike CSS moved rather than grew). Raise a budget only with the reason here.
 
 With the report layouts and maps (2026-10-20) the entry is 107.9 kB (the spec's `ys` key) and nothing in the entry's CSS changed. The
 budget script now counts three things differently, and one budget is new: (1) `MapCanvas-*` (MapLibre, pmtiles) and `MapTable-*` count
