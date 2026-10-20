@@ -82,8 +82,8 @@ export interface Catalog {
   coverage: CoverageRow[]
 }
 
-/** the production default, until the catalog is published */
-export const PUBLISHED_BASE = 'https://storage.oceanmetrics.io/indicators/'
+/** the production default: the bucket host, path-style (storage.oceanmetrics.io answers with a 302, one redirect per request) */
+export const PUBLISHED_BASE = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/'
 /** the dev default: the repo's catalog/, served by the dev middleware in vite.config.ts */
 export const DEV_BASE = './catalog/'
 
