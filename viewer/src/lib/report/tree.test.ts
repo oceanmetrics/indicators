@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { expandIndicators, expandPlaces } from '../../../../src/report/spec.ts'
 import {
-  NONE, buildIndicatorTree, buildPlaceTree, collapseToLeads, selectedIds, seriesOfCategory, toggleCategory, toggleCollection,
-  toggleIndicator, togglePlace, toggleSeries,
+  NONE, collapseToLeads, selectedIds, seriesOfCategory, toggleCategory, toggleCollection,
+  toggleIndicator, togglePlace, toggleSeries, toggleSet,
 } from './tree.ts'
-import type { TreeIndicator, TreeNode, TreePlace } from './tree.ts'
+import type { TreeIndicator, TreePlace } from './tree.ts'
 
 const ind = (id: string, series: string, lead: boolean, onms: string | undefined, extra: Partial<TreeIndicator> = {}): TreeIndicator => ({
   id, series, lead, category: onms ? { onms } : {}, title: `${id} (title)`, short: id.split(':').pop()!, ...extra,
@@ -123,93 +123,13 @@ describe('normalising a selection', () => {
   })
 })
 
-// coverage rows: sst (mur and oisst) in 3 places, chl in 2, npp in none, obis:records in 1, sdg in the EEZ only
-const row = (place_id: string, coll: string, indicator: string) => ({ place_id, coll, indicator, last_value: 1 })
 const PLACES: TreePlace[] = [
   { id: 'NMS:A', coll: 'places', name: 'Alpha' }, { id: 'NMS:B', coll: 'places', name: 'Bravo' }, { id: 'NMS:C', coll: 'places', name: 'Charlie' },
   { id: 'MRGID:1', coll: 'mr_eez', name: 'Zed EEZ' },
 ]
-const ROWS = [
-  ...['NMS:A', 'NMS:B', 'NMS:C'].flatMap(p => [row(p, 'places', 'sst:mur'), row(p, 'places', 'sst:oisst')]),
-  row('NMS:A', 'places', 'chl:chl'), row('NMS:B', 'places', 'chl:chl'),
-  row('NMS:A', 'places', 'obis:records'),
-  row('MRGID:1', 'mr_eez', 'sdg:mpa'),
-  { place_id: 'NMS:C', coll: 'places', indicator: 'npp:npp', last_value: null },
-]
-const flat = (ns: TreeNode[]): TreeNode[] => ns.flatMap(n => [n, ...flat(n.children), ...flat(n.more)])
-const tree = (sel = STAR, places = PLACES.slice(0, 3)) => buildIndicatorTree({ indicators: ALL, vocab: 'onms', terms: TERMS, sel, rows: ROWS, places })
 
-describe('the indicator tree', () => {
-  it('coverage gates it: an indicator with no value for the chosen places is left out, with its empty series and category', () => {
-    const t = tree()
-    expect(t.map(c => c.key)).toEqual(['water-quality', 'living-resources'])
-    expect(flat(t).filter(n => n.kind === 'indicator').map(n => n.key)).toEqual(['sst:mur', 'sst:oisst', 'chl:chl', 'obis:species', 'obis:records'])
-  })
-  it('counts places per node: leaves by coverageCounts, series and categories by the union', () => {
-    const t = tree()
-    const by = Object.fromEntries(flat(t).map(n => [n.key, n.hint]))
-    expect(by['sst:mur']).toBe('3 of 3 places')
-    expect(by['chl:chl']).toBe('2 of 3 places')
-    expect(by['obis:records']).toBe('1 of 3 places')
-    expect(by['obis']).toBe('1 of 3 places')
-    expect(by['water-quality']).toBe('3 of 3 places')
-  })
-  it('counts against the chosen places only', () => {
-    const by = Object.fromEntries(flat(tree(STAR, [PLACES[3]])).map(n => [n.key, n.hint]))
-    expect(Object.keys(by)).toEqual(['response', 'sdg', 'sdg:mpa'])
-    expect(by['sdg:mpa']).toBe('1 of 1 places')
-  })
-  it('an indicator the spec includes by id stays in the tree with no coverage', () => {
-    const t = tree({ include: ['npp:npp'], exclude: [] })
-    expect(flat(t).find(n => n.key === 'npp:npp')).toMatchObject({ state: 'checked', hint: '0 of 3 places' })
-  })
-  it('a series sits under its lead\'s category; its non-leads are under "more"', () => {
-    const sst = flat(tree()).find(n => n.key === 'sst')!
-    expect(sst.label).toBe('Sea surface temperature')
-    expect(sst.children.map(n => n.key)).toEqual(['sst:mur'])
-    expect(sst.more.map(n => n.key)).toEqual(['sst:oisst'])
-  })
-  it('a leaf is checked iff it is chosen; a series by its lead (mixed by another member); a category by its leads', () => {
-    const s = (sel: { include: string[]; exclude: string[] }) => Object.fromEntries(flat(tree(sel)).map(n => [n.key, n.state]))
-    expect(s(STAR)).toMatchObject({ 'water-quality': 'checked', sst: 'checked', 'sst:mur': 'checked', 'sst:oisst': 'unchecked', 'living-resources': 'checked' })
-    expect(s({ include: ['sst:oisst'], exclude: [] })).toMatchObject({ sst: 'mixed', 'sst:oisst': 'checked', 'sst:mur': 'unchecked', 'water-quality': 'unchecked' })
-    expect(s({ include: ['*'], exclude: ['chl:chl'] })).toMatchObject({ 'water-quality': 'mixed', chl: 'unchecked', sst: 'checked', 'living-resources': 'checked' })
-    expect(s({ include: [NONE], exclude: [] })).toMatchObject({ 'water-quality': 'unchecked', 'living-resources': 'unchecked' })
-  })
-  it('puts a lead whose tag the vocabulary does not name under "Other", last', () => {
-    const rows = [...ROWS, row('NMS:A', 'places', 'odd:x')]
-    const t = buildIndicatorTree({ indicators: ALL, vocab: 'onms', terms: TERMS, sel: STAR, rows, places: PLACES.slice(0, 3) })
-    expect(t.map(c => [c.key, c.label])).toEqual([['water-quality', 'Water quality'], ['living-resources', 'Living resources'], ['other', 'Other']])
-  })
-  it('a toggled selection reads back in the tree', () => {
-    const sel = toggleCategory(STAR, ALL, 'onms', KNOWN, 'water-quality', false)
-    expect(Object.fromEntries(tree(sel).map(c => [c.key, c.state]))).toEqual({ 'water-quality': 'unchecked', 'living-resources': 'checked' })
-  })
-})
-
-describe('the place tree', () => {
-  const COLLS = [{ id: 'places', title: 'Sanctuaries' }, { id: 'mr_eez', title: 'EEZs' }]
+describe('ticking places', () => {
   const sel = { include: ['*'], exclude: [] as string[], context: false }
-  const ptree = (s = sel, query = '') => buildPlaceTree({ places: PLACES, colls: COLLS, sel: s, query })
-
-  it('lists collections in order and places by name, with counts', () => {
-    const t = ptree()
-    expect(t.map(c => [c.key, c.hint])).toEqual([['places', '3 of 3 places'], ['mr_eez', '1 of 1 places']])
-    expect(t[0].children.map(p => p.label)).toEqual(['Alpha', 'Bravo', 'Charlie'])
-    expect(t[0].children[0]).toMatchObject({ key: 'NMS:A', hint: 'NMS:A', state: 'checked' })
-  })
-  it('a collection is mixed when some of its places are chosen', () => {
-    const t = ptree({ include: ['coll:places'], exclude: ['NMS:B'], context: false })
-    expect(t.map(c => c.state)).toEqual(['mixed', 'unchecked'])
-    expect(t[0].hint).toBe('2 of 3 places')
-  })
-  it('search narrows the leaves and drops a collection with none, but not the state', () => {
-    const t = ptree(sel, 'brav')
-    expect(t.map(c => c.key)).toEqual(['places'])
-    expect(t[0].children.map(p => p.key)).toEqual(['NMS:B'])
-    expect(t[0].state).toBe('checked')
-    expect(ptree(sel, 'mrgid:1').map(c => c.key)).toEqual(['mr_eez'])
-  })
   it('a place off: its id goes in exclude when `*` holds it', () => {
     expect(togglePlace(sel, PLACES, 'NMS:B', false)).toEqual({ include: ['*'], exclude: ['NMS:B'], context: false })
   })
@@ -225,7 +145,42 @@ describe('the place tree', () => {
     expect(toggleCollection(sel, PLACES, 'places', false)).toEqual({ include: ['*'], exclude: ['coll:places'], context: false })
     expect(expandPlaces(toggleCollection(sel, PLACES, 'places', false), PLACES).map(p => p.id)).toEqual(['MRGID:1'])
   })
+  it('a group off with the sanctuaries only chosen leaves nothing chosen, which is `none`', () => {
+    expect(togglePlace({ include: ['coll:places'], exclude: [], context: false }, PLACES, 'NMS:A', false)).toEqual({ include: ['coll:places'], exclude: ['NMS:A'], context: false })
+    expect(toggleCollection({ include: ['coll:places'], exclude: [], context: false }, PLACES, 'places', false)).toEqual({ include: [NONE], exclude: [], context: false })
+  })
   it('selectedIds reads a selection back', () => {
     expect([...selectedIds(toggleIndicator(STAR, ALL, 'odd:x', false), ALL)]).toEqual(ALL_LEADS.filter(i => i !== 'odd:x'))
+  })
+})
+
+describe('ticking a place set', () => {
+  const SETS = [{ id: 'political', groups: ['mr_eez', 'fao_high_seas'] }]
+  const ALLP: TreePlace[] = [...PLACES, { id: 'FAO:HS1', coll: 'fao_high_seas', name: 'High seas 1' }, { id: 'FAO:HS2', coll: 'fao_high_seas', name: 'High seas 2' }]
+  const base = { include: ['coll:places'], exclude: [] as string[], context: false }
+  const ids = (sel: typeof base) => expandPlaces(sel, ALLP, SETS).map(p => p.id)
+  it('on: set:<id> joins include and the places of its groups are chosen; the excludes of its groups and places go', () => {
+    const s = toggleSet({ ...base, exclude: ['MRGID:1', 'coll:fao_high_seas'] }, ALLP, SETS[0], true, SETS)
+    expect(s).toEqual({ include: ['coll:places', 'set:political'], exclude: [], context: false })
+    expect(ids(s)).toEqual(['NMS:A', 'NMS:B', 'NMS:C', 'MRGID:1', 'FAO:HS1', 'FAO:HS2'])
+  })
+  it('off: it and its groups leave include; the places of other rules stay', () => {
+    const s = toggleSet({ ...base, include: ['coll:places', 'set:political', 'coll:mr_eez'] }, ALLP, SETS[0], false, SETS)
+    expect(s).toEqual({ include: ['coll:places'], exclude: [], context: false })
+  })
+  it('off: when `*` still holds its places, the set is excluded', () => {
+    const s = toggleSet({ ...base, include: ['*'] }, ALLP, SETS[0], false, SETS)
+    expect(s).toEqual({ include: ['*'], exclude: ['set:political'], context: false })
+    expect(ids(s)).toEqual(['NMS:A', 'NMS:B', 'NMS:C'])
+  })
+  it('a place of a chosen set off is excluded by id; a group of the set off is excluded as the group', () => {
+    const on = toggleSet(base, ALLP, SETS[0], true, SETS)
+    expect(togglePlace(on, ALLP, 'FAO:HS1', false, SETS).exclude).toEqual(['FAO:HS1'])
+    const off = toggleCollection(on, ALLP, 'fao_high_seas', false, SETS)
+    expect(off.exclude).toEqual(['coll:fao_high_seas'])
+    expect(ids(off)).toEqual(['NMS:A', 'NMS:B', 'NMS:C', 'MRGID:1'])
+  })
+  it('an exclude of a set is not dropped as pointless', () => {
+    expect(toggleCollection({ include: ['*'], exclude: ['set:political'], context: false }, ALLP, 'places', false, SETS).exclude).toEqual(['set:political', 'coll:places'])
   })
 })

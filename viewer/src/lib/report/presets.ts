@@ -1,8 +1,8 @@
 // named report specs for the builder's "Start from" menu. they live here until instances land (instance.json holds
-// them then, plan §6). a preset is offered only when it expands to at least one place and one indicator, so the
-// OBIS one appears once OBIS indicators are published.
+// them then, plan §6). a preset is the shared selection (places and indicators, as for every view) plus a layout and a title.
+// it is offered only when it expands to at least one place and one indicator, so the OBIS one appears once OBIS indicators are published.
 import { DEFAULT_SPEC, expandIndicators, expandPlaces } from '../../../../src/report/spec.ts'
-import type { IndicatorLike, PlaceLike, ReportSpec } from '../../../../src/report/spec.ts'
+import type { IndicatorLike, PlaceLike, PlaceSetLike, ReportSpec } from '../../../../src/report/spec.ts'
 
 export interface Preset {
   id: string
@@ -27,8 +27,8 @@ export const PRESETS: Preset[] = [
 ]
 
 /** the presets that expand to something in this catalog */
-export function availablePresets(all: Preset[], inds: IndicatorLike[], placesList: PlaceLike[]): Preset[] {
-  return all.filter(p => expandPlaces(p.spec.places, placesList).length > 0 && expandIndicators(p.spec.indicators, inds).length > 0)
+export function availablePresets(all: Preset[], inds: IndicatorLike[], placesList: PlaceLike[], sets: readonly PlaceSetLike[] = []): Preset[] {
+  return all.filter(p => expandPlaces(p.spec.places, placesList, sets).length > 0 && expandIndicators(p.spec.indicators, inds).length > 0)
 }
 
 /** the preset a spec is, if it is exactly one (the builder's select shows it) */

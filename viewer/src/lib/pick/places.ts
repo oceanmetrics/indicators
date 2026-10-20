@@ -1,13 +1,14 @@
-// the place picker's rules that the page needs before the panel opens, in plain functions: the groups that have computed
-// places, the places the Matrix shows and the words on the picker's button. the panel's own rules (search, tree, ticks,
-// the collections nothing is computed for) are in placesTree.ts, loaded with the panel.
-import { collTitle } from '../data.ts'
+// the place picker's rules that the page needs before the panel opens, in plain functions: the groups (the gazetteer's polygon
+// collections, computed or not), the place sets and the words on the picker's button. the panel's own rules (search, tree,
+// ticks as rules) are in placesTree.ts, loaded with the panel.
+import { collTitle, GROUP_ORDER } from '../data.ts'
 import type { Layers, PlaceSet } from '../data.ts'
-import { availableSets, setRef } from '../sets.ts'
-import { shortPlaceName } from '../matrix.ts'
+import { isPolygonLayer } from '../gazetteerPlaces.ts'
+import { setRef } from '../sets.ts'
+import { orderGroups, shortPlaceName } from '../matrix.ts'
 import type { CoverageIndex, Place } from '../matrix.ts'
 
-export type PickMode = 'multi' | 'group' | 'place'
+export type PickMode = 'multi' | 'place'
 
 export interface GroupInfo {
   coll: string
@@ -16,15 +17,39 @@ export interface GroupInfo {
   computed: number
   /** the gazetteer's number of places in the collection, null until layers.json has loaded */
   total: number | null
-  /** the computed places by name */
+  /** the places the picker can list: the computed ones first, then (once the gazetteer's index is read) the others, each by name */
   places: Place[]
+  /** every place of the group is in `places`: nothing more would come from the gazetteer's index */
+  loaded: boolean
 }
 
-/** every group with computed places, in the index's group order, with its places by name */
-export function placeGroups(idx: CoverageIndex, layers: Layers = {}): GroupInfo[] {
-  return idx.colls.map(coll => {
-    const places = idx.places.filter(p => p.coll === coll).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
-    return { coll, title: collTitle(coll, layers), computed: places.length, total: layers[coll]?.n ?? null, places }
+export interface GroupOpts {
+  /** also the polygon collections of the gazetteer that nothing is computed for (the Matrix, Map and Report; the Place view lists computed places only) */
+  all?: boolean
+  /** the gazetteer's places are read (the universe holds them) */
+  gazetteer?: boolean
+}
+
+/**
+ * the groups the picker lists, in the index's group order, then (with `all`) the gazetteer's other polygon collections by
+ * their place in the group order and title; each with its places from the universe, computed first
+ */
+export function placeGroups(universe: Place[], idx: CoverageIndex, layers: Layers = {}, opts: GroupOpts = {}): GroupInfo[] {
+  const computedIds = new Set(idx.places.map(p => p.id))
+  const by = new Map<string, Place[]>()
+  for (const p of universe) by.set(p.coll, [...(by.get(p.coll) ?? []), p])
+  const nComputed = new Map<string, number>()
+  for (const p of idx.places) nComputed.set(p.coll, (nComputed.get(p.coll) ?? 0) + 1)
+  const rank = new Map(GROUP_ORDER.map((c, n) => [c, n]))
+  const others = opts.all
+    ? Object.keys(layers).filter(c => isPolygonLayer(layers[c].geom) && !idx.colls.includes(c))
+      .sort((a, b) => (rank.get(a) ?? 1e9) - (rank.get(b) ?? 1e9) || collTitle(a, layers).localeCompare(collTitle(b, layers)))
+    : []
+  return [...orderGroups(idx.colls), ...others].map(coll => {
+    const places = (by.get(coll) ?? []).slice().sort((a, b) => Number(computedIds.has(b.id)) - Number(computedIds.has(a.id)) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+    const computed = nComputed.get(coll) ?? 0
+    const total = layers[coll]?.n ?? null
+    return { coll, title: collTitle(coll, layers), computed, total, places, loaded: !!opts.gazetteer || (computed > 0 && (total == null || computed >= total)) }
   })
 }
 
@@ -33,7 +58,9 @@ export interface SetInfo {
   ref: string
   title: string
   note: string | null
-  /** the set's groups that have computed places, in the set's order */
+  /** what it combines, in a line: its groups' titles */
+  desc: string
+  /** the set's groups the picker lists, in the set's order */
   groups: GroupInfo[]
   /** the computed places of those groups */
   computed: number
@@ -41,34 +68,18 @@ export interface SetInfo {
   total: number | null
 }
 
-/** the place sets with a computed group, each with its groups, "n of N" and note: what the pickers list above the groups */
-export function placeSetInfos(sets: readonly PlaceSet[], groups: GroupInfo[], layers: Layers = {}): SetInfo[] {
-  return availableSets(sets, groups.map(g => g.coll)).map(s => {
+/** the place sets with a group the picker lists, each with its groups, "n of N", note and the line of what it combines */
+export function placeSetInfos(sets: readonly PlaceSet[], groups: GroupInfo[]): SetInfo[] {
+  return sets.map(s => {
     const mine = s.groups.map(c => groups.find(g => g.coll === c)).filter((g): g is GroupInfo => !!g)
-    const ns = s.groups.map(c => layers[c]?.n ?? null)
-    return { ref: setRef(s), title: s.title, note: s.note ?? null, groups: mine, computed: mine.reduce((n, g) => n + g.computed, 0), total: ns.every(n => n != null) ? ns.reduce((a, n) => a + (n as number), 0) : null }
+    return { s, mine }
+  }).filter(x => x.mine.length > 0).map(({ s, mine }) => {
+    const ns = mine.map(g => g.total)
+    return {
+      ref: setRef(s), title: s.title, note: s.note ?? null, desc: mine.map(g => g.title).join(' + '), groups: mine,
+      computed: mine.reduce((n, g) => n + g.computed, 0), total: ns.every(n => n != null) ? ns.reduce((a, n) => a + (n as number), 0) : null,
+    }
   })
-}
-
-export interface GroupNote {
-  /** "19 with SST" or "no values for SST" */
-  text: string
-  /** the group has values for the indicator shown */
-  has: boolean
-}
-
-// ---- the Matrix's selection: groups shown, minus the places removed ----
-
-/** the places the Matrix shows: those of the groups on display that were not removed */
-export function matrixChosen(idx: CoverageIndex, groups: string[], hidePlaces: string[]): Set<string> {
-  const shown = new Set(groups)
-  const hidden = new Set(hidePlaces)
-  return new Set(idx.places.filter(p => shown.has(p.coll) && !hidden.has(p.id)).map(p => p.id))
-}
-
-export interface MatrixPlaces {
-  colls: string[]
-  hidePlaces: string[]
 }
 
 // ---- the button's words ----
@@ -84,7 +95,7 @@ export function multiLabel(groups: GroupInfo[], chosen: ReadonlySet<string>, set
   const n = withChosen.reduce((s, x) => s + x.on.length, 0)
   if (n === 0) return 'No places'
   const whole = sets.find(s => s.groups.length > 1 && s.groups.length === withChosen.length && s.groups.every(g => withChosen.some(x => x.g.coll === g.coll && x.on.length === x.g.places.length)))
-  if (whole) return `${whole.title} \u00b7 ${plural(n, 'place')}`
+  if (whole) return `${whole.title} · ${plural(n, 'place')}`
   if (n === 1) return shortPlaceName(withChosen[0].on[0].name)
   if (withChosen.length === 1) {
     const { g, on } = withChosen[0]
@@ -93,10 +104,10 @@ export function multiLabel(groups: GroupInfo[], chosen: ReadonlySet<string>, set
   return `${plural(withChosen.length, 'group')} · ${plural(n, 'place')}`
 }
 
-/** what the group picker's button says: "Exclusive Economic Zones · 281 places" */
-export function groupLabel(g: Pick<GroupInfo, 'title' | 'computed'> | null): string {
-  return g ? `${g.title} · ${plural(g.computed, 'place')}` : 'Choose a place group'
+/** the line of the Select section: "National Marine Sanctuaries · 18 places × 24 indicators" */
+export function selectionLine(placeLabel: string, indicators: number): string {
+  return `${placeLabel} × ${plural(indicators, 'indicator')}`
 }
 
-/** what the place picker's button says: the place's short name */
+/** what the place picker's button says in the Place view: the place's short name */
 export const placeLabel = (p: Pick<Place, 'name'> | null) => (p ? shortPlaceName(p.name) : 'Choose a place')

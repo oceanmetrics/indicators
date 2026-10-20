@@ -40,7 +40,7 @@ const COVERAGE = [
 const manifest = { version: '2026.10.20', vocabularies: vocabs(), indicators: INDS } as unknown as Manifest
 const catalog = { manifest, coverage: COVERAGE }
 const idx = indexCoverage(COVERAGE)
-const spec = (o: Partial<ReportSpec>): ReportSpec => ({ ...DEFAULT_SPEC, ...o })
+const spec = (o: Partial<ReportSpec>): ReportSpec => ({ ...DEFAULT_SPEC, places: { include: ["*"], exclude: [], context: false }, ...o })   // these fixtures span the sanctuaries and an EEZ: every place
 const ids = (xs: { id: string }[]) => xs.map(x => x.id)
 
 describe('the report a spec chooses', () => {

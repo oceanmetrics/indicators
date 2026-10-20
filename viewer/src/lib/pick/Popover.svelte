@@ -39,6 +39,8 @@
     open = false
     trigger()?.focus()
   }
+  /** open the panel (the Map's "another indicator" opens the indicator picker of the Select section) */
+  export function show() { setTimeout(() => { if (!open) void toggle() }, 0) }
   function onkey(e: KeyboardEvent) {
     if (!open) return
     if (e.key === 'Escape') {
@@ -93,12 +95,6 @@
   .pop :global(.search) { display: flex; align-items: center; gap: var(--space-2); height: 2rem; padding: 0 var(--space-3); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--control-bg); color: var(--text-body); }
   .pop :global(.search:focus-within) { border-color: var(--accent); }
   .pop :global(.search input) { flex: 1; min-width: 0; border: 0; background: none; outline: none; font: var(--type-small); color: var(--text-strong); }
-  .pop :global(.nc) { border-top: 1px solid var(--border); padding-top: var(--space-2); }
-  .pop :global(.nc summary) { cursor: pointer; display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline; }
-  .pop :global(.nc ul) { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: var(--space-2); }
-  .pop :global(.nc li) { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-1) var(--space-3); font: var(--type-small); color: var(--text-strong); }
-  .pop :global(.nc .acts) { display: flex; gap: var(--space-3); font-size: 0.75rem; }
-  .pop :global(.nc a) { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
   @media (max-width: 600px) {
     .pop { position: fixed; z-index: 40; inset: auto 0 0 0; width: auto; max-height: 85dvh; border-radius: var(--radius-md) var(--radius-md) 0 0; }
   }

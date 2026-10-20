@@ -1,11 +1,12 @@
 // the indicator picker panel's rules, in plain functions (loaded with IndicatorPanel.svelte, on the first open): the tree
-// category -> series -> indicators over the places on display, with how many of those places have a value, the Matrix's ticks as
-// its own keys (`xi`, `ai`), and what the Map shows per indicator (which place groups have values).
+// category -> series -> indicators over the places of the selection, with how many of those places have a value, and a tick as
+// the rules that are the selection (`ii`, `ix`; report/tree.ts does the toggling).
 import type { Indicator, Term, VocabId } from '../data.ts'
 import { pickRow } from '../matrix.ts'
 import type { CoverageIndex, Place } from '../matrix.ts'
 import type { Check, TreeNode } from '../report/tree.ts'
-import { CAT_OTHER } from '../report/tree.ts'
+import { CAT_OTHER, toggleCategory, toggleIndicator, toggleSeries } from '../report/tree.ts'
+import type { IndSel } from '../selection.ts'
 
 /** for each indicator, the ids of the given places that have a value for it (the row a Matrix cell would show) */
 export function placesWithValue(idx: CoverageIndex, places: Pick<Place, 'id'>[], indicators: Indicator[]): Map<string, Set<string>> {
@@ -32,7 +33,7 @@ export interface IndicatorTreeOpts {
   showEmpty?: boolean
   /** a search of title, short title, series and id; empty = everything listed */
   query?: string
-  /** a hint of its own for a leaf (the Map: which groups have values); the group nodes then carry none */
+  /** a hint of its own for a leaf (the Place view: "not computed yet"); the group nodes then carry none */
   hintOf?: (ind: Indicator) => string
 }
 
@@ -92,61 +93,31 @@ export function buildIndicatorPickTree(o: IndicatorTreeOpts): TreeNode[] {
 
 // ---- ticks ----
 
-const leavesOf = (n: TreeNode): string[] => (n.kind === 'indicator' ? [n.key] : [...n.children, ...n.more].flatMap(leavesOf))
+/**
+ * a tick on a node as the selection's rules: a leaf is its id, a series its lead (`series:<id>`; the others are opened by hand),
+ * a category `cat:<term>`. off takes them out and, when another rule still holds them, excludes them (`ix`).
+ */
+export function toggleSelectedIndicators(
+  sel: IndSel, indicators: Indicator[], vocab: VocabId, known: string[], node: Pick<TreeNode, 'kind' | 'key'>, on: boolean,
+): IndSel {
+  if (node.kind === 'category') return toggleCategory(sel, indicators, vocab, known, node.key, on)
+  if (node.kind === 'series') return toggleSeries(sel, indicators, node.key, on)
+  return toggleIndicator(sel, indicators, node.key, on)
+}
+
+// ---- the Map: which places have values ----
 
 /**
- * the indicator ids a tick on a node stands for: on, an indicator is itself, a series is its lead and a category the leads
- * of its series (the rest is opened by hand); off, everything under the node
+ * indicator id -> the places that have a value for it, from the coverage rows (a row with a class counts too); `keep` narrows
+ * the rows to the places of the selection
  */
-export function nodeIndicatorIds(n: TreeNode, on: boolean): string[] {
-  if (!on || n.kind === 'indicator') return leavesOf(n)
-  return n.kind === 'series' ? [n.children[0].key] : n.children.map(s => s.children[0].key)
-}
-
-export interface IndicatorKeys {
-  hideInds: string[]
-  addInds: string[]
-}
-
-/**
- * ticks as the Matrix's own keys. `pool` is what the Matrix shows without additions (the leads, or every indicator with
- * the leads switch off): on, a removed one comes back (`xi` loses it) and one outside the pool is added (`ai`); off, an
- * added one is taken back out and one in the pool is removed.
- */
-export function toggleMatrixIndicators(state: IndicatorKeys, ids: string[], on: boolean, pool: ReadonlySet<string>): IndicatorKeys {
-  const set = new Set(ids)
-  if (on) return { hideInds: state.hideInds.filter(x => !set.has(x)), addInds: [...new Set([...state.addInds, ...ids.filter(x => !pool.has(x))])] }
-  return { hideInds: [...new Set([...state.hideInds, ...ids.filter(x => pool.has(x))])], addInds: state.addInds.filter(x => !set.has(x)) }
-}
-
-// ---- the Map: which groups have values ----
-
-/** indicator id -> group -> how many places of the group have a value, from the coverage rows (a place's group is `place_coll ?? coll`) */
-export function groupsWithValues(coverage: { indicator: string; place_id: string; coll: string; place_coll?: string | null; last_value: number | null; last_class: string | null }[]): Map<string, Map<string, number>> {
-  const seen = new Map<string, Map<string, Set<string>>>()
-  for (const r of coverage) {
-    if (r.last_value == null && r.last_class == null) continue
-    const g = r.place_coll ?? r.coll
-    const byGroup = seen.get(r.indicator) ?? new Map<string, Set<string>>()
-    byGroup.set(g, (byGroup.get(g) ?? new Set()).add(r.place_id))
-    seen.set(r.indicator, byGroup)
-  }
-  return new Map([...seen].map(([ind, byGroup]) => [ind, new Map([...byGroup].map(([g, ids]) => [g, ids.size]))]))
-}
-
-/** "National Marine Sanctuaries, Exclusive Economic Zones", or "3 groups" past two; "" when none */
-export function groupsHint(counts: Map<string, number> | undefined, titles: (coll: string) => string, order: string[] = []): string {
-  if (!counts || counts.size === 0) return ''
-  const rank = new Map(order.map((c, n) => [c, n]))
-  const names = [...counts.keys()].sort((a, b) => (rank.get(a) ?? 1e9) - (rank.get(b) ?? 1e9) || a.localeCompare(b)).map(titles)
-  return names.length <= 2 ? names.join(', ') : `${names.length} groups`
-}
-
-/** indicator id -> the places (any group) that have a value for it: what the Map lists, since it shows one group at a time */
-export function placesWithValueAnywhere(coverage: { indicator: string; place_id: string; last_value: number | null; last_class: string | null }[]): Map<string, Set<string>> {
+export function placesWithValueAnywhere<R extends { indicator: string; place_id: string; last_value: number | null; last_class: string | null }>(
+  coverage: readonly R[], keep: ((row: R) => boolean) | null = null,
+): Map<string, Set<string>> {
   const out = new Map<string, Set<string>>()
   for (const r of coverage) {
     if (r.last_value == null && r.last_class == null) continue
+    if (keep && !keep(r)) continue
     const have = out.get(r.indicator) ?? new Set<string>()
     out.set(r.indicator, have.add(r.place_id))
   }

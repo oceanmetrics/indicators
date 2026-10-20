@@ -1,6 +1,7 @@
 <script lang="ts">
   // the one indicator picker: a button that states the selection and the panel it opens (IndicatorPanel, loaded on the first
-  // open). modes: `multi` (Matrix, Report: tick indicators) and `single` (Map, Place view: choose one).
+  // open). modes: `multi` (the Select section above Matrix, Map and Report: tick indicators) and `single` (Map, Place view:
+  // choose one).
   import Popover from './Popover.svelte'
   import type { Indicator, Vocab, VocabId } from '../data.ts'
   import type { TreeNode } from '../report/tree.ts'
@@ -29,18 +30,20 @@
     onempty?: (v: boolean) => void
     /** single: offer "show indicators without values here" (kept in the panel, not in the URL) */
     canShowEmpty?: boolean
-    /** single: a hint of its own beside each indicator (the Map: the groups that have values) */
+    /** single: a hint of its own beside each indicator (the Place view: "not computed yet") */
     hintOf?: (ind: Indicator) => string
-    removed?: number
-    onrestore?: () => void
+    /** single: the way to the whole list ("another indicator": the Map lists the selection's indicators only) */
+    onother?: () => void
   }
   let props: Props = $props()
+  let pop: { show: () => void } | undefined = $state()
+  export function show() { pop?.show() }
 
   let Panel = $state.raw<typeof import('./IndicatorPanel.svelte').default | null>(null)
   const load = () => { if (!Panel) import('./IndicatorPanel.svelte').then(m => { Panel = m.default }) }
 </script>
 
-<Popover label={props.label} kicker="Indicators" icon="view-indicator" onopen={load}>
+<Popover bind:this={pop} label={props.label} kicker="Indicators" icon="view-indicator" onopen={load}>
   {#snippet children(close)}
     {#if Panel}
       <Panel {...props} {close} />

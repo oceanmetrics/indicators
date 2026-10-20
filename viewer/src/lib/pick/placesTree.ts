@@ -1,126 +1,74 @@
-// the place picker panel's rules, in plain functions (loaded with PlacePanel.svelte, on the first open): the search, the
-// tri-state tree, the Map's group list, the Matrix's ticks as its own keys, and the collections nothing is computed for yet.
-import { collTitle, gazetteerHref, GROUP_ORDER } from '../data.ts'
-import type { Layers } from '../data.ts'
-import { computedOf } from '../matrix.ts'
-import type { CoverageIndex } from '../matrix.ts'
-import { requestHref } from '../nextSteps.ts'
-import type { Check, TreeNode } from '../report/tree.ts'
-import type { GroupInfo, GroupNote, MatrixPlaces, SetInfo } from './places.ts'
+// the place picker panel's rules, in plain functions (loaded with PlacePanel.svelte, on the first open): the tri-state tree of the
+// place sets, the groups (the gazetteer's polygon collections, computed or not) and their places, and a tick as the rules
+// that are the selection (`pi`, `px`; report/tree.ts does the toggling).
+import { gazetteerHref } from '../data.ts'
 import type { PlaceSet } from '../data.ts'
-import { findSet, isSetRef } from '../sets.ts'
-
-// ---- the multi tree (Matrix, Report) ----
+import { ROW_CAP, computedOf } from '../matrix.ts'
+import type { Check, TreeNode } from '../report/tree.ts'
+import { toggleCollection, togglePlace, toggleSet } from '../report/tree.ts'
+import type { TreePlace } from '../report/tree.ts'
+import type { PlaceSel } from '../selection.ts'
+import type { GroupInfo, SetInfo } from './places.ts'
+import { isSetRef } from '../sets.ts'
 
 const check = (on: number, of: number): Check => (on === 0 ? 'unchecked' : on === of ? 'checked' : 'mixed')
 
+export interface PlaceTreeOpts {
+  /** the most places listed under one group */
+  cap?: number
+  /** the gazetteer's places are being read: a group that waits on them says so */
+  loading?: boolean
+}
+
+/** the line under a group of more places than are listed */
+export const capNote = (cap: number, total: number) =>
+  `The first ${cap.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} places. Search to find others, or tick the group to choose them all (the Matrix lists its first ${cap.toLocaleString('en-US')}).`
+
 /**
- * groups -> places as tri-state nodes over a set of chosen place ids. a group's hint is its "n of N" computed of the
- * gazetteer's total and it links to the collection in the gazetteer; a place's hint is its id. a search narrows the places
- * listed, never the state of a group.
+ * place sets and groups -> places as tri-state nodes over a set of chosen place ids. a group's hint is its "n of N computed" and it
+ * links to the collection in the gazetteer; a group whose places are not all read yet is `lazy` (it opens, and the panel asks for
+ * the gazetteer's places); a place's hint is its id. a search narrows the places listed, never the state of a group, and lists
+ * no place sets. a group longer than the cap lists its first places and says so.
  */
-export function placePickTree(groups: GroupInfo[], chosen: ReadonlySet<string>, query = '', sets: readonly SetInfo[] = []): TreeNode[] {
+export function placePickTree(groups: GroupInfo[], chosen: ReadonlySet<string>, query = '', sets: readonly SetInfo[] = [], opts: PlaceTreeOpts = {}): TreeNode[] {
   const needle = query.trim().toLowerCase()
-  // the place sets come first, as ticks of their own (a search narrows places, so it lists none); a set is ticked when all its
-  // places are, mixed when some are
+  const cap = opts.cap ?? ROW_CAP
+  // the place sets come first, as ticks of their own: ticked when all their places are, mixed when some are
   const out: TreeNode[] = needle ? [] : sets.map(s => {
     const ids = s.groups.flatMap(g => g.places.map(p => p.id))
     return {
-      kind: 'collection' as const, key: s.ref, label: s.title, title: s.note ?? undefined, state: check(ids.filter(id => chosen.has(id)).length, ids.length),
-      hint: `${computedOf(s.computed, s.total)} \u00b7 ${s.groups.length} ${s.groups.length === 1 ? 'group' : 'groups'}`, children: [], more: [],
+      kind: 'collection' as const, key: s.ref, label: s.title, title: s.note ?? undefined, desc: s.desc, state: check(ids.filter(id => chosen.has(id)).length, ids.length),
+      hint: `${computedOf(s.computed, s.total)} computed · ${s.groups.length} ${s.groups.length === 1 ? 'group' : 'groups'}`, children: [], more: [],
     }
   })
   for (const g of groups) {
-    const shown = needle ? g.places.filter(p => p.name.toLowerCase().includes(needle) || p.id.toLowerCase().includes(needle)) : g.places
-    if (!shown.length) continue
+    const hits = needle ? g.places.filter(p => p.name.toLowerCase().includes(needle) || p.id.toLowerCase().includes(needle)) : g.places
+    if (needle && !hits.length) continue
     const on = g.places.filter(p => chosen.has(p.id)).length
+    const shown = hits.slice(0, cap)
     out.push({
-      kind: 'collection', key: g.coll, label: g.title, state: check(on, g.places.length), hint: computedOf(g.computed, g.total),
+      kind: 'collection', key: g.coll, label: g.title, state: check(on, g.places.length), hint: `${computedOf(g.computed, g.total)} computed`,
       link: { href: gazetteerHref(g.coll), label: 'in the gazetteer' },
       children: shown.map(p => ({ kind: 'place' as const, key: p.id, label: p.name, state: chosen.has(p.id) ? 'checked' as const : 'unchecked' as const, hint: p.id, children: [], more: [] })),
       more: [],
+      ...(g.loaded ? {} : { lazy: true }),
+      ...(hits.length > cap ? { note: capNote(cap, hits.length) } : !g.loaded && opts.loading ? { note: 'Loading the places…' } : {}),
     })
   }
   return out
 }
 
 /**
- * the Map's group choices as leaves of the pick tree: every group with computed places, "n of N computed" and the note beside it,
- * those with values for the indicator shown first (the others keep their order after them); the current group is checked.
- * a leaf is kind `place` so the tree draws it as a button; its key is the group's collection.
+ * a tick in the picker as the selection's rules: a place set `set:<id>`, a group `coll:<slug>`, a place its id. `universe` is
+ * every place the selection can name now (the computed ones, and the gazetteer's once read); `sets` expand `set:` rules.
  */
-export function groupPickNodes(groups: GroupInfo[], current: string | null, noteOf: (coll: string) => GroupNote | null, sets: readonly SetInfo[] = []): TreeNode[] {
-  const nodes = groups.map(g => {
-    const note = noteOf(g.coll)
-    const node: TreeNode = {
-      kind: 'place', key: g.coll, label: g.title, state: g.coll === current ? 'checked' : 'unchecked',
-      hint: `${computedOf(g.computed, g.total)} computed${note ? ` \u00b7 ${note.text}` : ''}`,
-      link: { href: gazetteerHref(g.coll), label: 'in the gazetteer' }, children: [], more: [],
-    }
-    return { node, has: note?.has ?? true }
-  })
-  // the place sets are one choice each, above the groups (those with values for the indicator shown first); their key is `set:<id>`
-  const setNodes = sets.map(s => {
-    const note = noteOf(s.ref)
-    const node: TreeNode = {
-      kind: 'place', key: s.ref, label: s.title, title: s.note ?? undefined, state: s.ref === current ? 'checked' : 'unchecked',
-      hint: `${computedOf(s.computed, s.total)} computed \u00b7 ${s.groups.map(g => g.title).join(' + ')}${note ? ` \u00b7 ${note.text}` : ''}`, children: [], more: [],
-    }
-    return { node, has: note?.has ?? true }
-  })
-  return [...setNodes.filter(x => x.has), ...setNodes.filter(x => !x.has), ...nodes.filter(x => x.has), ...nodes.filter(x => !x.has)].map(x => x.node)
-}
-
-/**
- * a tick in the picker as the Matrix's own keys: a group on shows all its places; a group off hides it (the last group
- * cannot be switched off); a place off is removed (`xp`); a place on in a group that is not shown shows the group with
- * every other place of it removed, so only that place appears.
- */
-export function toggleMatrixPlaces(
-  idx: CoverageIndex, state: MatrixPlaces, node: { kind: 'collection' | 'place'; key: string }, on: boolean, sets: readonly PlaceSet[] = [],
-): MatrixPlaces {
-  // a place set is its groups ticked together (off: each in turn, so the last group stays)
-  if (node.kind === 'collection' && isSetRef(node.key)) {
-    const members = (findSet(node.key, sets)?.groups ?? []).filter(g => idx.colls.includes(g))
-    return members.reduce((st, key) => toggleMatrixPlaces(idx, st, { kind: 'collection', key }, on), state)
+export function toggleSelectedPlaces(
+  sel: PlaceSel, universe: TreePlace[], node: { kind: 'collection' | 'place'; key: string }, on: boolean, sets: readonly PlaceSet[] = [],
+): PlaceSel {
+  if (node.kind === 'place') return togglePlace(sel, universe, node.key, on, sets)
+  if (isSetRef(node.key)) {
+    const set = sets.find(s => `set:${s.id}` === node.key)
+    return set ? toggleSet(sel, universe, set, on, sets) : sel
   }
-  const { colls, hidePlaces } = state
-  const idsOf = (coll: string) => idx.places.filter(p => p.coll === coll).map(p => p.id)
-  if (node.kind === 'collection') {
-    const mine = new Set(idsOf(node.key))
-    if (on) return { colls: [...new Set([...colls, node.key])], hidePlaces: hidePlaces.filter(x => !mine.has(x)) }
-    const left = colls.filter(c => c !== node.key)
-    return left.length ? { colls: left, hidePlaces: hidePlaces.filter(x => !mine.has(x)) } : state
-  }
-  const place = idx.places.find(p => p.id === node.key)
-  if (!place) return state
-  if (!on) return { colls, hidePlaces: [...new Set([...hidePlaces, place.id])] }
-  if (colls.includes(place.coll)) return { colls, hidePlaces: hidePlaces.filter(x => x !== place.id) }
-  return { colls: [...colls, place.coll], hidePlaces: [...new Set([...hidePlaces.filter(x => x !== place.id), ...idsOf(place.coll).filter(x => x !== place.id)])] }
+  return toggleCollection(sel, universe, node.key, on, sets)
 }
-
-// ---- collections nothing is computed for yet ----
-
-export interface Uncomputed {
-  coll: string
-  title: string
-  n: number | null
-  gazetteer: string
-  request: string
-}
-
-const isPolygon = (geom: string | null) => !!geom && /polygon/i.test(geom)
-
-/**
- * every polygon collection of the gazetteer with no computed place, in the Matrix's group order and then by title, each
- * with its link into the gazetteer and the issue form pre-filled with the collection only (a maintainer reviews)
- */
-export function uncomputedCollections(layers: Layers, idx: CoverageIndex): Uncomputed[] {
-  const have = new Set(idx.places.flatMap(p => [p.coll, ...(p.valuesColls ?? [])]))
-  const rank = new Map(GROUP_ORDER.map((c, n) => [c, n]))
-  return Object.entries(layers)
-    .filter(([coll, l]) => isPolygon(l.geom) && !have.has(coll))
-    .map(([coll, l]) => ({ coll, title: collTitle(coll, layers), n: l.n, gazetteer: gazetteerHref(coll), request: requestHref({ collection: coll, collectionTitle: collTitle(coll, layers) }) }))
-    .sort((a, b) => (rank.get(a.coll) ?? 1e9) - (rank.get(b.coll) ?? 1e9) || a.title.localeCompare(b.title))
-}
-

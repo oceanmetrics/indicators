@@ -56,7 +56,7 @@ export interface CardGroup { term: Term; series: SeriesGroup[] }
  * indicators behind it. a series whose lead has no coverage here is led by its first indicator.
  */
 export function groupCards(indicators: Indicator[], vocabs: Record<VocabId, Vocab>, vocab: VocabId): CardGroup[] {
-  return groupColumns(indicators, vocabs, vocab, false).map(g => {
+  return groupColumns(indicators, vocabs, vocab).map(g => {
     const by = new Map<string, Indicator[]>()
     for (const i of g.indicators) by.set(i.series, [...(by.get(i.series) ?? []), i])
     return {

@@ -1,9 +1,9 @@
 // what the Map view shows when the hash names less than it needs: only indicators with coverage can be mapped, an
-// indicator has its own collections, and a hash with no indicator opens on sea surface temperature.
+// indicator has its own collections, and the indicator is the hash's when it is in the selection, else the first selected one
+// with values in the selected places (sea surface temperature first).
 import type { CoverageRow } from '../../../../src/coverage/build.ts'
-import type { Indicator, PlaceSet } from '../data.ts'
+import type { Indicator } from '../data.ts'
 import { orderGroups } from '../matrix.ts'
-import { expandGroups, findSet, isSetRef } from '../sets.ts'
 
 export const DEFAULT_MAP_INDICATOR = 'erddap:dhw_5km:CRW_SST:mean'
 
@@ -41,67 +41,11 @@ export function valuesCollsOfGroup(ind: Indicator, coverage: Cov[], group: strin
 }
 
 /**
- * the group a hash's `coll` names for an indicator: a group the indicator has values in; else (an old link names a values
- * collection) the group holding most of that collection's places with a value; else the indicator's first group
+ * the indicator the Map shows: the hash's when it is one of the selection's (`selected`) and has a value in the selected places
+ * (`have`: indicator id -> the places with a value), else sea surface temperature if the selection has it, else the first lead,
+ * else the first selected indicator with values there (manifest order); null when no selected indicator has a value
  */
-export function resolveGroup(ind: Indicator, coverage: Cov[], want: string | null, sets: readonly PlaceSet[] = []): string | null {
-  const groups = mapGroups(ind, coverage)
-  if (want && groups.includes(want)) return want
-  // a place set (`set:<id>`) stands when the indicator has values in at least one of its groups
-  if (isSetRef(want)) {
-    const set = findSet(want, sets)
-    if (set && set.groups.some(g => groups.includes(g))) return want
-    return groups[0] ?? null
-  }
-  if (want) {
-    const n = new Map<string, Set<string>>()
-    for (const r of coverage) if (r.indicator === ind.id && r.coll === want && hasValue(r)) n.set(groupOf(r), (n.get(groupOf(r)) ?? new Set()).add(r.place_id ?? ''))
-    const best = [...n].sort((a, b) => b[1].size - a[1].size || groups.indexOf(a[0]) - groups.indexOf(b[0]))[0]
-    if (best) return best[0]
-  }
-  return groups[0] ?? null
-}
-
-/**
- * the indicator to show for a group that has no value for the current one: the sea surface temperature if the group has it, else the
- * first lead with values there, else the first indicator with values there (manifest order); null when nothing is computed
- */
-export function leadForGroup(indicators: Indicator[], coverage: Cov[], group: string | readonly string[]): Indicator | null {
-  const groups = typeof group === 'string' ? [group] : group
-  const here = mappable(indicators, coverage.filter(r => groups.includes(groupOf(r))))
-  return here.find(i => i.id === DEFAULT_MAP_INDICATOR) ?? here.find(i => i.lead) ?? here[0] ?? null
-}
-
-export interface MapPick {
-  ind: Indicator | null
-  /** the place group shown */
-  coll: string | null
-  /** the groups the indicator has values in */
-  colls: string[]
-}
-
-/** the indicator and group a Map hash resolves to: what it names when that can be mapped, else the defaults */
-export function pickMap(indicators: Indicator[], coverage: CoverageRow[], want: { ind: string | null; coll: string | null }, sets: readonly PlaceSet[] = []): MapPick {
-  const list = mappable(indicators, coverage)
-  const ind = list.find(i => i.id === want.ind) ?? list.find(i => i.id === DEFAULT_MAP_INDICATOR) ?? list.find(i => i.lead) ?? list[0] ?? null
-  if (!ind) return { ind: null, coll: null, colls: [] }
-  return { ind, coll: resolveGroup(ind, coverage, want.coll, sets), colls: mapGroups(ind, coverage) }
-}
-
-/**
- * the sentence above the map when choosing a group switched the indicator: "SST is not computed for Exclusive Economic Zones;
- * showing OBIS species richness, all taxa."
- */
-export function switchNotice(from: Pick<Indicator, 'short'>, to: Pick<Indicator, 'title'>, groupTitle: string): string {
-  return `${from.short} is not computed for ${groupTitle}; showing ${to.title.replace(/\.$/, '')}.`
-}
-
-/**
- * the place groups a Map `coll` draws: the group itself, or the groups of the place set (those the indicator has values
- * in, in the set's order); a group only when the reference names none
- */
-export function drawnGroups(coll: string, ind: Indicator, coverage: Cov[], sets: readonly PlaceSet[] = []): string[] {
-  if (!isSetRef(coll)) return [coll]
-  const have = new Set(mapGroups(ind, coverage))
-  return expandGroups([coll], sets).filter(g => have.has(g))
+export function pickMapIndicator(selected: Indicator[], have: ReadonlyMap<string, ReadonlySet<string>>, want: string | null): Indicator | null {
+  const list = selected.filter(i => (have.get(i.id)?.size ?? 0) > 0)
+  return list.find(i => i.id === want) ?? list.find(i => i.id === DEFAULT_MAP_INDICATOR) ?? list.find(i => i.lead) ?? list[0] ?? null
 }

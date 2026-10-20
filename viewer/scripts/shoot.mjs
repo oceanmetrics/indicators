@@ -3,7 +3,8 @@
 // Map view (map_<indicator>_<color>_<theme>[_390].png), the Report view (report_*: the Scorecard, the Cards report, the
 // open builder over budget, the print preview) and the embed route (embed_*).
 // headless Chrome through puppeteer-core, against the dev server (started here when nothing answers on the port).
-//   node viewer/scripts/shoot.mjs [--url http://localhost:5181/] [--only matrix_mbon_dark] [--out docs/shots/live]
+//   node viewer/scripts/shoot.mjs [--url http://localhost:5181/] [--only matrix_mbon_dark] [--out docs/shots/live] [--data <catalog base URL>]
+// --data reads the catalog from another base (`?data=`), for example the published one while catalog/ is being rebuilt.
 import { spawn } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -16,6 +17,8 @@ const CHROME = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/M
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d }
 const URL_BASE = arg('--url', 'http://localhost:5181/')
 const ONLY = arg('--only', '')
+const DATA = arg('--data', '')
+const DATAQ = DATA ? `&data=${encodeURIComponent(DATA)}` : ''
 
 const DESKTOP = { width: 1440, height: 900, deviceScaleFactor: 2 }
 const TALL = { width: 1440, height: 1500, deviceScaleFactor: 2 }
@@ -220,7 +223,7 @@ try {
     page.on('pageerror', e => errors.push(String(e)))
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
     const embed = name.startsWith('embed_')
-    await page.goto(`${URL_BASE}${embed ? 'embed/' : ''}?brand=${brand}&theme=${theme}${hash ? '#' + hash : ''}`, { waitUntil: 'networkidle0' })
+    await page.goto(`${URL_BASE}${embed ? 'embed/' : ''}?brand=${brand}&theme=${theme}${DATAQ}${hash ? '#' + hash : ''}`, { waitUntil: 'networkidle0' })
     await page.waitForSelector(embed ? 'main.embed[data-state=done]' : '.lens[data-state=done]', { timeout: 30000 })
     // a report is ready when its layout is drawn and no card or recomputation is still waiting
     if (hash.includes('view=report')) {

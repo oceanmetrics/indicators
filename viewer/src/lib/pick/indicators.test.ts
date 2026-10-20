@@ -3,9 +3,8 @@ import type { CoverageRow } from '../../../../src/coverage/build.ts'
 import type { Indicator, Term } from '../data.ts'
 import { indexCoverage } from '../matrix.ts'
 import { multiIndicatorLabel } from './indicators.ts'
-import {
-  buildIndicatorPickTree, groupsHint, groupsWithValues, nodeIndicatorIds, placesWithValue, placesWithValueAnywhere, toggleMatrixIndicators,
-} from './indicatorsTree.ts'
+import { DEFAULT_SPEC, expandIndicators } from '../../../../src/report/spec.ts'
+import { buildIndicatorPickTree, placesWithValue, placesWithValueAnywhere, toggleSelectedIndicators } from './indicatorsTree.ts'
 
 // a small synthetic manifest: two categories, three series (sst has a lead and a second member), one indicator in no known category
 const ind = (o: Partial<Indicator> & { id: string }): Indicator => ({
@@ -65,7 +64,7 @@ describe('the indicator tree', () => {
     expect(keys('sst_max')).toEqual(['sst_max'])
     expect(keys('zzz')).toEqual([])
   })
-  it('a hint of its own for a leaf (the Map) leaves the groups with none', () => {
+  it('a hint of its own for a leaf (the Place view) leaves the groups with none', () => {
     const t = buildIndicatorPickTree({ ...base, hintOf: i => `h-${i.id}` })
     expect(t[0].hint).toBe('')
     expect(t[0].children[0].hint).toBe('')
@@ -73,47 +72,37 @@ describe('the indicator tree', () => {
   })
 })
 
-describe('the Matrix keys a tick writes', () => {
-  const t = buildIndicatorPickTree({ indicators: inds, vocab: 'onms', terms, chosen: new Set(['sst']), withValues: placesWithValue(idx, places, inds), nPlaces: 2 })
-  it('a tick on a series is its lead, on a category the leads of its series, on a leaf itself; off is everything under it', () => {
-    expect(nodeIndicatorIds(t[0].children[0], true)).toEqual(['sst'])
-    expect(nodeIndicatorIds(t[0], true)).toEqual(['sst'])
-    expect(nodeIndicatorIds(t[0].children[0].more[0], true)).toEqual(['sst_max'])
-    expect(nodeIndicatorIds(t[0].children[0], false)).toEqual(['sst', 'sst_max'])
-    expect(nodeIndicatorIds(t[0], false)).toEqual(['sst', 'sst_max'])
+describe('a tick is a change of the selection\'s rules', () => {
+  const known = terms.map(t => t.id)
+  const star = DEFAULT_SPEC.indicators
+  const ids = (sel: typeof star) => expandIndicators(sel, inds).map(i => i.id)
+  const tree = buildIndicatorPickTree({ indicators: inds, vocab: 'onms', terms, chosen: new Set(['sst', 'chl', 'odd', 'none']), withValues: placesWithValue(idx, places, inds), nPlaces: 2 })
+  it('a leaf off is excluded when the leads rule still holds it (ix); on again it comes back', () => {
+    const off = toggleSelectedIndicators(star, inds, 'onms', known, { kind: 'indicator', key: 'chl' }, false)
+    expect(off).toEqual({ include: ['*'], exclude: ['chl'] })
+    expect(ids(off)).toEqual(['sst', 'odd', 'none'])
+    expect(toggleSelectedIndicators(off, inds, 'onms', known, { kind: 'indicator', key: 'chl' }, true)).toEqual(star)
   })
-  const pool = new Set(['sst', 'chl'])   // the leads
-  it('on: a removed indicator comes back; one outside the pool is added', () => {
-    expect(toggleMatrixIndicators({ hideInds: ['chl'], addInds: [] }, ['chl', 'sst_max'], true, pool)).toEqual({ hideInds: [], addInds: ['sst_max'] })
+  it('a non-lead on joins include by id; a series off takes its lead out', () => {
+    expect(toggleSelectedIndicators(star, inds, 'onms', known, { kind: 'indicator', key: 'sst_max' }, true)).toEqual({ include: ['*', 'sst_max'], exclude: [] })
+    expect(toggleSelectedIndicators(star, inds, 'onms', known, { kind: 'series', key: 'sst' }, false)).toEqual({ include: ['*'], exclude: ['sst'] })
   })
-  it('off: an added indicator is taken back out; one in the pool is removed', () => {
-    expect(toggleMatrixIndicators({ hideInds: [], addInds: ['sst_max'] }, ['sst', 'sst_max'], false, pool)).toEqual({ hideInds: ['sst'], addInds: [] })
+  it('a category off excludes its series; on again brings them back', () => {
+    const off = toggleSelectedIndicators(star, inds, 'onms', known, { kind: 'category', key: 'water-quality' }, false)
+    expect(ids(off)).toEqual(['sst', 'odd'])
+    expect(ids(toggleSelectedIndicators(off, inds, 'onms', known, { kind: 'category', key: 'water-quality' }, true))).toEqual(['sst', 'chl', 'odd', 'none'])
   })
-  it('keeps what it does not touch and never repeats an id', () => {
-    expect(toggleMatrixIndicators({ hideInds: ['x'], addInds: ['y'] }, ['sst'], false, pool)).toEqual({ hideInds: ['x', 'sst'], addInds: ['y'] })
-    expect(toggleMatrixIndicators({ hideInds: ['sst'], addInds: [] }, ['sst'], false, pool)).toEqual({ hideInds: ['sst'], addInds: [] })
+  it('with every indicator (all) a leaf off is excluded; the tree nodes carry the keys the ticks read', () => {
+    const all = { include: ['all'], exclude: [] as string[] }
+    expect(ids(toggleSelectedIndicators(all, inds, 'onms', known, { kind: 'indicator', key: 'sst_max' }, false))).toEqual(['sst', 'chl', 'odd', 'none'])
+    expect(tree[0].children[0].key).toBe('sst')
   })
 })
 
-describe('the button and the Map hints', () => {
+describe('the button', () => {
   it('multi label: count, vocabulary, and leads only when on', () => {
     expect(multiIndicatorLabel(11, 'onms', true)).toBe('11 indicators · ONMS sections · leads only')
     expect(multiIndicatorLabel(1, 'eov', false)).toBe('1 indicator · GOOS EOVs')
-  })
-  it('groups with values, per indicator, counted by place (not by row) and by place_coll with coll as the fallback', () => {
-    const g = groupsWithValues([
-      row('A', 'sst'), row('A', 'sst'), row('B', 'sst'), row('P', 'sst', 1, 'mr_eez'), row('A', 'none', null),
-      { ...row('Q', 'old'), place_coll: undefined, coll: 'noaa_nerrs' } as CoverageRow,
-    ])
-    expect([...g.get('sst')!]).toEqual([['places', 2], ['mr_eez', 1]])
-    expect(g.has('none')).toBe(false)
-    expect([...g.get('old')!]).toEqual([['noaa_nerrs', 1]])
-  })
-  it('hint: the group titles for one or two groups, a count past two, nothing for none', () => {
-    const t = (c: string) => ({ places: 'Sanctuaries', mr_eez: 'EEZ', a: 'A', b: 'B' } as Record<string, string>)[c] ?? c
-    expect(groupsHint(new Map([['mr_eez', 1], ['places', 2]]), t, ['places', 'mr_eez'])).toBe('Sanctuaries, EEZ')
-    expect(groupsHint(new Map([['a', 1], ['b', 1], ['places', 1]]), t)).toBe('3 groups')
-    expect(groupsHint(undefined, t)).toBe('')
   })
 })
 
@@ -121,5 +110,9 @@ describe('the Map lists indicators by the places that have a value anywhere', ()
   it('counts a place once however many rows it has, and leaves out an indicator with only empty rows', () => {
     const w = placesWithValueAnywhere([row('A', 'sst'), row('A', 'sst'), row('B', 'sst', 1, 'mr_eez'), row('A', 'none', null)])
     expect([...w].map(([id, s]) => [id, [...s]])).toEqual([['sst', ['A', 'B']]])
+  })
+  it('narrowed to the places of the selection', () => {
+    const w = placesWithValueAnywhere([row('A', 'sst'), row('B', 'sst'), row('B', 'chl')], r => r.place_id === 'B')
+    expect([...w].map(([id, s]) => [id, [...s]])).toEqual([['sst', ['B']], ['chl', ['B']]])
   })
 })

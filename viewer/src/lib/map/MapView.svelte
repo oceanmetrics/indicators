@@ -1,41 +1,41 @@
 <script lang="ts">
-  // the Map view: one indicator over one place group (a gazetteer collection), coloured by its latest value, its departure
-  // from the place's own record, its status or trend, the length of its record (or, for a categorical indicator, its largest
-  // class or the share of one class) at a period the slider chooses. the classes, legend and table come from
+  // the Map view: one indicator over the places of the shared selection (the Select section above the tabs: the hash's pi, px, ii and
+  // ix), coloured by its latest value, its departure from the place's own record, its status or trend, the length of its record (or,
+  // for a categorical indicator, its largest class or the share of one class) at a period the slider chooses. every group of the
+  // selection is a part of the map, layered as a place set is (parts.ts), with one legend, one table and one colour scale across all
+  // their places; a group chosen in part is drawn restricted to its chosen places. the indicator is the hash's `ind` when it is in
+  // the selection, else the first selected one with values in the selected places. the classes, legend and table come from
   // classes.ts (status and trend from src/status); MapCanvas only draws. all state is the URL hash:
-  // #view=map&ind=&coll=&place=&color=&t=&cls=&method=
-  // the two pickers choose the group and the indicator; a group with no value for the indicator switches to its own lead, and
-  // says so above the map. the group's members that are not computed are drawn faint (and as a small hollow circle from far
-  // away), and a click on one offers the next steps. `coll` is a group, or `set:<id>`, a place set: its groups layered on one
-  // map (parts.ts), with one legend, one table and one colour scale across all their places.
+  // #view=map&ind=&pi=&px=&ii=&ix=&place=&color=&t=&cls=&method=
+  // the group's members that are not computed are drawn faint (and as a small hollow circle from far away), and a click on one offers
+  // the next steps.
   import { onMount } from 'svelte'
   import { Button, Notice, Select, Slider } from '@marinebon/ui'
   import { Icon } from '../../../../src/icons/index.ts'
   import { periodLabel } from '../../../../src/status/index.ts'
   import type { MethodId } from '../../../../src/status/index.ts'
+  import { expandIndicators } from '../../../../src/report/spec.ts'
   import type { Catalog, Layers } from '../data.ts'
-  import { GROUP_ORDER } from '../data.ts'
   import { groupHref, mapToMatrixHref, placeHref } from '../hash.ts'
   import type { MapColor, ViewState } from '../hash.ts'
-  import { cellModel, isLiveProducer, STATUS_WORDS, TREND_WORDS } from '../matrix.ts'
+  import { cellModel, indexCoverage, isLiveProducer, orderGroups, STATUS_WORDS, TREND_WORDS } from '../matrix.ts'
   import type { CoverageIndex, Place } from '../matrix.ts'
   import { defaultMethod, METHOD_LABELS } from '../place.ts'
+  import { includeIndicator, withSelection } from '../selection.ts'
   import { loadValuesFile } from '../valuesData.ts'
   import type { PlaceRow } from '../valuesData.ts'
   import { valuesUrl } from '../delivery.ts'
   import { computedGroups } from '../nextSteps.ts'
   import NextSteps from '../NextSteps.svelte'
-  import PlacePicker from '../pick/PlacePicker.svelte'
   import IndicatorPicker from '../pick/IndicatorPicker.svelte'
-  import { groupsHint, groupsWithValues, placesWithValueAnywhere } from '../pick/indicatorsTree.ts'
-  import { groupLabel, placeGroups, placeSetInfos } from '../pick/places.ts'
+  import { placesWithValueAnywhere } from '../pick/indicatorsTree.ts'
   import { MODE_LABELS, mapModel, periodToT } from './classes.ts'
   import { basemapCredit, dataCredit, partsCredit } from './credit.ts'
   import { loadGazetteer } from './gazetteer.ts'
   import type { GazLayer } from './gazetteer.ts'
   import { buildParts, partsBbox } from './parts.ts'
-  import { drawnGroups, leadForGroup, mappable, pickMap, switchNotice, valuesCollsOfGroup } from './pick.ts'
-  import { findSet, isSetRef } from '../sets.ts'
+  import { groupOf, mappable, pickMapIndicator, valuesCollsOfGroup } from './pick.ts'
+  import { needsPlaces, placeFilter, selectionGroups, selectionTitle } from './selection.ts'
   import { familyId, familyOf, FAMILY_DEFAULT, FAMILY_LABEL, isFamily } from './family.ts'
   import MapCanvas from './MapCanvas.svelte'
   import MapLegend from './MapLegend.svelte'
@@ -45,81 +45,64 @@
     catalog: Catalog
     view: ViewState
     titles: (coll: string) => string
-    /** every place's coverage (the group picker's list) and the gazetteer's layers (the "n of N") */
+    /** every place's coverage (for the next steps of a place not computed) and the gazetteer's layers */
     idx?: CoverageIndex | null
     layers?: Layers
+    /** every place the selection can name (the Select section's); the embed has none and reads the coverage's when a rule needs places */
+    universe?: Place[] | null
     onpatch: (p: Partial<ViewState>) => void
+    /** "another indicator": the indicator picker of the Select section (the app only) */
+    onother?: () => void
     /** ms from the start of the view until the map was drawn */
     onready?: (ms: number) => void
   }
-  let { catalog, view, titles, idx = null, layers = {}, onpatch, onready }: Props = $props()
+  let { catalog, view, titles, idx = null, layers: _layers = {}, universe = null, onpatch, onother, onready }: Props = $props()
 
   const t0 = performance.now()
   const m = $derived(catalog.manifest)
 
-  // ---- what is mapped ----
+  // ---- what is mapped: the groups of the selection and the indicator ----
   const sets = $derived(m.place_sets ?? [])
-  const pick = $derived(pickMap(m.indicators, catalog.coverage, { ind: view.ind, coll: view.coll }, sets))
-  const ind = $derived(pick.ind)
-  const coll = $derived(pick.coll)
-  // the groups drawn: the group, or the groups of the place set that the indicator has values in
-  const members = $derived(ind && coll ? drawnGroups(coll, ind, catalog.coverage, sets) : [])
-  const isSet = $derived(isSetRef(coll))
+  const selPlaces = $derived(view.spec.places)
+  const places = $derived(universe ?? (needsPlaces(selPlaces) ? indexCoverage(catalog.coverage).places : null))
+  const chosenGroups = $derived(selectionGroups(selPlaces, places, sets, selPlaces.include.includes('*') ? orderGroups(catalog.coverage.map(groupOf)) : []))
+  const members = $derived(chosenGroups.map(g => g.group))
+  const keep = $derived(placeFilter(chosenGroups))
+  const selectedInds = $derived(expandIndicators(view.spec.indicators, m.indicators))
+  // indicator id -> the selected places with a value for it
+  const have = $derived(placesWithValueAnywhere(catalog.coverage, r => keep(r.place_id, groupOf(r))))
+  const nSelected = $derived(new Set([...have.values()].flatMap(s => [...s])).size)
+  const ind = $derived(pickMapIndicator(selectedInds, have, view.ind))
+  const selTitle = $derived(selectionTitle(selPlaces, chosenGroups, titles))
   // the hash always names what is shown, so the view is a permalink even when it opened on the defaults
-  $effect(() => { if (ind && coll && (view.ind !== ind.id || view.coll !== coll)) onpatch({ ind: ind.id, coll }) })
+  $effect(() => { if (ind && view.ind !== ind.id) onpatch({ ind: ind.id }) })
+  // a sentence above the map when the indicator asked for is selected but has no value for these places
+  const wanted = $derived(view.ind ? selectedInds.find(i => i.id === view.ind) ?? null : null)
+  const notice = $derived(ind && wanted && wanted.id !== ind.id ? `${wanted.short} has no values for these places; showing ${ind.title.replace(/\.$/, '')}.` : '')
 
   // the OBIS indicators are one choice in the picker (OBIS biodiversity), then a metric and an EOV (family.ts)
   const mappableList = $derived(mappable(m.indicators, catalog.coverage))
   const family = $derived(ind ? familyOf(ind, mappableList) : null)
   const pickList = $derived.by(() => {
-    const rep = ind && isFamily(ind.id) ? ind.id : FAMILY_DEFAULT
-    return mappableList.filter(i => !isFamily(i.id) || i.id === rep).map(i => (isFamily(i.id) ? { ...i, short: FAMILY_LABEL } : i))
+    const here = selectedInds.filter(i => (have.get(i.id)?.size ?? 0) > 0)
+    const fam = here.filter(i => isFamily(i.id))
+    const rep = ind && isFamily(ind.id) ? ind.id : (fam.find(i => i.id === FAMILY_DEFAULT) ?? fam[0])?.id
+    return here.filter(i => !isFamily(i.id) || i.id === rep).map(i => (isFamily(i.id) ? { ...i, short: FAMILY_LABEL } : i))
   })
-  const valued = $derived(placesWithValueAnywhere(catalog.coverage))
-  const byGroup = $derived(groupsWithValues(catalog.coverage))
   const chosenInd = $derived(new Set(ind ? [ind.id] : []))
   // by year or by decade, when the indicator has both
   const grains = $derived(ind ? (['year', 'decade'] as const).filter(g => ind.time_grains.includes(g)) : [])
 
-  // ---- the group picker: the groups with values for this indicator first, the others marked ----
-  const groups = $derived(idx ? placeGroups(idx, layers) : [])
-  const setInfos = $derived(placeSetInfos(sets, groups, layers))
-  // places with a value for the indicator in a group, or in the groups of a set
-  const countOf = (c: string) => (ind ? (isSetRef(c) ? findSet(c, sets)?.groups ?? [] : [c]).reduce((n, g) => n + (byGroup.get(ind.id)?.get(g) ?? 0), 0) : 0)
-  const nHere = $derived(coll ? countOf(coll) : 0)
-  const noteOf = (c: string) => {
-    if (!ind) return null
-    const n = countOf(c)
-    return n ? { text: `${n} with ${ind.short}`, has: true } : { text: `no values for ${ind.short}`, has: false }
-  }
-  // the label of the group picker: the group's or the set's title and its computed places
-  const pickLabel = $derived.by(() => {
-    if (!coll) return groupLabel(null)
-    const s = setInfos.find(x => x.ref === coll)
-    const g = groups.find(x => x.coll === coll)
-    return groupLabel(s ? { title: s.title, computed: s.computed } : g ? { title: titles(coll), computed: nHere } : null)
-  })
-  // a notice that choosing a group switched the indicator, until the reader changes anything else
-  let notice = $state('')
-  function chooseGroup(c: { coll: string; placeId: string | null }) {
-    if (!ind) return
-    const reset = { color: null, t: null, cls: null, method: null, grain: null }
-    if (countOf(c.coll)) {
-      notice = ''
-      onpatch({ coll: c.coll, place: c.placeId, ...reset })
-      return
-    }
-    const next = leadForGroup(m.indicators, catalog.coverage, isSetRef(c.coll) ? findSet(c.coll, sets)?.groups ?? [] : c.coll)
-    if (!next) return
-    notice = switchNotice(ind, next, titles(c.coll))
-    onpatch({ ind: next.id, coll: c.coll, place: c.placeId, ...reset })
-  }
   function chooseInd(id: string) {
-    notice = ''
-    onpatch({ ind: id, coll: null, color: null, t: null, cls: null, method: null, grain: null })
+    onpatch({ ind: id, color: null, t: null, cls: null, method: null, grain: null })
+  }
+  // an indicator the reader reaches from here (another metric of the OBIS family) joins the selection, so the Map keeps showing it
+  function selectInd(id: string, extra: Partial<ViewState> = {}) {
+    const next = m.indicators.find(i => i.id === id)
+    onpatch({ ind: id, ...extra, ...(next ? { spec: withSelection(view, { indicators: includeIndicator(view.spec.indicators, next, m.indicators) }).spec } : {}) })
   }
 
-  // ---- the values files of the group: the slider's periods, departure, past statuses ----
+  // ---- the values files of the groups: the slider's periods, departure, past statuses ----
   let values = $state.raw<Map<string, PlaceRow[]> | null>(null)
   let valuesError = $state('')
   $effect(() => {
@@ -140,7 +123,7 @@
     return () => { live = false }
   })
 
-  // ---- the gazetteer layers that draw the group (or the groups of the set) ----
+  // ---- the gazetteer layers that draw the groups ----
   let gaz = $state.raw<Record<string, GazLayer> | null>(null)
   let layerError = $state('')
   $effect(() => {
@@ -154,7 +137,7 @@
 
   // ---- the model ----
   const model = $derived(
-    ind ? mapModel(ind, catalog.coverage, values, { group: isSet ? null : coll, groups: isSet ? members : null, color: view.color, t: view.t, method: view.method, cls: view.cls, grain: view.grain }) : null,
+    ind ? mapModel(ind, catalog.coverage, values, { group: null, groups: members, keep, color: view.color, t: view.t, method: view.method, cls: view.cls, grain: view.grain }) : null,
   )
   const method = $derived<MethodId | null>(ind ? defaultMethod(ind) : null)
 
@@ -171,14 +154,14 @@
   const noneColor = $derived.by(() => { void theme; return css(model?.none ?? '--map-none') })
   const faintColor = $derived.by(() => { void theme; return css('--map-member') })
   const focusColor = $derived.by(() => { void theme; return css('--map-focus') })
-  // a reference group's places with no class are filled with the no-data colour under a layer of ours (a set), so nothing below shows through
+  // a reference group's places with no class are filled with the no-data colour under a layer of ours (several groups), so nothing below shows through
   const nofillColor = $derived.by(() => { void theme; return css('--bg-tint') })
 
   // ---- the parts the map draws ----
-  const built = $derived(gaz && model ? buildParts(members, gaz, model.items, idx?.places ?? [], isSet) : null)
+  const built = $derived(gaz && model ? buildParts(chosenGroups, gaz, model.items, idx?.places ?? [], chosenGroups.length > 1) : null)
   const parts = $derived(built?.parts ?? [])
   const bbox = $derived(parts.length ? partsBbox(parts) : ([-180, -85, 180, 85] as [number, number, number, number]))
-  $effect(() => { if (built && coll) layerError = built.missing.length && !built.parts.length ? `The gazetteer has no drawable layer for ${built.missing.join(', ')}.` : '' })
+  $effect(() => { if (built) layerError = built.missing.length && !built.parts.length ? `The gazetteer has no drawable layer for ${built.missing.join(', ')}.` : '' })
 
   // ---- the period slider ----
   const periods = $derived(model?.periods ?? [])
@@ -197,14 +180,14 @@
   const selectedId = $derived(view.place)
   let marker = $state<{ lng: number; lat: number } | null>(null)
   let pickedName = $state<{ id: string; name: string; group: string | null } | null>(null)
-  $effect(() => { void coll; marker = null })
+  $effect(() => { void members.join(); marker = null })
   const selectedItem = $derived(model?.items.find(i => i.placeId === selectedId) ?? null)
-  const selectedName = $derived(selectedItem?.name ?? (pickedName?.id === selectedId && pickedName.name ? pickedName.name : null) ?? idx?.places.find(p => p.id === selectedId)?.name ?? selectedId ?? '')
+  const selectedName = $derived(selectedItem?.name ?? (pickedName?.id === selectedId && pickedName.name ? pickedName.name : null) ?? places?.find(p => p.id === selectedId)?.name ?? idx?.places.find(p => p.id === selectedId)?.name ?? selectedId ?? '')
   // the group of the selected place: where it was clicked, else its place in the index, else the first group drawn
-  const notYetGroup = $derived((pickedName?.id === selectedId ? pickedName.group : null) ?? idx?.places.find(p => p.id === selectedId)?.coll ?? members[0] ?? (coll as string))
+  const notYetGroup = $derived((pickedName?.id === selectedId ? pickedName.group : null) ?? places?.find(p => p.id === selectedId)?.coll ?? idx?.places.find(p => p.id === selectedId)?.coll ?? members[0] ?? '')
   // a member of the group with no computed row: the same states and ways forward as a Matrix cell with no value
   const notYet = $derived.by(() => {
-    if (!ind || !coll || !selectedId || selectedItem) return null
+    if (!ind || !selectedId || selectedItem) return null
     const place: Place = { id: selectedId, name: selectedName, coll: notYetGroup }
     // a member with no computed row: not computed yet (erddap-places can make it), else the producer has not done it
     const cm = cellModel(ind, place, null)
@@ -215,8 +198,8 @@
     if (p.placeId) pickedName = { id: p.placeId, name: p.name ?? '', group: p.group ?? null }
     onpatch({ place: p.placeId })
   }
-  const toPlace = (id: string) => placeHref(view, id, coll, ind?.id ?? null)
-  const toMatrix = (id: string) => mapToMatrixHref(view, coll, ind?.id ?? null, id)
+  const toPlace = (id: string) => placeHref(view, id, members[0] ?? null, ind?.id ?? null)
+  const toMatrix = (id: string) => mapToMatrixHref(view, ind?.id ?? null, id)
 
   // ---- the map is ready once it has drawn the data ----
   let drawn = $state<'loading' | 'done'>('loading')
@@ -229,28 +212,25 @@
       .filter(Boolean).map(s => s.replace(/\.+$/, '') + '.').join(' '),
   )
   const heading = $derived(
-    ind && model && coll ? `${ind.title} · ${titles(coll)} · by ${MODE_LABELS[model.color].toLowerCase()}${model.period ? ` · ${periodLabel(model.period, model.grain)}` : ''}` : '',
+    ind && model ? `${ind.title} · ${selTitle} · by ${MODE_LABELS[model.color].toLowerCase()}${model.period ? ` · ${periodLabel(model.period, model.grain)}` : ''}` : '',
   )
   const methodChoices: MethodId[] = ['iea-sd', 'names-pct']
 </script>
 
-{#if !ind || !model || !coll}
-  <Notice kind="info">No indicator in this catalog has values to map yet.</Notice>
+{#if !ind || !model}
+  <Notice kind="info">No selected indicator has values for the selected places. Choose others in the Select section above{#if onother}, or <button type="button" class="lnk" onclick={onother}>choose another indicator</button>{/if}.</Notice>
 {:else}
   <section class="controls" aria-label="Map controls">
-    {#if idx}
-      <PlacePicker mode="group" {idx} {layers} {sets} label={pickLabel} current={coll} onchoose={chooseGroup} {noteOf} />
-    {/if}
     <IndicatorPicker mode="single" label={family ? FAMILY_LABEL : ind.short} indicators={pickList} vocabs={m.vocabularies} vocab={view.vocab}
-      onvocab={v => onpatch({ vocab: v })} chosen={chosenInd} withValues={valued} nPlaces={0} hintOf={i => groupsHint(byGroup.get(i.id), titles, GROUP_ORDER)} onchoose={chooseInd} />
+      onvocab={v => onpatch({ vocab: v })} chosen={chosenInd} withValues={have} nPlaces={nSelected} onchoose={chooseInd} {onother} />
     {#if family}
       <div class="group">
         <Select label="Metric" value={family.metric} options={family.metrics.map(c => ({ value: c.id, label: c.label }))}
-          onchange={(v: string) => onpatch({ ind: familyId(v, family.eov), color: null, cls: null })} />
+          onchange={(v: string) => selectInd(familyId(v, family.eov), { color: null, cls: null })} />
       </div>
       <div class="group">
         <Select label="EOV" value={family.eov} options={family.eovs.map(c => ({ value: c.id, label: c.label }))}
-          onchange={(v: string) => onpatch({ ind: familyId(family.metric, v), color: null, cls: null })} />
+          onchange={(v: string) => selectInd(familyId(family.metric, v), { color: null, cls: null })} />
       </div>
     {/if}
     {#if grains.length > 1}
@@ -358,7 +338,7 @@
     </aside>
   </div>
 
-  <MapTable {model} placeHref={toPlace} selected={selectedId} caption={`${ind.title}, ${titles(coll)}: value, period and class of every place`} />
+  <MapTable {model} placeHref={toPlace} selected={selectedId} caption={`${ind.title}, ${selTitle}: value, period and class of every place`} />
 {/if}
 
 <style>
@@ -370,6 +350,7 @@
   .notice { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: var(--space-2) var(--space-3); background: var(--bg-tint); border-radius: var(--radius-sm); font: var(--type-small); color: var(--text-strong); }
   .notice :global(svg) { flex: none; color: var(--label-color); }
   .hint, .warn { font: var(--type-small); color: var(--text-body); }
+  .lnk { padding: 0; border: 0; background: none; color: var(--link); font: inherit; text-decoration: underline; cursor: pointer; }
   .summary { display: flex; align-items: center; gap: var(--space-2); margin: 0; font: var(--type-small); color: var(--text-body); }
   .summary :global(svg) { color: var(--label-color); flex: none; }
 

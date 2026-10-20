@@ -1,55 +1,42 @@
 <script lang="ts">
-  // the report builder: a preset, the two selection trees (places, indicators), the layout with its panel budget, the
-  // style (status method, recent window, baseline), the years and a title. it holds no state of its own: every change goes out through `onspec` as a new spec, so the report is always a permalink.
+  // the report builder: a starting point (a preset sets the shared selection, the layout and the title), the layout with its panel
+  // budget, the style (status method, recent window, baseline), the years and a title. the places and indicators are chosen in
+  // the Select section above the tabs, the same selection as the Matrix and the Map. it holds no state of its own: every change
+  // goes out through `onspec` as a new spec, so the report is always a permalink.
   import { Button, Select, Toggle } from '@marinebon/ui'
-  import PlacePicker from '../pick/PlacePicker.svelte'
-  import { multiLabel, placeGroups } from '../pick/places.ts'
   import { Icon } from '../../../../src/icons/index.ts'
   import type { IconName } from '../../../../src/icons/index.ts'
-  import { DEFAULT_SPEC, LAYOUT_IDS, LAYOUTS, expandPlaces } from '../../../../src/report/spec.ts'
+  import { DEFAULT_SPEC, LAYOUT_IDS, LAYOUTS } from '../../../../src/report/spec.ts'
   import type { Fix, Layout, ReportSpec } from '../../../../src/report/spec.ts'
-  import type { Catalog, Layers, VocabId } from '../data.ts'
+  import type { Catalog } from '../data.ts'
   import type { CoverageIndex } from '../matrix.ts'
   import { METHOD_IDS, DEPTHS } from '../hash.ts'
   import type { Depth } from '../hash.ts'
   import { METHOD_NOTES } from '../place.ts'
   import { availablePresets, PRESETS, presetOf } from './presets.ts'
   import type { ReportModel } from './report.ts'
-  import {
-    buildIndicatorTree, toggleCategory, toggleCollection, toggleIndicator, togglePlace, toggleSeries,
-  } from './tree.ts'
-  import type { TreeNode } from './tree.ts'
   import Fixes from './Fixes.svelte'
-  import Tree from './Tree.svelte'
 
   interface Props {
     catalog: Catalog
     idx: CoverageIndex
     spec: ReportSpec
     model: ReportModel
-    vocab: VocabId
     depth: Depth
-    titles: (coll: string) => string
-    layers: Layers
     split: 'place' | 'category' | null
     onspec: (spec: ReportSpec) => void
-    onview: (p: { vocab?: VocabId; depth?: Depth }) => void
+    onview: (p: { depth?: Depth }) => void
     onfix: (fix: Fix) => void
     onunsplit: () => void
     ondone: () => void
   }
-  let { catalog, idx, spec, model, vocab, depth, titles, layers, split, onspec, onview, onfix, onunsplit, ondone }: Props = $props()
+  let { catalog, idx, spec, model, depth, split, onspec, onview, onfix, onunsplit, ondone }: Props = $props()
 
   const LAYOUT_ICON: Record<Layout, IconName> = {
     cards: 'view-cards', scorecard: 'view-scorecard', 'small-multiples': 'view-small-multiples', quad: 'view-quad', 'map-sheet': 'view-map-sheet', dossier: 'view-dossier',
   }
-  const VOCABS: { id: VocabId; label: string }[] = [
-    { id: 'onms', label: 'ONMS sections' }, { id: 'names', label: 'NaMES themes' }, { id: 'eov', label: 'GOOS EOVs' },
-  ]
   const DEPTH_LABEL: Record<Depth, string> = { skim: 'Skimmer', swim: 'Swimmer', dive: 'Diver' }
   const all = $derived(catalog.manifest.indicators)
-  const terms = $derived(catalog.manifest.vocabularies[vocab].terms)
-  const known = $derived(terms.map(t => t.id))
   const set = (p: Partial<ReportSpec>) => onspec({ ...spec, ...p })
 
   // ---- presets ----
@@ -58,22 +45,7 @@
   const presetOptions = $derived([{ value: '', label: 'Custom' }, ...presets.map(p => ({ value: p.id, label: p.label }))])
   function pick(v: string) {
     const p = presets.find(x => x.id === v)
-    if (p) onspec({ ...p.spec, depth: spec.depth })
-  }
-
-  // ---- the trees ----
-  const chosenPlaces = $derived(expandPlaces(spec.places, idx.places))
-  const chosenIds = $derived(new Set(chosenPlaces.map(p => p.id)))
-  const indNodes = $derived(buildIndicatorTree({ indicators: all, vocab, terms, sel: spec.indicators, rows: catalog.coverage, places: chosenPlaces }))
-  function toggleP(n: { kind: 'collection' | 'place'; key: string }, on: boolean) {
-    const places = n.kind === 'collection' ? toggleCollection(spec.places, idx.places, n.key, on) : togglePlace(spec.places, idx.places, n.key, on)
-    set({ places })
-  }
-  function toggleI(n: TreeNode, on: boolean) {
-    const indicators = n.kind === 'category' ? toggleCategory(spec.indicators, all, vocab, known, n.key, on)
-      : n.kind === 'series' ? toggleSeries(spec.indicators, all, n.key, on)
-      : toggleIndicator(spec.indicators, all, n.key, on)
-    set({ indicators })
+    if (p) onspec({ ...p.spec, depth: spec.depth })   // the preset's places and indicators are the shared selection too
   }
 
   // ---- numbers: empty = null; a baseline needs both ends ----
@@ -98,29 +70,10 @@
       <span class="mbon-label">Title</span>
       <input type="text" value={spec.title ?? ''} placeholder="Untitled report" maxlength="120" onchange={e => set({ title: e.currentTarget.value.trim() || null })} />
     </label>
-    <div class="field" role="group" aria-label="Group indicators by">
-      <span class="mbon-label">Group indicators by</span>
-      <span class="row om-row">
-        {#each VOCABS as v (v.id)}
-          <Button variant="quiet" size="sm" pressed={vocab === v.id} onclick={() => onview({ vocab: v.id })}>{v.label}</Button>
-        {/each}
-      </span>
-    </div>
     <Button variant="primary" size="sm" onclick={ondone}>Done</Button>
   </div>
 
-  <div class="trees">
-    <section class="pane" aria-labelledby="bp">
-      <h3 id="bp" class="mbon-label">Places <span class="n">{chosenPlaces.length} chosen</span></h3>
-      <PlacePicker mode="multi" kicker="Groups and places" {idx} {layers} label={multiLabel(placeGroups(idx, layers), chosenIds)} chosen={chosenIds} ontoggle={toggleP} />
-      <Toggle checked={spec.places.context} label="Context extents" hint="needs the gazetteer's context links (not published yet)" disabled />
-    </section>
-    <section class="pane" aria-labelledby="bi">
-      <h3 id="bi" class="mbon-label">Indicators <span class="n">{model.indicators.length} chosen</span></h3>
-      <p class="hint om-note">Counts are places with a value, of the places chosen. A series ticks its lead; open it for the others.</p>
-      <div class="scroll"><Tree nodes={indNodes} label="Indicators" ontoggle={toggleI} empty="No indicator has a value for the chosen places." /></div>
-    </section>
-  </div>
+  <p class="om-note">The places and indicators are the selection above the tabs: the Matrix, the Map and this report share it. {model.places.length} {model.places.length === 1 ? 'place' : 'places'} and {model.indicators.length} {model.indicators.length === 1 ? 'indicator' : 'indicators'} of it have values.</p>
 
   <div class="opts om-controls">
     <div class="field" role="group" aria-label="Layout">
@@ -132,6 +85,9 @@
       </span>
     </div>
     <div class="fixes"><Fixes layout={spec.layout} budget={model.budget} {split} {onfix} {onunsplit} /></div>
+    <div class="field">
+      <Toggle checked={spec.places.context} label="Context extents" hint="needs the gazetteer's context links (not published yet)" disabled />
+    </div>
 
     <div class="field" role="group" aria-label="Status method">
       <span class="mbon-label">Status method</span>
@@ -179,7 +135,6 @@
   .top { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: flex-end; }
   .field { display: grid; gap: var(--space-1); min-width: 0; }
   .note { font: var(--type-small); color: var(--text-body); max-width: 34rem; }
-  .n { margin-left: var(--space-2); font: var(--type-label); letter-spacing: 0; color: var(--text-body); text-transform: none; }
   input[type='text'], input[type='number'] {
     height: 2rem; padding: 0 var(--space-3); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
     background: var(--control-bg); color: var(--text-strong); font: var(--type-small); min-width: 0;
@@ -188,10 +143,5 @@
   .text input { width: min(20rem, 100%); }
   .num input { width: 6rem; }
   .yr { width: 5.5rem; }
-  .trees { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); align-items: start; }
-  .pane { display: grid; gap: var(--space-2); min-width: 0; padding: var(--space-3); background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
-  h3 { margin: 0; }
-  .scroll { max-height: 22rem; overflow: auto; overscroll-behavior: contain; }
   .fixes { flex-basis: 100%; }
-  @media (max-width: 760px) { .trees { grid-template-columns: minmax(0, 1fr); } .scroll { max-height: 16rem; } }
 </style>

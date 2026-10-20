@@ -40,21 +40,37 @@ const OGC_ENV =
   (idField: string) =>
     `<ogc:Function name="env"><ogc:Function name="strConcat"><ogc:Literal>m</ogc:Literal><ogc:PropertyName>${idField}</ogc:PropertyName></ogc:Function><ogc:Literal>x</ogc:Literal></ogc:Function>`
 
+/** the most places a layer is restricted to by id: past it the whole layer is drawn (the SLD travels in the URL of every tile) */
+export const MAX_ONLY = 120
+
+/** the ids (digits) of the places a layer is restricted to, from place ids; null when there are too many to put in the request, or none is on the layer */
+export function onlyMrgids(placeIds: readonly string[] | null | undefined): string[] | null {
+  if (!placeIds) return null
+  const ids = placeIds.map(mrgidOf).filter((x): x is string => !!x)
+  return ids.length > 0 && ids.length <= MAX_ONLY ? ids : null
+}
+
 /**
  * the SLD: rule one outlines the places with no ENV entry (no fill, so the basemap shows); the else rule fills the
- * rest with the colour of their class, a Recode over the ENV value, 85 % opaque, with a thin line round it.
+ * rest with the colour of their class, a Recode over the ENV value, 85 % opaque, with a thin line round it. `only` restricts both
+ * rules to those places (their ids on the layer): the rest of the layer is not drawn.
  */
-export function sldBody(layer: string, idField: string, colors: string[], noneStroke: string, lineStroke: string, noneFill: string | null = null): string {
+export function sldBody(layer: string, idField: string, colors: string[], noneStroke: string, lineStroke: string, noneFill: string | null = null, only: readonly string[] | null = null): string {
   const env = OGC_ENV(idField)
+  const eq = (id: string) => `<ogc:PropertyIsEqualTo><ogc:PropertyName>${idField}</ogc:PropertyName><ogc:Literal>${id}</ogc:Literal></ogc:PropertyIsEqualTo>`
+  const ids = only && only.length ? (only.length === 1 ? eq(only[0]) : `<ogc:Or>${only.map(eq).join('')}</ogc:Or>`) : ''
+  const noEntry = `<ogc:PropertyIsEqualTo>${env}<ogc:Literal>x</ogc:Literal></ogc:PropertyIsEqualTo>`
+  const rule1 = ids ? `<ogc:Filter><ogc:And>${noEntry}${ids}</ogc:And></ogc:Filter>` : `<ogc:Filter>${noEntry}</ogc:Filter>`
+  const rule2 = ids ? `<ogc:Filter><ogc:And><ogc:Not>${noEntry}</ogc:Not>${ids}</ogc:And></ogc:Filter>` : '<ElseFilter/>'
   // under a layer of ours (a place set draws the FAO areas below the EEZs): every fill is opaque and the places with no class are
   // filled too, with the colour `noneFill`, so nothing below shows through them
   const opacity = noneFill ? '1' : '0.85'
   const noneRule = noneFill ? `<Fill><CssParameter name="fill">${noneFill}</CssParameter><CssParameter name="fill-opacity">1</CssParameter></Fill>` : ''
   const recode = `<ogc:Function name="Recode">${env}${colors.map((c, k) => `<ogc:Literal>${k}</ogc:Literal><ogc:Literal>${c}</ogc:Literal>`).join('')}</ogc:Function>`
   return `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc"><NamedLayer><Name>${layer}</Name><UserStyle><FeatureTypeStyle>` +
-    `<Rule><ogc:Filter><ogc:PropertyIsEqualTo>${env}<ogc:Literal>x</ogc:Literal></ogc:PropertyIsEqualTo></ogc:Filter>` +
+    `<Rule>${rule1}` +
     `<PolygonSymbolizer>${noneRule}<Stroke><CssParameter name="stroke">${noneStroke}</CssParameter><CssParameter name="stroke-width">0.8</CssParameter></Stroke></PolygonSymbolizer></Rule>` +
-    `<Rule><ElseFilter/><PolygonSymbolizer><Fill><CssParameter name="fill">${recode}</CssParameter><CssParameter name="fill-opacity">${opacity}</CssParameter></Fill>` +
+    `<Rule>${rule2}<PolygonSymbolizer><Fill><CssParameter name="fill">${recode}</CssParameter><CssParameter name="fill-opacity">${opacity}</CssParameter></Fill>` +
     `<Stroke><CssParameter name="stroke">${lineStroke}</CssParameter><CssParameter name="stroke-width">0.5</CssParameter></Stroke></PolygonSymbolizer></Rule>` +
     `</FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`
 }
@@ -68,12 +84,13 @@ const encEnv = (s: string) => encodeURIComponent(s).replace(/%3A/gi, ':').replac
  */
 export function wmsTileUrl(
   raster: Pick<RasterRef, 'tiles'>, entries: WmsEntry[], colors: string[], noneStroke: string, lineStroke: string, idField = 'mrgid', noneFill: string | null = null,
+  only: readonly string[] | null = null,
 ): string {
   const layer = layerName(raster)
   const q = [
     'SERVICE=WMS', 'VERSION=1.1.1', 'REQUEST=GetMap', `LAYERS=${layer}`, 'STYLES=', 'SRS=EPSG:3857', 'BBOX={bbox-epsg-3857}',
     'WIDTH=256', 'HEIGHT=256', 'FORMAT=image/png', 'TRANSPARENT=true',
-    `SLD_BODY=${encodeURIComponent(sldBody(layer, idField, colors, noneStroke, lineStroke, noneFill))}`,
+    `SLD_BODY=${encodeURIComponent(sldBody(layer, idField, colors, noneStroke, lineStroke, noneFill, only))}`,
     `ENV=${encEnv(envString(entries))}`,
   ]
   return `${wmsEndpoint(raster)}?${q.join('&')}`

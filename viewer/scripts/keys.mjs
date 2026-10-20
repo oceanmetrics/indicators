@@ -2,12 +2,15 @@
 // returns to the cell; Tab reaches a place link, Enter opens the Place view, and its controls are reachable by Tab.
 // the first pass is places as rows (#axes=p), the second the default, indicators as rows with places in columns: the same cell round
 // trip, and Tab + Enter on a remove button; then the Place view's breadcrumb returns to the cell it came from.
-//   node viewer/scripts/keys.mjs [--url https://oceanmetrics.io/indicators/]
+//   node viewer/scripts/keys.mjs [--url https://oceanmetrics.io/indicators/] [--data <catalog base URL>]
 import puppeteer from 'puppeteer-core'
 
 const CHROME = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d }
 const URL_BASE = arg('--url', 'http://localhost:5181/')
+const DATA = arg('--data', '')
+// the query every page opens with: the light theme, and the catalog base when asked for
+const Q = '?theme=light' + (DATA ? `&data=${encodeURIComponent(DATA)}` : '')
 
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, defaultViewport: { width: 1440, height: 900 } })
 const page = await browser.newPage()
@@ -26,7 +29,7 @@ const tabUntil = async (pred, max = 600) => {
   return null
 }
 
-await page.goto(`${URL_BASE}?theme=light#axes=p`, { waitUntil: 'networkidle0' })
+await page.goto(`${URL_BASE}${Q}#axes=p`, { waitUntil: 'networkidle0' })
 await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
 
 // a Matrix cell, its drawer, Esc, focus back
@@ -59,7 +62,7 @@ if (link) {
 
 // the default matrix: indicators in rows, places in columns
 await page.goto('about:blank')   // a fresh load: a hash-only change would keep the page, and the focus, as it was
-await page.goto(`${URL_BASE}?theme=light`, { waitUntil: 'networkidle0' })
+await page.goto(`${URL_BASE}${Q}`, { waitUntil: 'networkidle0' })
 await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
 const indRows = await page.evaluate(() => !!document.querySelector('table.matrix.indrows'))
 check(indRows, 'the default matrix has indicators in rows')
@@ -83,7 +86,7 @@ if (cell2) {
 // the way there and back: a cell -> its drawer -> "Open in place view" (the Place view opens on that indicator: its card
 // first, focus on its heading) -> the breadcrumb's Matrix link (the drawer reopens on the cell) -> Esc -> focus on the cell
 await page.goto('about:blank')
-await page.goto(`${URL_BASE}?theme=light`, { waitUntil: 'networkidle0' })
+await page.goto(`${URL_BASE}${Q}`, { waitUntil: 'networkidle0' })
 await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
 const cell3 = await tabUntil(f => f.tag === 'BUTTON' && /\bcell\b/.test(f.cls))
 if (cell3) {
@@ -111,7 +114,7 @@ if (cell3) {
 // Tab to the first remove button of a kind, press Enter: the hash gets xp= (place) or xi= (indicator), focus stays on a button
 for (const [kind, key] of [['place', 'xp='], ['indicator', 'xi=']]) {
   await page.goto('about:blank')   // a fresh load: a hash-only change would keep the page, and the focus, as it was
-  await page.goto(`${URL_BASE}?theme=light`, { waitUntil: 'networkidle0' })
+  await page.goto(`${URL_BASE}${Q}`, { waitUntil: 'networkidle0' })
   await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
   await page.evaluate(() => (document.activeElement instanceof HTMLElement) && document.activeElement.blur())
   const rm = await tabUntil(f => f.tag === 'BUTTON' && f.kind === kind && /^Remove .* from the matrix$/.test(f.label ?? ''), 1500)
@@ -129,7 +132,7 @@ for (const [kind, key] of [['place', 'xp='], ['indicator', 'xi=']]) {
 // the Report view: Tab reaches Edit, Enter opens the builder, Tab reaches a tree checkbox (role=checkbox), Space toggles it
 // and the hash changes (every report is a permalink)
 await page.goto('about:blank')
-await page.goto(`${URL_BASE}?theme=light#view=report&pi=coll:places&layout=scorecard`, { waitUntil: 'networkidle0' })
+await page.goto(`${URL_BASE}${Q}#view=report&pi=coll:places&layout=scorecard`, { waitUntil: 'networkidle0' })
 await page.waitForSelector('.lens[data-state=done] .rv', { timeout: 30000 })
 const edit = await tabUntil(f => f.tag === 'BUTTON' && f.label === 'Edit', 80)
 check(!!edit, `report: Tab reaches the Edit button${edit ? ` (${edit.presses} presses)` : ''}`)
@@ -152,7 +155,7 @@ if (edit) {
 // results, Space or Enter chooses, Esc closes and focus returns to the button
 const fresh = async hash => {
   await page.goto('about:blank')
-  await page.goto(`${URL_BASE}?theme=light${hash}`, { waitUntil: 'networkidle0' })
+  await page.goto(`${URL_BASE}${Q}${hash}`, { waitUntil: 'networkidle0' })
   await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
   await page.evaluate(() => (document.activeElement instanceof HTMLElement) && document.activeElement.blur())
 }

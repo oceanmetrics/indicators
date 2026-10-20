@@ -30,17 +30,17 @@ export interface ReportModel {
 
 const hasValue = (idx: CoverageIndex, p: Place, i: Indicator) => pickRow(idx, p.id, i)?.last_value != null
 
-/** a spec in this catalog: the rules expanded, then gated by coverage (a column or a row with no value is left out) */
+/** a spec in this catalog: the rules expanded (the place sets from the manifest), then gated by coverage (a column or a row with no value is left out) */
 export function buildReport(catalog: Pick<Catalog, 'manifest' | 'coverage'>, idx: CoverageIndex, spec: ReportSpec, vocab: VocabId): ReportModel {
   const all = catalog.manifest.indicators
-  const chosenPlaces = expandPlaces(spec.places, idx.places)
+  const chosenPlaces = expandPlaces(spec.places, idx.places, catalog.manifest.place_sets ?? [])
   const counts = coverageCounts(catalog.coverage, chosenPlaces)
   const indicators = expandIndicators(spec.indicators, all).filter(i => (counts.get(i.id) ?? 0) > 0)
   const collRank = new Map(idx.colls.map((c, n) => [c, n]))
   const places = chosenPlaces
     .filter(p => indicators.some(i => hasValue(idx, p, i)))
     .sort((a, b) => (collRank.get(a.coll) ?? 99) - (collRank.get(b.coll) ?? 99) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
-  const groups = groupColumns(indicators, catalog.manifest.vocabularies, vocab, false)
+  const groups = groupColumns(indicators, catalog.manifest.vocabularies, vocab)
   const leads = new Set(seriesLeads(all).values())
   const empties: EmptyCell[] = []
   for (const p of places) {

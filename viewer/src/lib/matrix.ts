@@ -5,9 +5,8 @@ import { fmt, periodLabel } from '../../../src/status/index.ts'
 import type { Grain, Status, Trend } from '../../../src/status/index.ts'
 import { shownGrainOrder } from '../../../src/coverage/build.ts'
 import type { CoverageRow } from '../../../src/coverage/build.ts'
-import { DEFAULT_GROUPS, GROUP_ORDER } from './data.ts'
-import type { Indicator, PlaceSet, Term, VocabId, Vocab } from './data.ts'
-import { expandGroups } from './sets.ts'
+import { GROUP_ORDER } from './data.ts'
+import type { Indicator, Term, VocabId, Vocab } from './data.ts'
 
 /**
  * a place. `coll` is its group: its home gazetteer collection (coverage `place_coll`, else the values collection).
@@ -56,19 +55,6 @@ export function indexCoverage(rows: CoverageRow[]): CoverageIndex {
   const list = [...places.values()]
   for (const p of list) p.valuesColls!.sort()
   return { rows: byKey, places: list, colls: orderGroups(list.map(p => p.coll)) }
-}
-
-/**
- * the groups the Matrix shows: the ones asked for (`colls`, where `set:<id>` stands for the groups of the place set, those
- * of them with computed places); none asked, or only an unknown set, and a search typed = every group (a search finds a
- * place wherever it is); none asked = the default groups that have places (the sanctuaries), else every group.
- */
-export function shownGroups(available: string[], colls: string[], q: string, sets: readonly PlaceSet[] = []): string[] {
-  const asked = expandGroups(colls, sets).filter(g => colls.includes(g) || available.includes(g))
-  if (asked.length) return asked
-  if (q.trim()) return available
-  const dflt = available.filter(c => DEFAULT_GROUPS.includes(c))
-  return dflt.length ? dflt : available
 }
 
 /** "19 of 20" (computed of the gazetteer's total), or just "19" while layers.json has not loaded */
@@ -220,21 +206,15 @@ const OTHER: Term = { id: 'other', label: 'Other' }
 
 /**
  * columns grouped by a vocabulary, in the vocabulary's term order; groups with no indicator are dropped, and an
- * indicator whose tag is not a term of the vocabulary goes to a last group "Other". `leadsOnly` keeps one column per
- * series (its lead), plus any id in `opts.add`; ids in `opts.hide` are always dropped. within a group, a series'
- * indicators stay together (the lead first) in manifest order.
+ * indicator whose tag is not a term of the vocabulary goes to a last group "Other". within a group, a series'
+ * indicators stay together (the lead first) in the order given.
  */
-export function groupColumns(
-  indicators: Indicator[], vocabs: Record<VocabId, Vocab>, vocab: VocabId, leadsOnly: boolean,
-  opts: { add?: string[]; hide?: string[] } = {},
-): ColumnGroup[] {
-  const add = new Set(opts.add ?? [])
-  const hide = new Set(opts.hide ?? [])
+export function groupColumns(indicators: Indicator[], vocabs: Record<VocabId, Vocab>, vocab: VocabId): ColumnGroup[] {
   const terms = vocabs[vocab]?.terms ?? []
   const known = new Set(terms.map(t => t.id))
   const seriesRank = new Map<string, number>()
   indicators.forEach(i => { if (!seriesRank.has(i.series)) seriesRank.set(i.series, seriesRank.size) })
-  const pool = indicators.map((ind, n) => ({ ind, n })).filter(x => !hide.has(x.ind.id) && (!leadsOnly || x.ind.lead || add.has(x.ind.id)))
+  const pool = indicators.map((ind, n) => ({ ind, n }))
   const order = (a: { ind: Indicator; n: number }, b: { ind: Indicator; n: number }) =>
     (seriesRank.get(a.ind.series) as number) - (seriesRank.get(b.ind.series) as number) || Number(b.ind.lead) - Number(a.ind.lead) || a.n - b.n
   const groups: ColumnGroup[] = []
@@ -250,62 +230,45 @@ export function groupColumns(
 
 /**
  * the indicators with no value for any place on display are left out (a column of empty cells says nothing); ids in
- * `keep` stay (what the reader added by hand). groups left empty are dropped.
+ * `keep` stay (what the reader named by hand). groups left empty are dropped. when no place on display has a value for any
+ * of them (places no one has computed yet), all stay, so each empty cell can be asked for.
  */
 export function withValues(cols: ColumnGroup[], rows: RowGroup[], idx: CoverageIndex, keep: Iterable<string> = []): ColumnGroup[] {
   const kept = new Set(keep)
   const places = rows.flatMap(g => g.places)
   const has = (ind: Indicator) => kept.has(ind.id) || places.some(p => pickRow(idx, p.id, ind)?.last_value != null)
-  return cols.map(g => ({ term: g.term, indicators: g.indicators.filter(has) })).filter(g => g.indicators.length > 0)
+  const out = cols.map(g => ({ term: g.term, indicators: g.indicators.filter(has) })).filter(g => g.indicators.length > 0)
+  return out.length || !places.length ? out : cols
 }
 
 export interface RowGroup {
   coll: string
   places: Place[]
+  /** the group's places before the cap, when it was capped */
+  total?: number
 }
+
+/** the most places one group shows: a group of thousands lists the first of them, and the reader narrows it by search or by picking places */
+export const ROW_CAP = 300
 
 /**
- * rows grouped by collection (empty `colls` = every collection), filtered by a case-insensitive search of name or id;
- * places in `hide` are dropped
+ * the rows of the chosen places: grouped by their home collection (the Matrix's group order), a case-insensitive search of
+ * name or id narrows them, the computed places (some coverage) come first in each group and then by name, and a group of
+ * more than `cap` places shows the first `cap` (its `total` says how many there are)
  */
-export function groupRows(idx: CoverageIndex, colls: string[], q: string, hide: string[] = []): RowGroup[] {
+export function selectionRows(places: Place[], idx: CoverageIndex, q: string, cap = ROW_CAP): RowGroup[] {
   const needle = q.trim().toLowerCase()
-  const wanted = colls.length ? new Set(colls) : null
-  const hidden = new Set(hide)
-  const out: RowGroup[] = []
-  for (const coll of idx.colls) {
-    if (wanted && !wanted.has(coll)) continue
-    const places = idx.places
-      .filter(p => p.coll === coll && !hidden.has(p.id) && (!needle || p.name.toLowerCase().includes(needle) || p.id.toLowerCase().includes(needle)))
-      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
-    if (places.length) out.push({ coll, places })
+  const computed = new Set(idx.places.map(p => p.id))
+  const by = new Map<string, Place[]>()
+  for (const p of places) {
+    if (needle && !p.name.toLowerCase().includes(needle) && !p.id.toLowerCase().includes(needle)) continue
+    if (!by.has(p.coll)) by.set(p.coll, [])
+    by.get(p.coll)!.push(p)
   }
-  return out
-}
-
-export interface SeriesGroup {
-  series: string
-  title: string
-  indicators: Indicator[]
-}
-
-/** the indicators not on display, grouped by series (manifest order, titled `series_title ?? series`), the lead first */
-export function addableIndicators(indicators: Indicator[], shown: Set<string>): SeriesGroup[] {
-  const groups = new Map<string, SeriesGroup>()
-  for (const ind of indicators) {
-    if (shown.has(ind.id)) continue
-    if (!groups.has(ind.series)) groups.set(ind.series, { series: ind.series, title: ind.series_title ?? ind.series, indicators: [] })
-    groups.get(ind.series)!.indicators.push(ind)
-  }
-  // a stable sort keeps manifest order among the non-leads
-  for (const g of groups.values()) g.indicators.sort((a, b) => Number(b.lead) - Number(a.lead))
-  return [...groups.values()]
-}
-
-/** the places removed from the display, in name order, for the restore list; ids that are not places are skipped */
-export function hiddenPlaces(idx: CoverageIndex, hide: string[]): Place[] {
-  const wanted = new Set(hide)
-  return idx.places.filter(p => wanted.has(p.id)).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+  return orderGroups(by.keys()).map(coll => {
+    const all = by.get(coll)!.sort((a, b) => Number(computed.has(b.id)) - Number(computed.has(a.id)) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+    return all.length > cap ? { coll, places: all.slice(0, cap), total: all.length } : { coll, places: all }
+  })
 }
 
 export interface MatrixStats {
