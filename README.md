@@ -10,7 +10,8 @@ compute them:
 |---|---|---|---|
 | [erddap-places](https://github.com/oceanmetrics/erddap-places) precomputed stats | ERDDAP grids: SST, bleaching alerts, chlorophyll, pH, O₂, nutrients, NPP, precipitation, Seascapes ... | NOAA sanctuaries and a few others (gazetteer collection `places`) | `om_indicators/adapters/erddap_places.py`: daily → month and year rows |
 | `oceanmetrics/places` `proto/eez_indicators` | UN SDG 14 series (14.5.1, 14.1.1, 14.6.1) | Marine Regions EEZs (`mr_eez`) | `om_indicators/adapters/sdg.py`: latest year |
-| [obisindicators](https://github.com/marinebon/obisindicators) | OBIS records, richness, Shannon, Simpson, ES(50), Hill, by year and EOV | EEZs, offshore regions | Phase 5 |
+| [noaa-onms/eco-indicators](https://github.com/noaa-onms/eco-indicators) | Copernicus Marine long records (1993- physics, 1997- ocean colour and plankton types) | NOAA sanctuaries (`places`) | `om_indicators/adapters/eco_indicators.py`: monthly means → month and year rows |
+| [obisindicators](https://github.com/marinebon/obisindicators) `obis-h3` release | OBIS records, richness, Shannon, Simpson, ES(50), Hill, Berger-Parker, density, by year, decade and EOV | Marine Regions EEZs and the high seas (`mr_eez`, `mr_high_seas`) | `om_indicators/adapters/obis.py`: exact point-in-polygon indicators |
 
 The values are derived tables (no geometry). Code is MIT; values are CC BY 4.0 with the upstream credit carried in
 the manifest.
@@ -23,7 +24,7 @@ One row per (place, indicator, period), in `values/indicator=<id>/coll=<slug>/da
 |---|---|---|
 | `place_id` | string | gazetteer id, `<authority>:<source_id>` (`NMS:CINMS`, `MRGID:8371`) |
 | `coll` | string | gazetteer collection of the place (`places`, `mr_eez`) |
-| `indicator` | string | `erddap:<dataset>:<variable>:<stat>`, `sdg:<series>`, `obis:<metric>[:<eov>]` |
+| `indicator` | string | `erddap:<dataset>:<variable>:<stat>`, `cmems:<dataset>:<variable>:mean`, `sdg:<series>`, `obis:<metric>[:<eov>]` |
 | `time_grain` | string | `all`, `decade`, `year`, `month` or `day` |
 | `time` | date | first day of the period; null for `all` |
 | `class` | string | categorical indicators only: the class whose area share `value` is |
@@ -70,6 +71,8 @@ npm run check                                # svelte-check + tsc
 # build the catalog from what the producers have published
 uv run om-ind erddap-places --out catalog    # gazetteer/stats -> complete month and year rows
 uv run om-ind sdg --values ../places/proto/eez_indicators/data/values.json --out catalog
+uv run om-ind eco-indicators --out catalog   # noaa-onms/eco-indicators at the latest commit of data/copernicus.csv (--ref <sha> pins one)
+uv run om-ind obis --out catalog             # the latest obis-h3 release's place_exact layer (--release v20261012 pins one)
 uv run om-ind manifest --out catalog         # catalog/indicators.json
 npm run coverage:build -- catalog            # catalog/coverage.parquet (statuses from src/status)
 uv run om-ind validate catalog               # every values file and coverage.parquet against the schemas
@@ -89,8 +92,8 @@ Rscript fixtures/ecoidx/build_iea_sd_fixtures.R ~/Github/noaa-iea/ecoidx   # the
 ## Publishing
 
 - **Catalog:** `.github/workflows/catalog.yml` runs daily (08:07 UTC) on the self-hosted `macmini` runner:
-  `scripts/build_catalog.sh` (erddap-places rebuilt from the published stats, the SDG series pulled from the published
-  catalog), then `scripts/publish_catalog.sh` syncs to `s3://oceanmetrics.io-public/indicators/` (values first, the
+  `scripts/build_catalog.sh` (erddap-places, eco-indicators and obis rebuilt from what they publish, the SDG series pulled
+  from the published catalog), then `scripts/publish_catalog.sh` syncs to `s3://oceanmetrics.io-public/indicators/` (values first, the
   manifest last; `--delete` only under `indicators/values/`). Read it at
   https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/ (`storage.oceanmetrics.io/indicators/` once
   that host's Caddy allow-list includes the prefix). To refresh the SDG series from the places prototype:

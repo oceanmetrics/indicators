@@ -2,6 +2,8 @@
 
   om-ind erddap-places [--base URL] [--cache DIR] [--out catalog] [--only dataset/variable ...]
   om-ind sdg [--values PATH] [--out catalog]
+  om-ind eco-indicators [--out catalog] [--ref SHA] [--cache DIR]
+  om-ind obis [--out catalog] [--release vYYYYMMDD] [--cache DIR]
   om-ind manifest [--out catalog] [--sdg-values PATH] [--version YYYY.MM.DD]
   om-ind validate [catalog]
   om-ind pull --family sdg [--base URL] [--out catalog]
@@ -66,6 +68,38 @@ def _add_sdg(sub: argparse._SubParsersAction) -> None:
   p.set_defaults(func=func)
 
 
+# eco-indicators ----
+def _add_eco_indicators(sub: argparse._SubParsersAction) -> None:
+  p = sub.add_parser("eco-indicators", help="noaa-onms/eco-indicators Copernicus Marine sanctuary means -> month and year rows")
+  p.add_argument("--out", type=Path, default=Path("catalog"))
+  p.add_argument("--ref", help="commit of the repo to read (default: the latest on main that touched data/copernicus.csv)")
+  p.add_argument("--cache", type=Path, default=Path("cache/eco-indicators"))
+
+  def func(a: argparse.Namespace) -> int:
+    from om_indicators.adapters import eco_indicators
+    s = eco_indicators.run(a.out, ref=a.ref, cache=a.cache)
+    print(f"noaa-onms/eco-indicators @ {s['ref']} ({s['commit_date']})")
+    print_summary(s)
+    return 0
+  p.set_defaults(func=func)
+
+
+# obis ----
+def _add_obis(sub: argparse._SubParsersAction) -> None:
+  p = sub.add_parser("obis", help="the obis-h3 release's exact place indicators -> year, decade and all-years rows")
+  p.add_argument("--out", type=Path, default=Path("catalog"))
+  p.add_argument("--release", help="obis-h3 release, e.g. v20261012 (default: latest.json)")
+  p.add_argument("--cache", type=Path, default=Path("cache/obis"))
+
+  def func(a: argparse.Namespace) -> int:
+    from om_indicators.adapters import obis
+    s = obis.run(a.out, release=a.release, cache=a.cache)
+    print(f"obis-h3 {s['release']}, OBIS snapshot {s['obis_snapshot']}, WoRMS {s['worms_version']}")
+    print_summary(s)
+    return 0
+  p.set_defaults(func=func)
+
+
 # manifest ----
 def _add_manifest(sub: argparse._SubParsersAction) -> None:
   p = sub.add_parser("manifest", help="config + vocabularies + values + producer STAC -> indicators.json")
@@ -126,7 +160,8 @@ def _add_validate(sub: argparse._SubParsersAction) -> None:
   p.set_defaults(func=func)
 
 
-COMMANDS: list[Callable[[argparse._SubParsersAction], None]] = [_add_erddap_places, _add_sdg, _add_manifest, _add_validate, _add_pull]
+COMMANDS: list[Callable[[argparse._SubParsersAction], None]] = [
+  _add_erddap_places, _add_sdg, _add_eco_indicators, _add_obis, _add_manifest, _add_validate, _add_pull]
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -58,6 +58,10 @@ indicators.json + coverage.parquet ──► viewer/ (imports src/status/, src/i
   all rows or none) live in `validate_rows()`, each with a test.
 - **Adapters read published outputs only** and never change a producer repo. The STAC items stay the provenance:
   each values file lists the exact items/files it read in `om:provenance.sources`.
+- **Producers without a STAC state their dataset in `provenance.dataset`** (SDG, `eco_indicators.py` for the Copernicus
+  Marine long records at a pinned eco-indicators commit, `obis.py` for the obis-h3 release's `place_exact` layer); the
+  manifest prefers it for any family and cites the dataset by its own `citation` line where `PRODUCERS[fam].cite_dataset`.
+  OBIS counts a record in every place that contains it: its totals across places are never summed (stated in `method`).
 - **The manifest takes titles, units, providers, licences and citations from the producer's STAC**, never typed
   here. `config/indicators.yml` holds only what is ours: category tags (ONMS, NaMES, EOV), series, lead, preferred,
   kind, min_periods, status method and grain.

@@ -8,7 +8,11 @@
 #
 # ONMS mapping (plan §6, Ben 2026-10-20): drivers and pressures = heat stress (CRW) and precipitation (IMERG);
 # water quality = SST, pH and the carbonate system, O2, chl, salinity, nutrients, bottom temperature, mixed layer;
-# habitat = Seascapes; living resources = NPP, phytoplankton, zooplankton (OBIS later); response = SDG 14.5.1, 14.6.1.
+# habitat = Seascapes; living resources = NPP, phytoplankton (functional types), zooplankton, OBIS; response = SDG 14.5.1,
+# 14.6.1. OBIS is shown as values (status_method: values): yearly counts track sampling effort.
+# long records: where a Copernicus Marine long record (eco-indicators, 1993- or 1997-) measures the same `variable` as a
+# short erddap CMEMS record (2021-2025), the long one is `preferred` and the short one is not.
+# `ordinal: true` (categorical only): the classes are ordered as the manifest lists them.
 # EOV mapping (plan §8): SST and heat stress -> sea surface temperature; O2 -> oxygen; pH, DIC, pCO2 -> inorganic
 # carbon; chl -> ocean colour; NPP and phytoplankton carbon -> phytoplankton.
 
@@ -45,6 +49,7 @@ indicators:
     series_title: Coral heat stress
     lead: true
     kind: categorical
+    ordinal: true
     status_method: values
     unit_label: share
     decimals: 2
@@ -75,8 +80,7 @@ indicators:
     short: Bottom temperature
     variable: bottom-temperature
     series: cmems-physics
-    series_title: Ocean physics (CMEMS)
-    lead: true
+    preferred: false
     unit_label: "°C"
     decimals: 2
     category: {onms: water-quality, names: physical-chemical, eov: subsurface-temperature}
@@ -86,6 +90,7 @@ indicators:
     short: Mixed layer depth
     variable: mixed-layer-depth
     series: cmems-physics
+    preferred: false
     unit_label: m
     decimals: 1
     category: {onms: water-quality, names: physical-chemical, eov: physics}
@@ -95,6 +100,7 @@ indicators:
     short: Salinity
     variable: salinity
     series: cmems-physics
+    preferred: false
     unit_label: PSU
     decimals: 2
     category: {onms: water-quality, names: physical-chemical, eov: sea-surface-salinity}
@@ -183,6 +189,7 @@ indicators:
     title: Chlorophyll-a (CMEMS, 0.5 m)
     short: Chlorophyll-a
     variable: chl
+    preferred: false
     series: cmems-plankton
     series_title: Plankton and production (CMEMS)
     lead: true
@@ -276,3 +283,945 @@ indicators:
     decimals: 0
     category: {onms: response, names: human-dimensions, eov: fish}
     eov_match: related
+
+  # ---- eco-indicators: Copernicus Marine long records over the sanctuaries (monthly, noaa-onms/eco-indicators) ----
+  # physics reanalysis 1993-; the long record is the preferred one of each variable the short erddap CMEMS records also
+  # carry (bottom temperature, mixed layer depth, salinity, chlorophyll-a). thetao leads cmems-physics; it shares the
+  # variable `sst` with CRW but is not preferred over it (CRW's record is longer and satellite-observed).
+  - id: "cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:thetao:mean"
+    title: Sea water temperature (CMEMS reanalysis, 0.5 m)
+    short: Temperature 0.5 m
+    description: >-
+      Monthly sea water potential temperature at 0.5 m from the Copernicus Marine global ocean physics reanalysis
+      (1993-), averaged over the place.
+    variable: sst
+    preferred: false
+    series: cmems-physics
+    series_title: Ocean physics (CMEMS)
+    lead: true
+    unit_label: "°C"
+    decimals: 2
+    category: {onms: water-quality, names: physical-chemical, eov: sea-surface-temperature}
+    eov_match: exact
+  - id: "cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:bottomT:mean"
+    title: Sea bottom temperature (CMEMS reanalysis)
+    short: Bottom temperature
+    description: >-
+      Monthly potential temperature at the sea floor from the Copernicus Marine global ocean physics reanalysis (1993-),
+      averaged over the place.
+    variable: bottom-temperature
+    series: cmems-physics
+    unit_label: "°C"
+    decimals: 2
+    category: {onms: water-quality, names: physical-chemical, eov: subsurface-temperature}
+    eov_match: exact
+  - id: "cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:so:mean"
+    title: Salinity (CMEMS reanalysis, 0.5 m)
+    short: Salinity 0.5 m
+    description: >-
+      Monthly sea water salinity at 0.5 m from the Copernicus Marine global ocean physics reanalysis (1993-), averaged
+      over the place.
+    variable: salinity
+    series: cmems-physics
+    unit_label: PSU
+    decimals: 2
+    category: {onms: water-quality, names: physical-chemical, eov: sea-surface-salinity}
+    eov_match: exact
+  - id: "cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:mlotst:mean"
+    title: Mixed layer depth (CMEMS reanalysis)
+    short: Mixed layer depth
+    description: >-
+      Monthly ocean mixed layer thickness (sigma-theta definition) from the Copernicus Marine global ocean physics
+      reanalysis (1993-), averaged over the place.
+    variable: mixed-layer-depth
+    series: cmems-physics
+    unit_label: m
+    decimals: 1
+    category: {onms: water-quality, names: physical-chemical, eov: physics}
+    eov_match: discipline
+
+  # ---- eco-indicators: Copernicus Marine ocean colour, GlobColour L4 4 km (monthly, 1997-) ----
+  - id: "cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:CHL:mean"
+    title: Chlorophyll-a (CMEMS ocean colour, 4 km)
+    short: Chlorophyll-a (ocean colour)
+    description: >-
+      Monthly surface chlorophyll-a from satellite ocean colour (Copernicus Marine GlobColour L4, 4 km, 1997-),
+      averaged over the place.
+    variable: chl
+    series: cmems-ocean-colour
+    series_title: Ocean colour (CMEMS)
+    lead: true
+    unit_label: "mg m⁻³"
+    decimals: 3
+    category: {onms: water-quality, names: biological, eov: ocean-colour}
+    eov_match: exact
+  - id: "cmems:cmems_obs-oc_glo_bgc-pp_my_l4-multi-4km_P1M:PP:mean"
+    title: Primary production (CMEMS ocean colour, 4 km)
+    short: Primary production (OC)
+    description: >-
+      Monthly primary productivity of biomass expressed as carbon, from satellite ocean colour (Copernicus Marine
+      GlobColour L4, 4 km, 1997-), averaged over the place.
+    variable: npp
+    preferred: false
+    series: cmems-ocean-colour
+    unit_label: "mg m⁻² d⁻¹"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: phytoplankton}
+    eov_match: exact
+  - id: "cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:DIATO:mean"
+    title: Diatom chlorophyll-a (CMEMS ocean colour)
+    short: Diatoms
+    description: >-
+      Monthly chlorophyll-a of diatoms, a phytoplankton functional type from satellite ocean colour (Copernicus Marine
+      GlobColour L4, 1997-), averaged over the place.
+    variable: pft-diatoms
+    series: cmems-ocean-colour
+    unit_label: "mg m⁻³"
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: phytoplankton}
+    eov_match: exact
+  - id: "cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:DINO:mean"
+    title: Dinoflagellate chlorophyll-a (CMEMS ocean colour)
+    short: Dinoflagellates
+    description: >-
+      Monthly chlorophyll-a of dinophytes, a phytoplankton functional type from satellite ocean colour (Copernicus
+      Marine GlobColour L4, 1997-), averaged over the place.
+    variable: pft-dinoflagellates
+    series: cmems-ocean-colour
+    unit_label: "mg m⁻³"
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: phytoplankton}
+    eov_match: exact
+  - id: "cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:GREEN:mean"
+    title: Green algae chlorophyll-a (CMEMS ocean colour)
+    short: Green algae
+    description: >-
+      Monthly chlorophyll-a of green algae, a phytoplankton functional type from satellite ocean colour (Copernicus
+      Marine GlobColour L4, 1997-), averaged over the place.
+    variable: pft-green-algae
+    series: cmems-ocean-colour
+    unit_label: "mg m⁻³"
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: phytoplankton}
+    eov_match: exact
+  - id: "cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:HAPTO:mean"
+    title: Haptophyte chlorophyll-a (CMEMS ocean colour)
+    short: Haptophytes
+    description: >-
+      Monthly chlorophyll-a of haptophytes, a phytoplankton functional type from satellite ocean colour (Copernicus
+      Marine GlobColour L4, 1997-), averaged over the place.
+    variable: pft-haptophytes
+    series: cmems-ocean-colour
+    unit_label: "mg m⁻³"
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: phytoplankton}
+    eov_match: exact
+  - id: "cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:MICRO:mean"
+    title: Microphytoplankton chlorophyll-a (CMEMS ocean colour)
+    short: Microphytoplankton
+    description: >-
+      Monthly chlorophyll-a of microphytoplankton (the largest size class), from satellite ocean colour (Copernicus
+      Marine GlobColour L4, 1997-), averaged over the place.
+    variable: pft-micro
+    series: cmems-ocean-colour
+    unit_label: "mg m⁻³"
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: phytoplankton}
+    eov_match: exact
+  - id: "cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:NANO:mean"
+    title: Nanophytoplankton chlorophyll-a (CMEMS ocean colour)
+    short: Nanophytoplankton
+    description: >-
+      Monthly chlorophyll-a of nanophytoplankton (the middle size class), from satellite ocean colour (Copernicus
+      Marine GlobColour L4, 1997-), averaged over the place.
+    variable: pft-nano
+    series: cmems-ocean-colour
+    unit_label: "mg m⁻³"
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: phytoplankton}
+    eov_match: exact
+  - id: "cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:PICO:mean"
+    title: Picophytoplankton chlorophyll-a (CMEMS ocean colour)
+    short: Picophytoplankton
+    description: >-
+      Monthly chlorophyll-a of picophytoplankton (the smallest size class), from satellite ocean colour (Copernicus
+      Marine GlobColour L4, 1997-), averaged over the place.
+    variable: pft-pico
+    series: cmems-ocean-colour
+    unit_label: "mg m⁻³"
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: phytoplankton}
+    eov_match: exact
+  - id: "cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:PROCHLO:mean"
+    title: Prochlorophyte chlorophyll-a (CMEMS ocean colour)
+    short: Prochlorophytes
+    description: >-
+      Monthly chlorophyll-a of prochlorophytes, a phytoplankton functional type from satellite ocean colour (Copernicus
+      Marine GlobColour L4, 1997-), averaged over the place.
+    variable: pft-prochlorophytes
+    series: cmems-ocean-colour
+    unit_label: "mg m⁻³"
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: phytoplankton}
+    eov_match: exact
+  - id: "cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:PROKAR:mean"
+    title: Prokaryote chlorophyll-a (CMEMS ocean colour)
+    short: Prokaryotes
+    description: >-
+      Monthly chlorophyll-a of prokaryotic phytoplankton, a functional type from satellite ocean colour (Copernicus
+      Marine GlobColour L4, 1997-), averaged over the place.
+    variable: pft-prokaryotes
+    series: cmems-ocean-colour
+    unit_label: "mg m⁻³"
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: phytoplankton}
+    eov_match: exact
+
+  # ---- OBIS place indicators, exact point-in-polygon (obisindicators, obis-h3 release) ----
+  # nine metrics x all taxa and the seven EOVs, one series per EOV. yearly counts track sampling effort, so
+  # status_method is values (no status); ONMS living resources, NaMES biological; the all-taxa series is tagged with
+  # the biology and ecosystems discipline, each EOV series with its GOOS term.
+  # -- all taxa --
+  - id: "obis:records"
+    title: "OBIS records, all taxa"
+    short: "Records (all)"
+    description: "Number of OBIS occurrence records inside the place; all taxa."
+    series: obis-all
+    status_method: values
+    unit_label: "records"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: bioeco}
+    eov_match: discipline
+  - id: "obis:species"
+    title: "OBIS species richness, all taxa"
+    short: "Species (all)"
+    description: "Species richness: distinct species names among the OBIS records inside the place; all taxa."
+    series: obis-all
+    series_title: "OBIS (all taxa)"
+    lead: true
+    status_method: values
+    unit_label: "species"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: bioeco}
+    eov_match: discipline
+  - id: "obis:shannon"
+    title: "OBIS Shannon diversity, all taxa"
+    short: "Shannon H' (all)"
+    description: "Shannon diversity H' = -sum(p ln p) over the species of the OBIS records inside the place; all taxa."
+    series: obis-all
+    status_method: values
+    unit_label: ""
+    decimals: 2
+    category: {onms: living-resources, names: biological, eov: bioeco}
+    eov_match: discipline
+  - id: "obis:simpson"
+    title: "OBIS Simpson index, all taxa"
+    short: "Simpson (all)"
+    description: "Simpson index, the sum of squared species shares in the OBIS records inside the place (higher is less even); all taxa."
+    series: obis-all
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: bioeco}
+    eov_match: discipline
+  - id: "obis:es50"
+    title: "OBIS Hurlbert ES(50), all taxa"
+    short: "ES(50) (all)"
+    description: "Hurlbert's expected number of species in a random draw of 50 of the place's OBIS records (empty where it has fewer than 50); all taxa."
+    series: obis-all
+    status_method: values
+    unit_label: "species"
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: bioeco}
+    eov_match: discipline
+  - id: "obis:hill1"
+    title: "OBIS Hill number N1, all taxa"
+    short: "Hill N1 (all)"
+    description: "Hill number N1 = exp(Shannon), the effective number of common species in the place's OBIS records; all taxa."
+    series: obis-all
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: bioeco}
+    eov_match: discipline
+  - id: "obis:hill2"
+    title: "OBIS Hill number N2, all taxa"
+    short: "Hill N2 (all)"
+    description: "Hill number N2 = 1 / Simpson, the effective number of dominant species in the place's OBIS records; all taxa."
+    series: obis-all
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: bioeco}
+    eov_match: discipline
+  - id: "obis:bp"
+    title: "OBIS Berger-Parker dominance, all taxa"
+    short: "Berger-Parker (all)"
+    description: "Berger-Parker dominance: the share of the place's OBIS records that belong to the most recorded species; all taxa."
+    series: obis-all
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: bioeco}
+    eov_match: discipline
+  - id: "obis:density"
+    title: "OBIS record density, all taxa"
+    short: "Record density (all)"
+    description: "OBIS records per square kilometre of the place (a sampling-effort measure); all taxa."
+    series: obis-all
+    status_method: values
+    unit_label: "records km\u207b\u00b2"
+    decimals: 4
+    category: {onms: living-resources, names: biological, eov: bioeco}
+    eov_match: discipline
+  # -- fish --
+  - id: "obis:records:fish"
+    title: "OBIS records, fish"
+    short: "Records (fish)"
+    description: "Number of OBIS occurrence records inside the place; fish only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-fish
+    status_method: values
+    unit_label: "records"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: fish}
+    eov_match: exact
+  - id: "obis:species:fish"
+    title: "OBIS species richness, fish"
+    short: "Species (fish)"
+    description: "Species richness: distinct species names among the OBIS records inside the place; fish only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-fish
+    series_title: "OBIS (fish)"
+    lead: true
+    status_method: values
+    unit_label: "species"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: fish}
+    eov_match: exact
+  - id: "obis:shannon:fish"
+    title: "OBIS Shannon diversity, fish"
+    short: "Shannon H' (fish)"
+    description: "Shannon diversity H' = -sum(p ln p) over the species of the OBIS records inside the place; fish only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-fish
+    status_method: values
+    unit_label: ""
+    decimals: 2
+    category: {onms: living-resources, names: biological, eov: fish}
+    eov_match: exact
+  - id: "obis:simpson:fish"
+    title: "OBIS Simpson index, fish"
+    short: "Simpson (fish)"
+    description: "Simpson index, the sum of squared species shares in the OBIS records inside the place (higher is less even); fish only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-fish
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: fish}
+    eov_match: exact
+  - id: "obis:es50:fish"
+    title: "OBIS Hurlbert ES(50), fish"
+    short: "ES(50) (fish)"
+    description: "Hurlbert's expected number of species in a random draw of 50 of the place's OBIS records (empty where it has fewer than 50); fish only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-fish
+    status_method: values
+    unit_label: "species"
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: fish}
+    eov_match: exact
+  - id: "obis:hill1:fish"
+    title: "OBIS Hill number N1, fish"
+    short: "Hill N1 (fish)"
+    description: "Hill number N1 = exp(Shannon), the effective number of common species in the place's OBIS records; fish only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-fish
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: fish}
+    eov_match: exact
+  - id: "obis:hill2:fish"
+    title: "OBIS Hill number N2, fish"
+    short: "Hill N2 (fish)"
+    description: "Hill number N2 = 1 / Simpson, the effective number of dominant species in the place's OBIS records; fish only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-fish
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: fish}
+    eov_match: exact
+  - id: "obis:bp:fish"
+    title: "OBIS Berger-Parker dominance, fish"
+    short: "Berger-Parker (fish)"
+    description: "Berger-Parker dominance: the share of the place's OBIS records that belong to the most recorded species; fish only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-fish
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: fish}
+    eov_match: exact
+  - id: "obis:density:fish"
+    title: "OBIS record density, fish"
+    short: "Record density (fish)"
+    description: "OBIS records per square kilometre of the place (a sampling-effort measure); fish only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-fish
+    status_method: values
+    unit_label: "records km\u207b\u00b2"
+    decimals: 4
+    category: {onms: living-resources, names: biological, eov: fish}
+    eov_match: exact
+  # -- hard corals --
+  - id: "obis:records:hard-corals"
+    title: "OBIS records, hard corals"
+    short: "Records (corals)"
+    description: "Number of OBIS occurrence records inside the place; hard corals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-hard-corals
+    status_method: values
+    unit_label: "records"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: hard-coral}
+    eov_match: exact
+  - id: "obis:species:hard-corals"
+    title: "OBIS species richness, hard corals"
+    short: "Species (corals)"
+    description: "Species richness: distinct species names among the OBIS records inside the place; hard corals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-hard-corals
+    series_title: "OBIS (hard corals)"
+    lead: true
+    status_method: values
+    unit_label: "species"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: hard-coral}
+    eov_match: exact
+  - id: "obis:shannon:hard-corals"
+    title: "OBIS Shannon diversity, hard corals"
+    short: "Shannon H' (corals)"
+    description: "Shannon diversity H' = -sum(p ln p) over the species of the OBIS records inside the place; hard corals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-hard-corals
+    status_method: values
+    unit_label: ""
+    decimals: 2
+    category: {onms: living-resources, names: biological, eov: hard-coral}
+    eov_match: exact
+  - id: "obis:simpson:hard-corals"
+    title: "OBIS Simpson index, hard corals"
+    short: "Simpson (corals)"
+    description: "Simpson index, the sum of squared species shares in the OBIS records inside the place (higher is less even); hard corals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-hard-corals
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: hard-coral}
+    eov_match: exact
+  - id: "obis:es50:hard-corals"
+    title: "OBIS Hurlbert ES(50), hard corals"
+    short: "ES(50) (corals)"
+    description: "Hurlbert's expected number of species in a random draw of 50 of the place's OBIS records (empty where it has fewer than 50); hard corals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-hard-corals
+    status_method: values
+    unit_label: "species"
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: hard-coral}
+    eov_match: exact
+  - id: "obis:hill1:hard-corals"
+    title: "OBIS Hill number N1, hard corals"
+    short: "Hill N1 (corals)"
+    description: "Hill number N1 = exp(Shannon), the effective number of common species in the place's OBIS records; hard corals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-hard-corals
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: hard-coral}
+    eov_match: exact
+  - id: "obis:hill2:hard-corals"
+    title: "OBIS Hill number N2, hard corals"
+    short: "Hill N2 (corals)"
+    description: "Hill number N2 = 1 / Simpson, the effective number of dominant species in the place's OBIS records; hard corals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-hard-corals
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: hard-coral}
+    eov_match: exact
+  - id: "obis:bp:hard-corals"
+    title: "OBIS Berger-Parker dominance, hard corals"
+    short: "Berger-Parker (corals)"
+    description: "Berger-Parker dominance: the share of the place's OBIS records that belong to the most recorded species; hard corals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-hard-corals
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: hard-coral}
+    eov_match: exact
+  - id: "obis:density:hard-corals"
+    title: "OBIS record density, hard corals"
+    short: "Record density (corals)"
+    description: "OBIS records per square kilometre of the place (a sampling-effort measure); hard corals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-hard-corals
+    status_method: values
+    unit_label: "records km\u207b\u00b2"
+    decimals: 4
+    category: {onms: living-resources, names: biological, eov: hard-coral}
+    eov_match: exact
+  # -- mangroves --
+  - id: "obis:records:mangroves"
+    title: "OBIS records, mangroves"
+    short: "Records (mangroves)"
+    description: "Number of OBIS occurrence records inside the place; mangroves only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-mangroves
+    status_method: values
+    unit_label: "records"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: mangroves}
+    eov_match: exact
+  - id: "obis:species:mangroves"
+    title: "OBIS species richness, mangroves"
+    short: "Species (mangroves)"
+    description: "Species richness: distinct species names among the OBIS records inside the place; mangroves only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-mangroves
+    series_title: "OBIS (mangroves)"
+    lead: true
+    status_method: values
+    unit_label: "species"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: mangroves}
+    eov_match: exact
+  - id: "obis:shannon:mangroves"
+    title: "OBIS Shannon diversity, mangroves"
+    short: "Shannon H' (mangroves)"
+    description: "Shannon diversity H' = -sum(p ln p) over the species of the OBIS records inside the place; mangroves only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-mangroves
+    status_method: values
+    unit_label: ""
+    decimals: 2
+    category: {onms: living-resources, names: biological, eov: mangroves}
+    eov_match: exact
+  - id: "obis:simpson:mangroves"
+    title: "OBIS Simpson index, mangroves"
+    short: "Simpson (mangroves)"
+    description: "Simpson index, the sum of squared species shares in the OBIS records inside the place (higher is less even); mangroves only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-mangroves
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: mangroves}
+    eov_match: exact
+  - id: "obis:es50:mangroves"
+    title: "OBIS Hurlbert ES(50), mangroves"
+    short: "ES(50) (mangroves)"
+    description: "Hurlbert's expected number of species in a random draw of 50 of the place's OBIS records (empty where it has fewer than 50); mangroves only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-mangroves
+    status_method: values
+    unit_label: "species"
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: mangroves}
+    eov_match: exact
+  - id: "obis:hill1:mangroves"
+    title: "OBIS Hill number N1, mangroves"
+    short: "Hill N1 (mangroves)"
+    description: "Hill number N1 = exp(Shannon), the effective number of common species in the place's OBIS records; mangroves only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-mangroves
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: mangroves}
+    eov_match: exact
+  - id: "obis:hill2:mangroves"
+    title: "OBIS Hill number N2, mangroves"
+    short: "Hill N2 (mangroves)"
+    description: "Hill number N2 = 1 / Simpson, the effective number of dominant species in the place's OBIS records; mangroves only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-mangroves
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: mangroves}
+    eov_match: exact
+  - id: "obis:bp:mangroves"
+    title: "OBIS Berger-Parker dominance, mangroves"
+    short: "Berger-Parker (mangroves)"
+    description: "Berger-Parker dominance: the share of the place's OBIS records that belong to the most recorded species; mangroves only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-mangroves
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: mangroves}
+    eov_match: exact
+  - id: "obis:density:mangroves"
+    title: "OBIS record density, mangroves"
+    short: "Record density (mangroves)"
+    description: "OBIS records per square kilometre of the place (a sampling-effort measure); mangroves only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-mangroves
+    status_method: values
+    unit_label: "records km\u207b\u00b2"
+    decimals: 4
+    category: {onms: living-resources, names: biological, eov: mangroves}
+    eov_match: exact
+  # -- marine mammals --
+  - id: "obis:records:marine-mammals"
+    title: "OBIS records, marine mammals"
+    short: "Records (mammals)"
+    description: "Number of OBIS occurrence records inside the place; marine mammals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-marine-mammals
+    status_method: values
+    unit_label: "records"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: marine-mammals}
+    eov_match: exact
+  - id: "obis:species:marine-mammals"
+    title: "OBIS species richness, marine mammals"
+    short: "Species (mammals)"
+    description: "Species richness: distinct species names among the OBIS records inside the place; marine mammals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-marine-mammals
+    series_title: "OBIS (marine mammals)"
+    lead: true
+    status_method: values
+    unit_label: "species"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: marine-mammals}
+    eov_match: exact
+  - id: "obis:shannon:marine-mammals"
+    title: "OBIS Shannon diversity, marine mammals"
+    short: "Shannon H' (mammals)"
+    description: "Shannon diversity H' = -sum(p ln p) over the species of the OBIS records inside the place; marine mammals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-marine-mammals
+    status_method: values
+    unit_label: ""
+    decimals: 2
+    category: {onms: living-resources, names: biological, eov: marine-mammals}
+    eov_match: exact
+  - id: "obis:simpson:marine-mammals"
+    title: "OBIS Simpson index, marine mammals"
+    short: "Simpson (mammals)"
+    description: "Simpson index, the sum of squared species shares in the OBIS records inside the place (higher is less even); marine mammals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-marine-mammals
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: marine-mammals}
+    eov_match: exact
+  - id: "obis:es50:marine-mammals"
+    title: "OBIS Hurlbert ES(50), marine mammals"
+    short: "ES(50) (mammals)"
+    description: "Hurlbert's expected number of species in a random draw of 50 of the place's OBIS records (empty where it has fewer than 50); marine mammals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-marine-mammals
+    status_method: values
+    unit_label: "species"
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: marine-mammals}
+    eov_match: exact
+  - id: "obis:hill1:marine-mammals"
+    title: "OBIS Hill number N1, marine mammals"
+    short: "Hill N1 (mammals)"
+    description: "Hill number N1 = exp(Shannon), the effective number of common species in the place's OBIS records; marine mammals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-marine-mammals
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: marine-mammals}
+    eov_match: exact
+  - id: "obis:hill2:marine-mammals"
+    title: "OBIS Hill number N2, marine mammals"
+    short: "Hill N2 (mammals)"
+    description: "Hill number N2 = 1 / Simpson, the effective number of dominant species in the place's OBIS records; marine mammals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-marine-mammals
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: marine-mammals}
+    eov_match: exact
+  - id: "obis:bp:marine-mammals"
+    title: "OBIS Berger-Parker dominance, marine mammals"
+    short: "Berger-Parker (mammals)"
+    description: "Berger-Parker dominance: the share of the place's OBIS records that belong to the most recorded species; marine mammals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-marine-mammals
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: marine-mammals}
+    eov_match: exact
+  - id: "obis:density:marine-mammals"
+    title: "OBIS record density, marine mammals"
+    short: "Record density (mammals)"
+    description: "OBIS records per square kilometre of the place (a sampling-effort measure); marine mammals only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-marine-mammals
+    status_method: values
+    unit_label: "records km\u207b\u00b2"
+    decimals: 4
+    category: {onms: living-resources, names: biological, eov: marine-mammals}
+    eov_match: exact
+  # -- sea turtles --
+  - id: "obis:records:sea-turtles"
+    title: "OBIS records, sea turtles"
+    short: "Records (turtles)"
+    description: "Number of OBIS occurrence records inside the place; sea turtles only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-sea-turtles
+    status_method: values
+    unit_label: "records"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: sea-turtles}
+    eov_match: exact
+  - id: "obis:species:sea-turtles"
+    title: "OBIS species richness, sea turtles"
+    short: "Species (turtles)"
+    description: "Species richness: distinct species names among the OBIS records inside the place; sea turtles only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-sea-turtles
+    series_title: "OBIS (sea turtles)"
+    lead: true
+    status_method: values
+    unit_label: "species"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: sea-turtles}
+    eov_match: exact
+  - id: "obis:shannon:sea-turtles"
+    title: "OBIS Shannon diversity, sea turtles"
+    short: "Shannon H' (turtles)"
+    description: "Shannon diversity H' = -sum(p ln p) over the species of the OBIS records inside the place; sea turtles only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-sea-turtles
+    status_method: values
+    unit_label: ""
+    decimals: 2
+    category: {onms: living-resources, names: biological, eov: sea-turtles}
+    eov_match: exact
+  - id: "obis:simpson:sea-turtles"
+    title: "OBIS Simpson index, sea turtles"
+    short: "Simpson (turtles)"
+    description: "Simpson index, the sum of squared species shares in the OBIS records inside the place (higher is less even); sea turtles only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-sea-turtles
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: sea-turtles}
+    eov_match: exact
+  - id: "obis:es50:sea-turtles"
+    title: "OBIS Hurlbert ES(50), sea turtles"
+    short: "ES(50) (turtles)"
+    description: "Hurlbert's expected number of species in a random draw of 50 of the place's OBIS records (empty where it has fewer than 50); sea turtles only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-sea-turtles
+    status_method: values
+    unit_label: "species"
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: sea-turtles}
+    eov_match: exact
+  - id: "obis:hill1:sea-turtles"
+    title: "OBIS Hill number N1, sea turtles"
+    short: "Hill N1 (turtles)"
+    description: "Hill number N1 = exp(Shannon), the effective number of common species in the place's OBIS records; sea turtles only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-sea-turtles
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: sea-turtles}
+    eov_match: exact
+  - id: "obis:hill2:sea-turtles"
+    title: "OBIS Hill number N2, sea turtles"
+    short: "Hill N2 (turtles)"
+    description: "Hill number N2 = 1 / Simpson, the effective number of dominant species in the place's OBIS records; sea turtles only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-sea-turtles
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: sea-turtles}
+    eov_match: exact
+  - id: "obis:bp:sea-turtles"
+    title: "OBIS Berger-Parker dominance, sea turtles"
+    short: "Berger-Parker (turtles)"
+    description: "Berger-Parker dominance: the share of the place's OBIS records that belong to the most recorded species; sea turtles only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-sea-turtles
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: sea-turtles}
+    eov_match: exact
+  - id: "obis:density:sea-turtles"
+    title: "OBIS record density, sea turtles"
+    short: "Record density (turtles)"
+    description: "OBIS records per square kilometre of the place (a sampling-effort measure); sea turtles only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-sea-turtles
+    status_method: values
+    unit_label: "records km\u207b\u00b2"
+    decimals: 4
+    category: {onms: living-resources, names: biological, eov: sea-turtles}
+    eov_match: exact
+  # -- seabirds --
+  - id: "obis:records:seabirds"
+    title: "OBIS records, seabirds"
+    short: "Records (seabirds)"
+    description: "Number of OBIS occurrence records inside the place; seabirds only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seabirds
+    status_method: values
+    unit_label: "records"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: seabirds}
+    eov_match: exact
+  - id: "obis:species:seabirds"
+    title: "OBIS species richness, seabirds"
+    short: "Species (seabirds)"
+    description: "Species richness: distinct species names among the OBIS records inside the place; seabirds only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seabirds
+    series_title: "OBIS (seabirds)"
+    lead: true
+    status_method: values
+    unit_label: "species"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: seabirds}
+    eov_match: exact
+  - id: "obis:shannon:seabirds"
+    title: "OBIS Shannon diversity, seabirds"
+    short: "Shannon H' (seabirds)"
+    description: "Shannon diversity H' = -sum(p ln p) over the species of the OBIS records inside the place; seabirds only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seabirds
+    status_method: values
+    unit_label: ""
+    decimals: 2
+    category: {onms: living-resources, names: biological, eov: seabirds}
+    eov_match: exact
+  - id: "obis:simpson:seabirds"
+    title: "OBIS Simpson index, seabirds"
+    short: "Simpson (seabirds)"
+    description: "Simpson index, the sum of squared species shares in the OBIS records inside the place (higher is less even); seabirds only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seabirds
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: seabirds}
+    eov_match: exact
+  - id: "obis:es50:seabirds"
+    title: "OBIS Hurlbert ES(50), seabirds"
+    short: "ES(50) (seabirds)"
+    description: "Hurlbert's expected number of species in a random draw of 50 of the place's OBIS records (empty where it has fewer than 50); seabirds only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seabirds
+    status_method: values
+    unit_label: "species"
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: seabirds}
+    eov_match: exact
+  - id: "obis:hill1:seabirds"
+    title: "OBIS Hill number N1, seabirds"
+    short: "Hill N1 (seabirds)"
+    description: "Hill number N1 = exp(Shannon), the effective number of common species in the place's OBIS records; seabirds only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seabirds
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: seabirds}
+    eov_match: exact
+  - id: "obis:hill2:seabirds"
+    title: "OBIS Hill number N2, seabirds"
+    short: "Hill N2 (seabirds)"
+    description: "Hill number N2 = 1 / Simpson, the effective number of dominant species in the place's OBIS records; seabirds only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seabirds
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: seabirds}
+    eov_match: exact
+  - id: "obis:bp:seabirds"
+    title: "OBIS Berger-Parker dominance, seabirds"
+    short: "Berger-Parker (seabirds)"
+    description: "Berger-Parker dominance: the share of the place's OBIS records that belong to the most recorded species; seabirds only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seabirds
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: seabirds}
+    eov_match: exact
+  - id: "obis:density:seabirds"
+    title: "OBIS record density, seabirds"
+    short: "Record density (seabirds)"
+    description: "OBIS records per square kilometre of the place (a sampling-effort measure); seabirds only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seabirds
+    status_method: values
+    unit_label: "records km\u207b\u00b2"
+    decimals: 4
+    category: {onms: living-resources, names: biological, eov: seabirds}
+    eov_match: exact
+  # -- seagrasses --
+  - id: "obis:records:seagrasses"
+    title: "OBIS records, seagrasses"
+    short: "Records (seagrass)"
+    description: "Number of OBIS occurrence records inside the place; seagrasses only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seagrasses
+    status_method: values
+    unit_label: "records"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: seagrass}
+    eov_match: exact
+  - id: "obis:species:seagrasses"
+    title: "OBIS species richness, seagrasses"
+    short: "Species (seagrass)"
+    description: "Species richness: distinct species names among the OBIS records inside the place; seagrasses only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seagrasses
+    series_title: "OBIS (seagrasses)"
+    lead: true
+    status_method: values
+    unit_label: "species"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: seagrass}
+    eov_match: exact
+  - id: "obis:shannon:seagrasses"
+    title: "OBIS Shannon diversity, seagrasses"
+    short: "Shannon H' (seagrass)"
+    description: "Shannon diversity H' = -sum(p ln p) over the species of the OBIS records inside the place; seagrasses only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seagrasses
+    status_method: values
+    unit_label: ""
+    decimals: 2
+    category: {onms: living-resources, names: biological, eov: seagrass}
+    eov_match: exact
+  - id: "obis:simpson:seagrasses"
+    title: "OBIS Simpson index, seagrasses"
+    short: "Simpson (seagrass)"
+    description: "Simpson index, the sum of squared species shares in the OBIS records inside the place (higher is less even); seagrasses only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seagrasses
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: seagrass}
+    eov_match: exact
+  - id: "obis:es50:seagrasses"
+    title: "OBIS Hurlbert ES(50), seagrasses"
+    short: "ES(50) (seagrass)"
+    description: "Hurlbert's expected number of species in a random draw of 50 of the place's OBIS records (empty where it has fewer than 50); seagrasses only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seagrasses
+    status_method: values
+    unit_label: "species"
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: seagrass}
+    eov_match: exact
+  - id: "obis:hill1:seagrasses"
+    title: "OBIS Hill number N1, seagrasses"
+    short: "Hill N1 (seagrass)"
+    description: "Hill number N1 = exp(Shannon), the effective number of common species in the place's OBIS records; seagrasses only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seagrasses
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: seagrass}
+    eov_match: exact
+  - id: "obis:hill2:seagrasses"
+    title: "OBIS Hill number N2, seagrasses"
+    short: "Hill N2 (seagrass)"
+    description: "Hill number N2 = 1 / Simpson, the effective number of dominant species in the place's OBIS records; seagrasses only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seagrasses
+    status_method: values
+    unit_label: ""
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: seagrass}
+    eov_match: exact
+  - id: "obis:bp:seagrasses"
+    title: "OBIS Berger-Parker dominance, seagrasses"
+    short: "Berger-Parker (seagrass)"
+    description: "Berger-Parker dominance: the share of the place's OBIS records that belong to the most recorded species; seagrasses only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seagrasses
+    status_method: values
+    unit_label: ""
+    decimals: 3
+    category: {onms: living-resources, names: biological, eov: seagrass}
+    eov_match: exact
+  - id: "obis:density:seagrasses"
+    title: "OBIS record density, seagrasses"
+    short: "Record density (seagrass)"
+    description: "OBIS records per square kilometre of the place (a sampling-effort measure); seagrasses only (the EOV's IOOS Marine Life Data Network taxa)."
+    series: obis-seagrasses
+    status_method: values
+    unit_label: "records km\u207b\u00b2"
+    decimals: 4
+    category: {onms: living-resources, names: biological, eov: seagrass}
+    eov_match: exact

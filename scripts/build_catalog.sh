@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # build the indicator catalog into <out> (default catalog/) from what the producers have published, then validate it.
 #   scripts/build_catalog.sh [out]
-# erddap-places is rebuilt from the published gazetteer/stats; the SDG series are pulled from the published catalog
-# (they are rebuilt by hand from the places prototype: SDG_VALUES=<values.json> scripts/build_catalog.sh). no step
-# writes outside <out>; nothing is uploaded (scripts/publish_catalog.sh does that).
+# erddap-places is rebuilt from the published gazetteer/stats; eco-indicators (Copernicus Marine long records over the
+# sanctuaries, at the latest commit of data/copernicus.csv; ECO_REF=<sha> pins one) and obis (the latest obis-h3
+# release; OBIS_RELEASE=vYYYYMMDD pins one) are rebuilt from what they publish; the SDG series are pulled from the
+# published catalog (they are rebuilt by hand from the places prototype: SDG_VALUES=<values.json>
+# scripts/build_catalog.sh). no step writes outside <out>; nothing is uploaded (scripts/publish_catalog.sh does that).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT="${1:-catalog}"
@@ -11,6 +13,8 @@ rm -rf "$OUT/values" "$OUT/indicators.json" "$OUT/coverage.parquet"
 mkdir -p "$OUT"
 
 uv run om-ind erddap-places --out "$OUT"
+uv run om-ind eco-indicators --out "$OUT" ${ECO_REF:+--ref "$ECO_REF"}
+uv run om-ind obis --out "$OUT" ${OBIS_RELEASE:+--release "$OBIS_RELEASE"}
 if [ -n "${SDG_VALUES:-}" ]; then
   uv run om-ind sdg --values "$SDG_VALUES" --out "$OUT"
 else

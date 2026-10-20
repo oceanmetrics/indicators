@@ -163,7 +163,109 @@ def test_repo_config_is_consistent():
     assert sum(entries[i]["lead"] for i in ids) == 1, s
   variables = {}
   for e in entries.values():
-    variables.setdefault(e["variable"], []).append(e["id"])
+    variables.setdefault(e.get("variable", e["id"]), []).append(e["id"])   # the builder defaults variable to the id
   for var, ids in variables.items():
     assert sum(bool(entries[i]["preferred"]) for i in ids) == 1, var
   assert len(terms["eov"]) == 39 and len(terms["onms"]) == 7 and len(terms["names"]) == 3
+
+
+# ordinal classes ----
+def test_ordinal_categorical_carries_the_flag_and_others_do_not(tmp_path):
+  write(tmp_path, ind=BAA, cls=["0", "1"], unit="1")
+  man, _ = build(tmp_path, [entry(id=BAA, kind="categorical", status_method="values", series="heat", variable="baa", ordinal=True)])
+  assert man["indicators"][0]["ordinal"] is True and list(man["indicators"][0]["classes"]) == ["0", "1"]
+  man, _ = build(tmp_path, [entry(id=BAA, kind="categorical", status_method="values", series="heat", variable="baa")])
+  assert "ordinal" not in man["indicators"][0]
+
+
+def test_ordinal_applies_to_categorical_indicators_only(tmp_path):
+  write(tmp_path)
+  with pytest.raises(ValueError, match="ordinal applies to categorical indicators only"):
+    build(tmp_path, [entry(ordinal=True)])
+
+
+def test_repo_config_marks_the_bleaching_alert_area_ordinal():
+  entries, _ = m.load_config()
+  assert [i for i, e in entries.items() if e.get("ordinal")] == [BAA]
+
+
+# any producer states its dataset through the provenance ----
+CMEMS = "cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:thetao:mean"
+OBIS = "obis:species"
+DATASET = {"id": "GLOBAL_MULTIYEAR_PHY_001_030", "title": "Global Ocean Physics Reanalysis",
+           "via": "https://github.com/noaa-onms/eco-indicators",
+           "providers": [{"name": "Copernicus Marine Service (Mercator Ocean International)", "roles": ["producer", "licensor"]},
+                         {"name": "noaa-onms/eco-indicators", "roles": ["processor"]}],
+           "license": "other", "doi": "https://doi.org/10.48670/moi-00021",
+           "citation": "E.U. Copernicus Marine Service Information; Global Ocean Physics Reanalysis; https://doi.org/10.48670/moi-00021"}
+
+
+def write_stated(tmp_path, ind, dataset, unit="degrees_C"):
+  rows = [{"place_id": "NMS:A", "coll": "places", "indicator": ind, "time_grain": "year", "time": dt.date(y, 1, 1), "class": None,
+           "value": 1.0, "n": 12.0, "unit": unit} for y in (2019, 2020)]
+  contract.write_values(rows, tmp_path, {**PROV, "dataset": dataset})
+
+
+def no_lookup(ind_id):
+  raise AssertionError(f"{ind_id}: the provenance states the dataset, nothing may be looked up")
+
+
+def test_cmems_dataset_comes_from_the_provenance_and_is_cited_by_its_own_line(tmp_path):
+  write_stated(tmp_path, CMEMS, DATASET)
+  e = entry(id=CMEMS, variable="sst", series="cmems-physics", preferred=True)
+  man, _ = m.build_manifest(m.scan_values(tmp_path), {CMEMS: e}, VOCABS, no_lookup, "2026.10.20", "2026-10-20T00:00:00Z")
+  (i,) = man["indicators"]
+  assert i["dataset"] == DATASET
+  assert i["producer"] == {"name": "noaa-onms/eco-indicators", "url": "https://github.com/noaa-onms/eco-indicators"}
+  assert i["method"]["kind"] == "precomputed-external" and i["n_meaning"].startswith("months averaged")
+  assert i["citation"] == (DATASET["citation"] + ". Values: Ocean Metrics Indicators, manifest 2026.10.20, "
+                           f"{CMEMS}, CC BY 4.0, {m.SITE}")
+
+
+def test_obis_dataset_comes_from_the_provenance_and_the_manifest_states_the_overlap_rule(tmp_path):
+  ds = {"id": "obis", "title": "OBIS occurrence data", "via": "https://obis.org", "license": "various", "doi": None,
+        "providers": [{"name": "Ocean Biodiversity Information System (OBIS)", "roles": ["producer", "licensor"]}],
+        "citation": "OBIS (2026) Ocean Biodiversity Information System. Intergovernmental Oceanographic Commission of UNESCO. https://obis.org"}
+  write_stated(tmp_path, OBIS, ds, unit="species")
+  e = entry(id=OBIS, variable=OBIS, series="obis-all", status_method="values")
+  man, _ = m.build_manifest(m.scan_values(tmp_path), {OBIS: e}, VOCABS, no_lookup, "2026.10.20", "2026-10-20T00:00:00Z")
+  (i,) = man["indicators"]
+  assert i["dataset"] == ds and i["producer"]["name"] == "obisindicators"
+  assert "never summed" in i["method"]["summary"] and "point-in-polygon" in i["method"]["summary"]
+  assert i["citation"].startswith("OBIS (2026) Ocean Biodiversity Information System.")
+
+
+# the config covers what the adapters write ----
+def test_every_obis_indicator_is_configured_as_values_with_its_eov_tag():
+  from om_indicators.adapters import obis
+  entries, _ = m.load_config()
+  assert {i for i in entries if i.startswith("obis:")} == set(obis.all_indicator_ids())
+  goos = {None: "bioeco", "fish": "fish", "hard-corals": "hard-coral", "mangroves": "mangroves", "marine-mammals": "marine-mammals",
+          "sea-turtles": "sea-turtles", "seabirds": "seabirds", "seagrasses": "seagrass"}
+  for eov, slug in obis.EOVS.items():
+    inds = [e for e in entries.values() if e["series"] == "obis-" + (slug or "all")]
+    assert len(inds) == 9 and [e["id"] for e in inds if e["lead"]] == [obis.indicator_id("species", eov)]
+    for e in inds:
+      assert e["status_method"] == "values" and e["min_periods"] == 10 and e["status_grain"] == "year" and e["recent"] == 5
+      assert e["category"] == {"onms": "living-resources", "names": "biological", "eov": goos[slug]}
+      assert e["eov_match"] == ("discipline" if slug is None else "exact")
+
+
+def test_every_published_cmems_variable_is_configured_with_status_iea_sd():
+  from om_indicators.adapters import eco_indicators as eco
+  entries, _ = m.load_config()
+  ids = {eco.indicator_id(d, v) for d, vs in eco.DATASETS.items() for v in vs}
+  assert {i for i in entries if i.startswith("cmems:")} == ids and len(ids) == 15
+  assert all(entries[i]["status_method"] == "iea-sd" and entries[i]["min_periods"] == 10 for i in ids)
+  assert entries["cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:thetao:mean"]["lead"]
+  assert entries["cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:CHL:mean"]["lead"]
+
+
+def test_long_cmems_records_are_preferred_over_the_short_erddap_ones_of_the_same_variable():
+  entries, _ = m.load_config()
+  for long_id, short_id in (("cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:bottomT:mean", "erddap:cmems_altimetry:tob:mean"),
+                            ("cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:mlotst:mean", "erddap:cmems_altimetry:mlotst:mean"),
+                            ("cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:so:mean", "erddap:cmems_salinity:so:mean"),
+                            ("cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:CHL:mean", "erddap:cmems_biogeochem_phyto:chl:mean")):
+    assert entries[long_id]["variable"] == entries[short_id]["variable"]
+    assert entries[long_id]["preferred"] and not entries[short_id]["preferred"]

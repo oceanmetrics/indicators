@@ -265,16 +265,16 @@ class Fetcher:
       return list(ex.map(fn, items))
 
 
-def resolve_places(index_path: Path, place_ids: Iterable[str]) -> None:
-  """every place must be exactly one row with collection 'places' in the gazetteer index, else raise naming it."""
+def resolve_places(index_path: Path, place_ids: Iterable[str], coll: str = COLL) -> None:
+  """every place must be exactly one row with collection `coll` in the gazetteer index, else raise naming it."""
   t = pq.read_table(index_path, columns=["place_id", "collection"]).to_pylist()
   count: dict[str, int] = defaultdict(int)
   for r in t:
-    if r["collection"] == COLL:
+    if r["collection"] == coll:
       count[r["place_id"]] += 1
   for pid in sorted(set(place_ids)):
     if count[pid] != 1:
-      raise ValueError(f"place_id {pid!r} resolves to {count[pid]} rows with collection {COLL!r} in the gazetteer index, "
+      raise ValueError(f"place_id {pid!r} resolves to {count[pid]} rows with collection {coll!r} in the gazetteer index, "
                        "expected exactly 1")
 
 

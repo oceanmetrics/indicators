@@ -61,6 +61,37 @@ PRODUCERS = {
         "value, else its sovereign's; joint regimes and overlapping claims get none."),
     },
   },
+  "cmems": {
+    "name": "noaa-onms/eco-indicators", "url": "https://github.com/noaa-onms/eco-indicators",
+    "catalog": None,
+    "n_meaning": "months averaged into the period: 1 for a monthly mean, 12 for a yearly mean",
+    "cite_dataset": True,
+    "method": {
+      "kind": "precomputed-external",
+      "code": "https://github.com/oceanmetrics/indicators/blob/main/om_indicators/adapters/eco_indicators.py",
+      "continuous": (
+        "Monthly means of a Copernicus Marine Service product over each sanctuary polygon, extracted by "
+        "noaa-onms/eco-indicators (mean of the grid cells under the polygon, with the spatial SD in x_sd). A year is the "
+        "mean of its 12 monthly means, written only when all 12 months have a value."),
+    },
+  },
+  "obis": {
+    "name": "obisindicators", "url": "https://github.com/marinebon/obisindicators",
+    "catalog": "https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/obis-h3/latest.json",
+    "n_meaning": "OBIS occurrence records inside the place in the period (every metric of a place and EOV shares one n)",
+    "cite_dataset": True,
+    "method": {
+      "kind": "precomputed-exact",
+      "code": "https://github.com/oceanmetrics/indicators/blob/main/om_indicators/adapters/obis.py",
+      "continuous": (
+        "Exact point-in-polygon on an OBIS snapshot (no H3 binning): the indicators are computed from the occurrence "
+        "records inside the place's true polygon, by year, by decade and over all years; EOV membership follows the IOOS "
+        "Marine Life Data Network taxonomy seeds. A record counts in every place whose polygon contains it (Marine "
+        "Regions joint regimes overlap their parties' 200 NM zones), so totals across places exceed the distinct records "
+        "and are never summed. The snapshot's own year is incomplete and not published. Yearly counts track sampling "
+        "effort, so they are shown as values, not as a status."),
+    },
+  },
 }
 
 
@@ -154,12 +185,16 @@ def producer_family(indicator: str) -> str:
   return indicator.split(":", 1)[0]
 
 
-def citation(ind: dict, version: str, extra: str | None = None) -> str:
-  """how to cite one indicator's values: the upstream producers, the dataset, then these derived values"""
+def citation(ind: dict, version: str, extra: str | None = None, cite_dataset: bool = False) -> str:
+  """how to cite one indicator's values: the upstream producers, the dataset, then these derived values. a producer
+  whose dataset states its own citation line (Copernicus Marine, OBIS) is cited by that line."""
   ds = ind["dataset"]
   who = "; ".join(p["name"] for p in ds["providers"] if "producer" in p.get("roles", [])) or ds["providers"][0]["name"]
   link = ds.get("doi") or ds.get("via") or ds.get("stac")
-  parts = [f"{who}. {ds['title']}." + (f" {link}." if link else "")]
+  if cite_dataset and ds.get("citation"):
+    parts = [ds["citation"].rstrip(".") + "."]
+  else:
+    parts = [f"{who}. {ds['title']}." + (f" {link}." if link else "")]
   if extra:
     parts.append(extra)
   parts.append(f"Values: Ocean Metrics Indicators, manifest {version}, {ind['id']}, CC BY 4.0, {SITE}")
@@ -205,12 +240,16 @@ def build_manifest(values: dict[str, dict], entries: dict[str, dict], vocabs: di
       var = ind_id.split(":")[2] if fam == "erddap" else None
       classes = variables.get(var, {}).get("erddap-places:classes") if var else None
       out["classes"] = classes or {c: c for c in sorted(v["classes"], key=lambda c: (len(c), c))}
+      if e.get("ordinal"):
+        out["ordinal"] = True  # the classes are ordered as listed (e.g. bleaching alert levels)
+    elif e.get("ordinal"):
+      raise ValueError(f"{ind_id}: ordinal applies to categorical indicators only")
     if out["description"] is None:
       what = variables.get(ind_id.split(":")[2], {}).get("description") if fam == "erddap" else None
       out["description"] = (f"{(what or e['title']).capitalize()} from {ds['title']}, " +
                             ("area-weighted over the place, as monthly and yearly means." if fam == "erddap" else "joined to the place."))
     eez_note = f"EEZ boundaries: {eez_attribution}" if fam == "sdg" and eez_attribution and not stated else None
-    out["citation"] = citation(out, version, eez_note)
+    out["citation"] = citation(out, version, eez_note, bool(prod.get("cite_dataset")))
     inds.append({k: x for k, x in out.items() if x is not None})
   # series titles follow the lead
   titles = {i["series"]: i["series_title"] for i in inds if i.get("series_title")}

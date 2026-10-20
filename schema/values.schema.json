@@ -17,7 +17,7 @@
       "pattern": "^[a-z][a-z0-9_]*$"
     },
     "indicator": {
-      "description": "Stable indicator id, `<producer family>:<id parts>`: erddap:<dataset>:<variable>:<stat>, sdg:<series>, obis:<metric> or obis:<metric>:<eov>. Listed in indicators.json.",
+      "description": "Stable indicator id, `<producer family>:<id parts>`: erddap:<dataset>:<variable>:<stat>, cmems:<dataset>:<variable>:mean, sdg:<series>, obis:<metric> or obis:<metric>:<eov>. Listed in indicators.json.",
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]*:[A-Za-z0-9_.\\-]+(:[A-Za-z0-9_.\\-]+)*$"
     },
