@@ -65,9 +65,14 @@ export function buildParts(groups: readonly string[], all: Record<string, GazLay
     const derived = home.kind === 'derived'
     const kind = layer.kind === 'raster' ? 'raster' : 'vector'
     if (derived) {
-      const pieces = places.filter(p => p.coll === group && p.displayId)
-      const toPlace = new Map(pieces.map(p => [p.displayId as string, p.id]))
-      const toFeature = new Map(pieces.map(p => [p.id, p.displayId as string]))
+      // the pieces of the group: its places in the index (those with no value for this indicator are drawn faint) and, with no index
+      // (the embed), the places that have one
+      const pieces = [
+        ...places.filter(p => p.coll === group && p.displayId).map(p => ({ id: p.id, displayId: p.displayId as string })),
+        ...mine.filter(i => i.displayId).map(i => ({ id: i.placeId, displayId: i.displayId as string })),
+      ]
+      const toPlace = new Map(pieces.map(p => [p.displayId, p.id]))
+      const toFeature = new Map(pieces.map(p => [p.id, p.displayId]))
       const classOf = new Map<string, number>()
       for (const i of mine) { const f = toFeature.get(i.placeId); if (f && i.k != null) classOf.set(f, i.k) }
       parts.push({ group, kind, layer, home, derived, classOf, known: mine.map(i => toFeature.get(i.placeId)).filter((f): f is string => !!f), only: [...toPlace.keys()].sort(), toPlace, toFeature, opaque })

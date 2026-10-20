@@ -11,7 +11,7 @@ compute them:
 | [erddap-places](https://github.com/oceanmetrics/erddap-places) precomputed stats | ERDDAP grids: SST, bleaching alerts, chlorophyll, pH, O₂, nutrients, NPP, precipitation, Seascapes ... | NOAA sanctuaries and a few others (gazetteer collection `places`) | `om_indicators/adapters/erddap_places.py`: daily → month and year rows |
 | `oceanmetrics/places` `proto/eez_indicators` | UN SDG 14 series (14.5.1, 14.1.1, 14.6.1) | Marine Regions EEZs (`mr_eez`) | `om_indicators/adapters/sdg.py`: latest year |
 | [noaa-onms/eco-indicators](https://github.com/noaa-onms/eco-indicators) | Copernicus Marine long records (1993- physics, 1997- ocean colour and plankton types) | NOAA sanctuaries (`places`) | `om_indicators/adapters/eco_indicators.py`: monthly means → month and year rows |
-| [obisindicators](https://github.com/marinebon/obisindicators) `obis-h3` release | OBIS records, richness, Shannon, Simpson, ES(50), Hill, Berger-Parker, density, by year, decade and EOV | Marine Regions EEZs and the high seas (`mr_eez`, `mr_high_seas`) | `om_indicators/adapters/obis.py`: exact point-in-polygon indicators |
+| [obisindicators](https://github.com/marinebon/obisindicators) `obis-h3` release | OBIS records, richness, Shannon, Simpson, ES(50), Hill, Berger-Parker, density, by year, decade and EOV | Marine Regions EEZs, the high seas and the high seas by FAO major fishing area (`mr_eez`, `mr_high_seas`, `fao_high_seas`) | `om_indicators/adapters/obis.py`: exact point-in-polygon indicators |
 
 The values are derived tables (no geometry). Code is MIT; values are CC BY 4.0 with the upstream credit carried in
 the manifest.
@@ -49,7 +49,7 @@ WHERE time_grain = 'year' ORDER BY place_id, time;
 | path | language | what |
 |---|---|---|
 | `schema/` | JSON Schema | the contract (`values`, `provenance`), the manifest (`indicators`), `coverage` |
-| `config/` | YAML | `indicators.yml` (categories, series, lead, preferred, kind, min_periods) and the vocabularies |
+| `config/` | YAML | `indicators.yml` (categories, series, lead, preferred, kind, min_periods), the vocabularies, and `place_sets.yml` (named lists of place groups: the manifest's `place_sets`) |
 | `om_indicators/` | Python (uv) | contract validator and writer, producer adapters, manifest builder, CLI `om-ind` |
 | `tests/` | pytest | one test per rule, exact-row fixtures |
 | `src/status/` | TypeScript | the status methods (`iea-sd`, `names-pct`, `values`): the **only** implementation, used by the coverage builder and the viewer |
@@ -96,9 +96,10 @@ Indicators are the rows and places the columns. Places are grouped by their **ho
 build flags `--gazetteer-index <file|URL|none>` and `--layers <file|URL|none>`, `OM_OFFLINE=1` uses the cached copies
 under `cache/gazetteer/`). A place in two values collections (Pitcairn's EEZ: `places` and `mr_eez`) is one place; each
 cell reads the values file of its own coverage row. Each group says how many of its places are computed of the
-gazetteer's total and links to it. Opens on the sanctuaries; the other groups are chips. An indicator with no value for
+gazetteer's total and links to it. Opens on the National Marine Sanctuaries (the `places` collection: the `NMS:*` ids; `noaa_sanctuaries` holds the ONMS section ids, another id space); the other groups are chips. An indicator with no value for
 any place on display is hidden.
-Hash keys: `colls` (comma list of groups; none = the sanctuaries, every group while searching), `q` (a place search kept from old
+A place of a **derived** gazetteer layer (the high seas by FAO area, `fao_high_seas`, which has no geometry of its own) also carries `display_id` in `coverage.parquet`: its index `source_id` (`FAO:21`), the id of the feature of the layer that draws it (`fao_major_areas`); null for any other place.
+Hash keys: `colls` (comma list of groups, or `set:<id>` for the groups of a place set; none = the sanctuaries, every group while searching), `q` (a place search kept from old
 links; the toolbar shows it as a chip), `vocab`, `leads`, `depth`, `cell` (an open drawer: `place|indicator`), `axes=p` (places as rows;
 the old `axes=t` reads as the default), `empty=1` (show the indicators without values), `xp` and `xi` (removed places and indicators),
 `ai` (added indicators).
@@ -169,6 +170,8 @@ value (five quantile classes), its departure from the place's own mean (in SD), 
 one class. A slider walks the periods. Hash keys: `ind`, `coll` (the group; an old link's values collection still resolves to the
 group holding most of its places), `place` (the place selected), `color` (`value|departure|status|trend|record|class|share`), `t`
 (`2024` or `2024-07`; none = each place's latest), `cls` (the class `share` maps), `grain` and `method`.
+- **Place sets** (`config/place_sets.yml`, the manifest's `place_sets`; `viewer/src/lib/sets.ts`): a named list of place groups offered as one choice above the groups, in the place picker (Matrix: a tick that ticks all its groups; Map: one choice) and in a link as `set:<id>` (`coll=set:political` on the Map, `colls=set:political` in the Matrix; a link that names groups reads as before). `political` is **Ocean by jurisdiction**: the EEZs (`mr_eez`) and the high seas by FAO major fishing area (`fao_high_seas`), which together cover the ocean. A record on a shared boundary counts in each place, so place totals are never summed. An `ecological` set (MEOW and PPOW) waits on UNEP-WCMC's permission and has no data here. The Map draws a set by layering its groups, the vector and derived groups first and the reference (WMS) groups on top (`viewer/src/lib/map/parts.ts`), with one legend, one table and one colour scale across all their places; a click answers from the top group down, so an EEZ over a high-seas piece is the EEZ, and open sea is the piece.
+- **Derived groups:** a gazetteer layer with `kind: "derived"` (layers.json `display: {via, id_from}`) is drawn as the features of its `via` layer (`fao_major_areas`, PMTiles) whose `place_id` is a place's `display_id`; only those features are drawn, each coloured by the value of its place, and a click selects the place, not the FAO area. An FAO polygon covers its EEZs too: it is drawn under the EEZ WMS, and under a set the WMS fills every EEZ opaque (the places with no class in the no-data tint), so only each area's high-seas part shows. We host no geometry of the Marine Regions layers; the FAO major areas are the gazetteer's own PMTiles.
 - **Group picker:** every group with computed places, those with values for the indicator shown first (with how many), the others
   marked "no values for <indicator>". Choosing one of those switches to that group's own lead (the sea surface temperature when it has
   it) and says so above the map ("SST is not computed for National Estuarine Research Reserves; showing Precipitation (NASA IMERG).").
@@ -178,7 +181,8 @@ group holding most of its places), `place` (the place selected), `color` (`value
   collections (`mr_eez`) by Marine Regions' own WMS (one request per tile, an SLD plus `ENV`; no Marine Regions geometry is hosted by
   us). Values are read from every values file of the indicator that holds places of the group (the EEZ group: `mr_eez`'s file plus
   Pitcairn's in `places`).
-- **Members that are not computed** are drawn as faint outlines (`--map-member`) in a vector group (the other 29 reserves beside Wells);
+- **Members that are not computed** are drawn as faint outlines (`--map-member`) in a vector group (the other 29 reserves beside Wells),
+  and below zoom 7, where an outline is too small to see, also as a small hollow circle at the member's label point in the same faint colour;
   clicking one, or opening a link to it, frames it and offers the same ways forward as an empty Matrix cell. A reference group draws
   them in the "no data" class. The legend and "The map as a table" carry every class in words and glyphs, so nothing depends on colour.
 
@@ -191,8 +195,8 @@ group holding most of its places), `place` (the place selected), `color` (`value
 - one map: `embed/#view=map&…` with the Map view's keys, for example the live CoastWatch OBIS for the MBON tools page:
 
 ```html
-<iframe src="https://oceanmetrics.io/indicators/embed/?brand=mbon#view=map&ind=obis:species&coll=mr_eez&grain=decade"
-  title="OBIS species richness by EEZ (Ocean Metrics Indicators)" width="100%" height="900" style="border:0"></iframe>
+<iframe src="https://oceanmetrics.io/indicators/embed/?brand=mbon#view=map&ind=obis:species&coll=set:political&grain=decade"
+  title="OBIS species richness by EEZ and high-seas area (Ocean Metrics Indicators)" width="100%" height="900" style="border:0"></iframe>
 ```
 
 ## Requests
@@ -228,7 +232,7 @@ People" (PPG-26-197).
 `node scripts/size-budget.mjs` after `npm run build`, in gzip: entry JS ≤ 110 kB, all JS except the map chunk ≤ 200 kB,
 the map chunk (MapLibre, pmtiles and the map components) ≤ 330 kB, CSS except the map's ≤ 15 kB, the map's CSS ≤ 15 kB.
 At the first deploy (2026-10-20) the entry was 86.5 kB and the CSS 6.7 kB. The map chunk has its own budget because
-MapLibre is about 230 kB gzip and is loaded only when the Map view is opened. With the two pickers (2026-10-20) the entry is 107.0 kB and the CSS 14.98 kB: the picker panels and their rules load on the first open, and rules that several components repeated live once in `viewer/src/app.css` as `om-*` classes (gzip is per file, so each copy cost bytes). Nothing was raised. Raise a budget only with the reason here.
+MapLibre is about 230 kB gzip and is loaded only when the Map view is opened. With the two pickers (2026-10-20) the entry is 107.0 kB and the CSS 14.98 kB (107.6 and 15.0 with the place sets: their code is the Map's or lives in the lazy panels, and their rules reuse `om-*` classes): the picker panels and their rules load on the first open, and rules that several components repeated live once in `viewer/src/app.css` as `om-*` classes (gzip is per file, so each copy cost bytes). Nothing was raised. Raise a budget only with the reason here.
 
 ## Brand and icons
 

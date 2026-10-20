@@ -195,6 +195,10 @@ const SHOTS = [
   ['embed_card_oceanmetrics_light', 'oceanmetrics', 'light', CARD, EMBED_HASH],
   ['embed_card_oceanmetrics_dark', 'oceanmetrics', 'dark', CARD, EMBED_HASH],
   ['embed_card_oceanmetrics_light_390', 'oceanmetrics', 'light', CARD_PHONE, EMBED_HASH],
+  // the CoastWatch-OBIS embed: the political set, species richness by decade
+  ['embed_map_political_mbon_light', 'mbon', 'light', { width: 900, height: 1100, deviceScaleFactor: 1 }, POLITICAL],
+  // the Matrix of the set: its groups, places as rows
+  ['matrix_political_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, 'colls=set:political&axes=p'],
 ]
 
 async function alive(url) { try { return (await fetch(url)).ok } catch { return false } }

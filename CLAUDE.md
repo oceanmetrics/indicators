@@ -54,14 +54,20 @@ indicators.json + coverage.parquet ──► viewer/ (imports src/status/, src/i
 - **Places are grouped by `place_coll`** (the home gazetteer collection, written by the coverage builder from the
   gazetteer index and `layers.json`), never by the values `coll`. The values file of a cell always comes from its
   coverage row's `coll` (`valuesCollOf()`): Pitcairn's EEZ is one place with rows in `places` and `mr_eez`. In the
-  gazetteer index the `NMS:*` sanctuaries and `PSGID:939` live only in the `places` collection (the `noaa_sanctuaries`
-  collection holds `ONMS:*` ids), so the default group is `DEFAULT_GROUPS` in `viewer/src/lib/data.ts`. Matrix hash keys:
+  gazetteer index the `NMS:*` sanctuaries live only in the `places` collection (the `noaa_sanctuaries`
+  collection holds `ONMS:*` ids, another id space), so the default group is `DEFAULT_GROUPS` in `viewer/src/lib/data.ts`.
+  A place of a **derived** layer (`fao_high_seas`) carries `display_id` (its index `source_id`: the feature of the layer that
+  draws it). **Place sets** (`config/place_sets.yml` -> the manifest's `place_sets`; `set:<id>` in `coll` and `colls`;
+  `viewer/src/lib/sets.ts`) are named lists of groups: the Matrix expands them, the Map layers them. Matrix hash keys:
   `colls`, `q`, `vocab`, `leads`, `depth`, `cell`, `axes=p`, `empty=1`, `xp`, `xi`, `ai` (README "Matrix view").
 - **The Map view** (`viewer/src/lib/map/`): classes, legends and the table come from `classes.ts` (status and trend
   only through `src/status`); reference collections (Marine Regions `mr_*`) are drawn by Marine Regions' own WMS
   (`wms.ts`: an SLD plus `ENV`, one request per tile) and never from geometry we host. The map's `coll` is a place group
   (`place_coll ?? coll`, `pick.ts`), read from every values file that holds its places; the group's members that are not
-  computed are drawn faint in a vector group.
+  computed are drawn faint in a vector group, and below zoom 7 also as a small hollow circle (`paint.ts`). A **place set** is
+  drawn by layering its groups (`parts.ts`: vector and derived groups first, WMS on top, one legend and scale), a **derived**
+  group as the features of its `via` layer matched by `display_id`; a click answers from the top part down. Reference
+  geometry (Marine Regions) is never hosted by us, in a set as anywhere: the EEZs stay Marine Regions' own WMS.
 - **The pickers** (`viewer/src/lib/pick/`): one place picker and one indicator picker for every view, the rules in plain
   `.ts` (`places.ts`, `placesTree.ts`, `indicators.ts`, `indicatorsTree.ts`; the `*Tree` files and the panels load on the
   first open, so keep them out of the entry). Shared look-alike CSS lives once in `viewer/src/app.css` as `om-*` classes

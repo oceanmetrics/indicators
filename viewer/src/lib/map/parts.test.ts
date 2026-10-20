@@ -75,6 +75,11 @@ describe('the parts of a place set', () => {
     expect(parts.map(p => p.opaque)).toEqual([true, true])
     expect(buildParts(['mr_eez'], all, items, places).parts[0].opaque).toBe(false)
   })
+  it('without the index (the embed) the pieces are the places that have a value', () => {
+    const fao = buildParts(['fao_high_seas'], all, items, []).parts[0]
+    expect(fao.only).toEqual(['FAO:21', 'FAO:87'])
+    expect(placeOf(fao, 'FAO:21')).toBe('FAOHS:21')
+  })
   it('a vector part knows its computed members', () => {
     const p = buildParts(['noaa_nerrs'], all, [item('NERRS:WEL', 'noaa_nerrs', 1)], [place('NERRS:WEL', 'noaa_nerrs')]).parts[0]
     expect([p.known, p.only, p.derived, [...p.classOf]]).toEqual([['NERRS:WEL'], null, false, [['NERRS:WEL', 1]]])

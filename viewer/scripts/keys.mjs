@@ -211,6 +211,17 @@ if (t) {
   check(await page.waitForSelector('.pop', { hidden: true, timeout: 5000 }).then(() => true, () => false), 'group picker: choosing closes the panel')
   check(/trig/.test((await focused())?.cls ?? ''), 'group picker: focus returns to its button')
 }
+// Map, group picker: the place set is the first row; Enter on it writes coll=set:political
+await fresh('#view=map&ind=obis:species&coll=mr_eez')
+was = await page.evaluate(() => location.hash)
+t = await openWith(/Exclusive Economic Zones/, 'set picker')
+if (t) {
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+  check(await hashChanged(was, 'coll=set:political'), `set picker: Enter on the place set (${await page.evaluate(() => location.hash)})`)
+  check(await page.waitForSelector('.pop', { hidden: true, timeout: 5000 }).then(() => true, () => false), 'set picker: choosing closes the panel')
+  check(/trig/.test((await focused())?.cls ?? ''), 'set picker: focus returns to its button')
+}
 // Place view, place: type "channel", ArrowDown, Enter goes to that place
 await fresh('#view=place&place=NMS:FKNMS')
 await page.waitForSelector('.pv .controls', { timeout: 30000 })
