@@ -151,6 +151,30 @@ describe('words', () => {
   })
 })
 
+describe('groupColumns: the order', () => {
+  const inds = [
+    ind({ id: 'a', short: 'Zeta', series: 's1', lead: false, category: { onms: 'water-quality' } }),
+    ind({ id: 'b', short: 'Beta', series: 's1', lead: true, category: { onms: 'water-quality' } }),
+    ind({ id: 'c', short: 'Alpha', series: 's2', lead: true, category: { onms: 'drivers' } }),
+    ind({ id: 'd', short: 'Delta', series: 's3', lead: true, category: { onms: 'mystery' } }),
+  ]
+  it('A to Z: the groups by label (Other last), the indicators by short title', () => {
+    const g = groupColumns(inds, vocabs(), 'onms', { sort: 'az', group: true, custom: [] })
+    expect(g.map(x => [x.term.id, x.indicators.map(i => i.id)])).toEqual([['drivers', ['c']], ['water-quality', ['b', 'a']], ['other', ['d']]])
+  })
+  it('ungrouped it is one group with no id, in the order given', () => {
+    const g = groupColumns(inds, vocabs(), 'onms', { sort: 'az', group: false, custom: [] })
+    expect(g.map(x => [x.term.id, x.indicators.map(i => i.id)])).toEqual([['', ['c', 'b', 'd', 'a']]])
+  })
+  it('a custom order moves an indicator to the front of its group', () => {
+    const g = groupColumns(inds, vocabs(), 'onms', { sort: 'custom', group: true, custom: ['a'] })
+    expect(g.find(x => x.term.id === 'water-quality')!.indicators.map(i => i.id)).toEqual(['a', 'b'])
+  })
+  it('without an order it is the vocabulary order (the Place view keeps it)', () => {
+    expect(groupColumns(inds, vocabs(), 'onms').map(g => g.term.id)).toEqual(['drivers', 'water-quality', 'other'])
+  })
+})
+
 describe('groupColumns', () => {
   const inds = [
     ind({ id: 'a', series: 's1', lead: false, category: { onms: 'water-quality', eov: 'oxygen' } }),
@@ -204,8 +228,12 @@ describe('place groups: place_coll, not the values collection', () => {
     const old = indexCoverage([row({ place_id: 'NMS:A', coll: 'places' }), row({ place_id: 'MRGID:9', coll: 'mr_eez' })])
     expect(old.places.map(p => [p.id, p.coll])).toEqual([['NMS:A', 'places'], ['MRGID:9', 'mr_eez']])
   })
+  it('a place carries the centre of its bbox from the coverage rows, and none when they lack it', () => {
+    const i = indexCoverage([row({ place_id: 'NMS:A', lat: 37, lon: -123 } as never), row({ place_id: 'NMS:B', lat: null, lon: null } as never), row({ place_id: 'NMS:C' })])
+    expect(i.places.map(p => [p.id, p.lat, p.lon])).toEqual([['NMS:A', 37, -123], ['NMS:B', undefined, undefined], ['NMS:C', undefined, undefined]])
+  })
   it('selectionRows lists a place once, in its home group', () => {
-    expect(selectionRows(idx.places, idx, '').map(g => [g.coll, g.places.map(p => p.id)])).toEqual([['places', ['NMS:A']], ['noaa_nerrs', ['NERRS:WEL']], ['mr_eez', ['MRGID:8439']]])
+    expect(selectionRows(idx.places, idx, '').map(g => [g.coll, g.places.map(p => p.id)])).toEqual([['mr_eez', ['MRGID:8439']], ['noaa_nerrs', ['NERRS:WEL']], ['places', ['NMS:A']]])
   })
 })
 
@@ -214,8 +242,14 @@ describe('selectionRows: the rows of the chosen places', () => {
     row({ place_id: 'NMS:B', place_name: 'Bravo' }), row({ place_id: 'NMS:A', place_name: 'Alpha' }),
     row({ place_id: 'MRGID:9', place_name: 'Zed EEZ', coll: 'mr_eez' }),
   ])
-  it('groups follow the group order (sanctuaries first) and places sort by name', () => {
-    expect(selectionRows(idx.places, idx, '').map(g => [g.coll, g.places.map(p => p.name)])).toEqual([['places', ['Alpha', 'Bravo']], ['mr_eez', ['Zed EEZ']]])
+  it('groups are A-Z by title (the slug when no title is given) and places A-Z by name', () => {
+    expect(selectionRows(idx.places, idx, '').map(g => [g.coll, g.places.map(p => p.name)])).toEqual([['mr_eez', ['Zed EEZ']], ['places', ['Alpha', 'Bravo']]])
+    const title = (c: string) => (c === 'places' ? 'Aardvark sanctuaries' : 'Zebra EEZs')
+    expect(selectionRows(idx.places, idx, '', undefined, title).map(g => g.coll)).toEqual(['places', 'mr_eez'])
+  })
+  it('the order given is used: north to south, grouping off', () => {
+    const ps = [{ id: 'NMS:A', name: 'Alpha', coll: 'places', lat: 10, lon: 0 }, { id: 'NMS:B', name: 'Bravo', coll: 'places', lat: 30, lon: 0 }, { id: 'MRGID:9', name: 'Zed EEZ', coll: 'mr_eez', lat: 20, lon: 0 }]
+    expect(selectionRows(ps, idx, '', { sort: 'ns', group: false, custom: [] }).map(g => [g.coll, g.places.map(p => p.id)])).toEqual([['', ['NMS:B', 'MRGID:9', 'NMS:A']]])
   })
   it('only the places given are rows', () => {
     expect(selectionRows(idx.places.filter(p => p.coll === 'mr_eez'), idx, '').map(g => g.coll)).toEqual(['mr_eez'])
@@ -229,9 +263,18 @@ describe('selectionRows: the rows of the chosen places', () => {
   it('orderGroups: the group order first, unknown groups after, alphabetically', () => {
     expect(orderGroups(['b_unknown', 'mr_eez', 'places', 'noaa_nerrs', 'a_unknown', 'noaa_sanctuaries'])).toEqual(['noaa_sanctuaries', 'places', 'noaa_nerrs', 'mr_eez', 'a_unknown', 'b_unknown'])
   })
-  it('a place that is not in the coverage at all is a row, after the computed places of its group', () => {
+  it('a place that is not in the coverage at all is a row, in A-Z with the computed ones', () => {
     const gaz = [{ id: 'NMS:A', name: 'Alpha', coll: 'places' }, { id: 'NMS:0', name: 'Aardvark (not computed)', coll: 'places' }, { id: 'NMS:B', name: 'Bravo', coll: 'places' }]
-    expect(selectionRows(gaz, idx, '').map(g => g.places.map(p => p.id))).toEqual([['NMS:A', 'NMS:B', 'NMS:0']])
+    expect(selectionRows(gaz, idx, '').map(g => g.places.map(p => p.id))).toEqual([['NMS:0', 'NMS:A', 'NMS:B']])
+  })
+  it('a group past the cap keeps its computed places among the ones shown, in the order given', () => {
+    const many = Array.from({ length: ROW_CAP + 5 }, (_, n) => ({ id: `PSGID:${String(n).padStart(5, '0')}`, name: `MPA ${String(n).padStart(5, '0')}`, coll: 'protectedseas_mpa' }))
+    const late = indexCoverage([row({ place_id: 'PSGID:00304', place_name: 'MPA 00304', coll: 'protectedseas_mpa' })])
+    const g = selectionRows(many, late, '')[0]
+    expect(g.places).toHaveLength(ROW_CAP)
+    expect(g.places.map(p => p.id)).toContain('PSGID:00304')
+    expect(g.places.map(p => p.id)).not.toContain('PSGID:00299')
+    expect(g.places.map(p => p.id)).toEqual([...g.places.map(p => p.id)].sort())
   })
   it('a group of more than the cap shows the first of them and says how many there are', () => {
     const many = Array.from({ length: ROW_CAP + 40 }, (_, n) => ({ id: `PSGID:${String(n).padStart(5, '0')}`, name: `MPA ${String(n).padStart(5, '0')}`, coll: 'protectedseas_mpa' }))

@@ -4,6 +4,9 @@
 //   excluded: `coll:<slug>`, `set:<id>`, a place id; none = `coll:places`, the sanctuaries), ii and ix (the indicators:
 //   `*` = each series' lead, the default, `all`, `cat:<term>`, `series:<id>`, `series:<id>:*`, ids). the old keys (colls, xp,
 //   xi, ai, leads, and the Map's coll) are read as the same selection and dropped on the next write.
+// - the order the selection is shown in (src/report/order.ts), shared like the selection: ps (place sort: az, the default, ns, sn,
+//   we, custom), pg=0 (places not grouped), po (the custom order: a comma list of place ids, led by `g:<collection>` entries
+//   for the groups), is (indicator sort: az, the default, vocab, custom), ig=0, io (as po, with `g:<term>`).
 // - shared: vocab, depth, axes=p (places as rows; absent = indicators in rows, places in columns; the old axes=t means the
 //   default and is dropped on the next write), empty=1 (also the indicators with no value for any place on display).
 // - Matrix: q (place search, narrows the selection), cell (an open drawer: place_id|indicator).
@@ -20,7 +23,8 @@ import type { VocabId } from './data.ts'
 import type { Grain, MethodId } from '../../../src/status/index.ts'
 import { DEFAULT_SPEC, specFromParams, specParams } from '../../../src/report/spec.ts'
 import type { ReportSpec } from '../../../src/report/spec.ts'
-import { migrateSelectionKeys, withSelection } from './selection.ts'
+import { ORDER_KEYS, ORDER_LISTS } from '../../../src/report/order.ts'
+import { migrateSelectionKeys, selectionSpec, withSelection } from './selection.ts'
 
 export type Depth = 'skim' | 'swim' | 'dive'
 export const DEPTHS: Depth[] = ['skim', 'swim', 'dive']
@@ -106,16 +110,16 @@ export function parseHash(hash: string): ViewState {
     grain: MAP_GRAINS.includes(kv.get('grain') as Grain) ? (kv.get('grain') as Grain) : null,
     proj: kv.get('proj') === 'globe' ? 'globe' : null,
     // outside the Report only the selection is read; the Report's other keys are its own
-    spec: view === 'report' ? spec : withSelection({ spec: DEFAULT_SPEC }, { places: { ...spec.places, context: false }, indicators: spec.indicators }).spec,
+    spec: view === 'report' ? spec : selectionSpec(spec),
   }
 }
 
 const SPEC_LISTS = new Set(['pi', 'px', 'ii', 'ix'])
-const listValue = (k: string, v: string) => (SPEC_LISTS.has(k) ? v.split(',').map(enc).join(',') : enc(v))
+const listValue = (k: string, v: string) => (SPEC_LISTS.has(k) || ORDER_LISTS.has(k) ? v.split(',').map(enc).join(',') : enc(v))
 
-/** the selection's keys of a spec (`pi`, `px`, `ii`, `ix`), defaults left out, as `key=value` parts */
+/** the selection's keys of a spec (`pi`, `px`, `ii`, `ix`) and the order's (`ps pg po is ig io`), defaults left out, as `key=value` parts */
 function selectionParts(spec: ReportSpec): string[] {
-  return specParams(spec).filter(([k]) => SPEC_LISTS.has(k)).map(([k, v]) => k + '=' + listValue(k, v))
+  return specParams(spec).filter(([k]) => SPEC_LISTS.has(k) || ORDER_KEYS.has(k)).map(([k, v]) => k + '=' + listValue(k, v))
 }
 
 /** the hash of a state; each view writes only its own keys */
@@ -172,7 +176,7 @@ export function serializeHash(s: ViewState): string {
 /** what a link to another view carries of the state it is opened from: the selection, the vocabulary, the detail level, the orientation and show-empty */
 export type Carry = Pick<ViewState, 'vocab' | 'depth' | 'axes' | 'showEmpty' | 'spec'> & Partial<Pick<ViewState, 'method'>>
 
-const selOnly = (from: Pick<ViewState, 'spec'>): ReportSpec => withSelection({ spec: DEFAULT_SPEC }, { places: { ...from.spec.places, context: false }, indicators: from.spec.indicators }).spec
+const selOnly = (from: Pick<ViewState, 'spec'>): ReportSpec => selectionSpec(from.spec)
 
 const carried = (from: Carry): ViewState => ({
   ...DEFAULT_STATE, vocab: from.vocab, depth: from.depth, axes: from.axes, showEmpty: from.showEmpty, spec: selOnly(from),
@@ -180,7 +184,7 @@ const carried = (from: Carry): ViewState => ({
 
 /** another view's state with this one's shared keys: its own keys stay, the selection, vocabulary, detail, orientation and show-empty follow */
 export function carryOver(target: ViewState, from: Carry): ViewState {
-  const spec = withSelection(target, { places: from.spec.places, indicators: from.spec.indicators }).spec
+  const spec = withSelection(target, { places: from.spec.places, indicators: from.spec.indicators, order: from.spec.order }).spec
   return {
     ...target, vocab: from.vocab, depth: from.depth, axes: from.axes, showEmpty: from.showEmpty,
     spec: target.view === 'report' ? { ...spec, depth: from.depth } : spec,

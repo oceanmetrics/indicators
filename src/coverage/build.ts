@@ -3,6 +3,8 @@
 // the same module the viewer runs, so a cell in the Matrix and a card in a report cannot disagree.
 import { assess, categoricalSentence, completeGrid, periodLabel } from '../status/index.ts'
 import type { Grain, MethodId, Point } from '../status/index.ts'
+import { bboxCentre } from './centre.ts'
+import type { Bbox, Centre } from './centre.ts'
 
 /** a contract row as read from a values file (time as an ISO date string or null) */
 export interface ValueRow {
@@ -49,6 +51,13 @@ export interface CoverageRow {
    * coverage table built before 2026-10-20.
    */
   display_id?: string | null
+  /**
+   * the centre of the place's bounding box in the gazetteer index (src/coverage/centre.ts: longitude unwrapped across the
+   * antimeridian, then back in -180..180), for ordering places north to south or west to east. null when the index lacks the
+   * place; absent in a coverage table built before 2026-10-20.
+   */
+  lat?: number | null
+  lon?: number | null
   indicator: string
   time_grain: Grain
   t0: string | null
@@ -95,6 +104,8 @@ export interface IndexEntry {
   collection: string
   /** the id of the place in its source; for a place of a derived layer, the id of the feature that draws it */
   source_id?: string | null
+  /** the place's bounding box in the index (the east beyond 180 for a place that crosses the antimeridian) */
+  bbox?: Bbox | null
 }
 
 /**
@@ -126,11 +137,25 @@ export function displayIds(entries: IndexEntry[], homes: Map<string, string>, de
   return out
 }
 
+/**
+ * the centre of every place's bbox in the gazetteer index, read from its home collection's row (as `displayIds`); a place with
+ * no usable bbox has none
+ */
+export function placeCentres(entries: IndexEntry[], homes: Map<string, string>): Map<string, Centre> {
+  const out = new Map<string, Centre>()
+  for (const e of entries) {
+    if (homes.get(e.place_id) !== e.collection) continue
+    const c = bboxCentre(e.bbox)
+    if (c) out.set(e.place_id, c)
+  }
+  return out
+}
+
 /** the home collection of a place; the values collection when the index does not list the place (or there is no index) */
 export const homeColl = (placeId: string, valuesColl: string, homes?: Map<string, string> | null): string => homes?.get(placeId) ?? valuesColl
 
 const empty = (r: ValueRow, placeName = r.place_id, placeColl = r.coll): CoverageRow => ({
-  place_id: r.place_id, place_name: placeName, coll: r.coll, place_coll: placeColl, display_id: null, indicator: r.indicator, time_grain: r.time_grain,
+  place_id: r.place_id, place_name: placeName, coll: r.coll, place_coll: placeColl, display_id: null, lat: null, lon: null, indicator: r.indicator, time_grain: r.time_grain,
   t0: null, t1: null, n_periods: 0, last_time: null, last_value: null, last_class: null,
   status_method: null, status: null, trend: null, recent_mean: null, recent_from: null, recent_to: null,
   lt_mean: null, lt_sd: null, why: null, sentence: null, spark: '[]',
@@ -200,7 +225,7 @@ export function shownGrainOrder(statusGrain: Grain): Grain[] {
 }
 
 export function coverageOf(
-  rows: ValueRow[], ind: ManifestIndicator, names: Map<string, string>, homes?: Map<string, string> | null, display?: Map<string, string> | null,
+  rows: ValueRow[], ind: ManifestIndicator, names: Map<string, string>, homes?: Map<string, string> | null, display?: Map<string, string> | null, centres?: Map<string, Centre> | null,
 ): CoverageRow[] {
   const groups = new Map<string, ValueRow[]>()
   for (const r of rows) {
@@ -213,6 +238,9 @@ export function coverageOf(
     const home = homeColl(g[0].place_id, g[0].coll, homes)
     const row = ind.kind === 'categorical' ? categoricalRow(g, ind, name, home) : continuousRow(g, ind, name, home)
     row.display_id = display?.get(g[0].place_id) ?? null
+    const centre = centres?.get(g[0].place_id)
+    row.lat = centre?.lat ?? null
+    row.lon = centre?.lon ?? null
     out.push(row)
   }
   // a sparkline only on the row a cell shows: the others would be bytes nobody draws (OBIS decades, months beside years)

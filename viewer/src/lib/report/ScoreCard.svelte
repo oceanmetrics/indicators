@@ -8,6 +8,7 @@
   import { Icon } from '../../../../src/icons/index.ts'
   import type { StatusResult } from '../../../../src/status/index.ts'
   import type { ReportSpec } from '../../../../src/report/spec.ts'
+  import { isDefaultAxis } from '../../../../src/report/order.ts'
   import type { Catalog, Indicator } from '../data.ts'
   import { valuesUrl } from '../delivery.ts'
   import type { Depth } from '../hash.ts'
@@ -84,14 +85,19 @@
   const cell = (p: Place, i: Indicator) => cells.get(key(p, i))!
 
   // ---- exceptions first, inside each collection and each category ----
-  const sorting = $derived(spec.style.status !== 'values')
-  const shownGroups = $derived(!sorting ? groups : groups.map(g => ({ ...g, indicators: byScore(g.indicators, i => places.reduce((n, p) => n + exceptionWeight(cell(p, i).rank), 0)) })))
+  // the exceptions-first order is the default one of a status method; an axis whose order the reader chose (a sort key, grouping off, their
+  // own order) keeps it. places are grouped as the spec says: by collection, or one list
+  const method = $derived(spec.style.status !== 'values')
+  const sortingInds = $derived(method && isDefaultAxis(spec.order.indicators))
+  const sortingPlaces = $derived(method && isDefaultAxis(spec.order.places))
+  const sorting = $derived(sortingInds || sortingPlaces)
+  const shownGroups = $derived(!sortingInds ? groups : groups.map(g => ({ ...g, indicators: byScore(g.indicators, i => places.reduce((n, p) => n + exceptionWeight(cell(p, i).rank), 0)) })))
   const flat = $derived(shownGroups.flatMap(g => g.indicators))
   const rows = $derived.by(() => {
-    const colls = [...new Set(places.map(p => p.coll))]
+    const colls = spec.order.places.group ? [...new Set(places.map(p => p.coll))] : ['']
     return colls.map(c => {
-      const mine = places.filter(p => p.coll === c)
-      return { coll: c, places: sorting ? byScore(mine, p => inds.reduce((n, i) => n + exceptionWeight(cell(p, i).rank), 0)) : mine }
+      const mine = c ? places.filter(p => p.coll === c) : places
+      return { coll: c, places: sortingPlaces ? byScore(mine, p => inds.reduce((n, i) => n + exceptionWeight(cell(p, i).rank), 0)) : mine }
     })
   })
 
@@ -106,7 +112,8 @@
     mq.addEventListener('change', on)
     return () => mq.removeEventListener('change', on)
   })
-  const ex = $derived(sorting ? 'Places and indicators are sorted with out-of-range statuses and strong trends first.' : 'Values only: no status is drawn.')
+  const ex = $derived(sorting ? 'Places and indicators are sorted with out-of-range statuses and strong trends first (choose another order in the Select section to keep your own).' : method ? 'The order is the one chosen in the Select section.' : 'Values only: no status is drawn.')
+  const collTitle = (c: string) => (c ? titles(c) : 'All places')
 </script>
 
 {#snippet glyphs(c: ScoreCell)}
@@ -150,7 +157,7 @@
   {:else if narrow}
     <div class="cards">
       {#each rows as r (r.coll)}
-        <h4 class="coll mbon-label">{titles(r.coll)} · {r.places.length}</h4>
+        <h4 class="coll mbon-label">{collTitle(r.coll)} · {r.places.length}</h4>
         {#each r.places as p (p.id)}
           <article class="pc">
             <h5><a href={placeHref(p.id, p.coll)}>{p.name}</a></h5>
@@ -175,7 +182,7 @@
           <tr class="groups">
             <th class="corner" scope="col" rowspan="2"><span class="mbon-label">Indicator</span></th>
             {#each rows as r (r.coll)}
-              <th scope="colgroup" colspan={r.places.length} class="group"><span class="gh2"><span class="mbon-label">{titles(r.coll)} · {r.places.length}</span></span></th>
+              <th scope="colgroup" colspan={r.places.length} class="group"><span class="gh2"><span class="mbon-label">{collTitle(r.coll)} · {r.places.length}</span></span></th>
             {/each}
           </tr>
           <tr class="heads">
@@ -217,7 +224,7 @@
         </thead>
         <tbody>
           {#each rows as r (r.coll)}
-            <tr class="band"><th scope="colgroup" colspan={flat.length + 1}><span class="mbon-label">{titles(r.coll)} · {r.places.length}</span></th></tr>
+            <tr class="band"><th scope="colgroup" colspan={flat.length + 1}><span class="mbon-label">{collTitle(r.coll)} · {r.places.length}</span></th></tr>
             {#each r.places as p (p.id)}
               <tr>
                 <th scope="row" class="rh"><a href={placeHref(p.id, p.coll)} title="Open the place view of {p.name}">{p.name}</a></th>

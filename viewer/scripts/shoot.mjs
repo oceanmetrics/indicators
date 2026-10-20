@@ -2,7 +2,9 @@
 // the place and indicator pickers open matrix_*_places_picker and matrix_*_indicators_picker, the Select section select_*, a group
 // nothing is computed for uncomputed_*, the drawer), the Place view (place_<place>_<brand>_<theme>[_390].png), the
 // Map view (map_<indicator>_<color>_<theme>[_390].png), the Report view (report_*: the Scorecard, the Cards report, the
-// open builder over budget, the print preview, Small multiples, the Quad plot, the Map sheet and the Dossier) and the embed route (embed_*).
+// open builder over budget, the print preview, Small multiples, the Quad plot, the Map sheet and the Dossier), the order of the rows
+// and columns (order_*: the Order control open, a flat north-to-south order in both orientations, a custom order, a drag in progress with
+// its drop bar and a refused drop, the move buttons on focus) and the embed route (embed_*).
 // headless Chrome through puppeteer-core, against the dev server (started here when nothing answers on the port).
 //   node viewer/scripts/shoot.mjs [--url http://localhost:5181/] [--only matrix_mbon_dark] [--out docs/shots/live] [--data <catalog base URL>]
 // --data reads the catalog from another base (`?data=`), for example the published one while catalog/ is being rebuilt.
@@ -122,6 +124,32 @@ const clickAt = (lon, lat) => async page => {
   await new Promise(r => setTimeout(r, 800))
 }
 
+// the order: the Order control's panel, a drag in progress (a drop bar after a column; a refused drop into another group), the move
+// buttons of a focused header
+const openOrder = async page => {
+  await page.evaluate(() => [...document.querySelectorAll('.select .pk')].find(p => p.querySelector('.mbon-label')?.textContent === 'Order')?.querySelector('button.trig')?.click())
+  await page.waitForSelector('.pop[role=dialog] .om-row button', { timeout: 10000 })
+  await new Promise(r => setTimeout(r, 300))
+}
+const dragOver = (axis, from, to, half = 'after') => async page => {
+  await page.evaluate(([a, f, t, h]) => {
+    const find = id => [...document.querySelectorAll('th[data-ax]')].find(e => e.dataset.ax === a && e.dataset.kind === 'item' && e.dataset.id === id)
+    const src = find(f), dst = find(t)
+    dst.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    const dt = new DataTransfer()
+    const r = dst.getBoundingClientRect()
+    src.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }))
+    dst.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + r.width * (h === 'after' ? 0.75 : 0.25), clientY: r.top + r.height * (h === 'after' ? 0.75 : 0.25) }))
+  }, [axis, from, to, half])
+  await new Promise(r => setTimeout(r, 200))
+}
+const focusMove = (axis, kind, id) => async page => {
+  await page.evaluate(([a, k, i]) => [...document.querySelectorAll('th[data-ax]')].find(e => e.dataset.ax === a && e.dataset.kind === k && e.dataset.id === i)?.querySelector('button.mvb')?.focus(), [axis, kind, id])
+  await new Promise(r => setTimeout(r, 300))
+}
+const ORDER_NS = 'pi=coll:places,coll:mr_eez&ps=ns&pg=0'
+const ORDER_CUSTOM = 'pi=coll:places,coll:noaa_nerrs&ps=custom&po=g:places,NMS:FKNMS,NMS:CINMS'
+
 const SHOTS = [
   ['matrix_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, ''],
   ['matrix_oceanmetrics_dark', 'oceanmetrics', 'dark', DESKTOP, ''],
@@ -231,6 +259,31 @@ const SHOTS = [
   // the Map of a selection of several groups, and of some places of one
   ['map_selection_groups_oceanmetrics_light', 'oceanmetrics', 'light', MAP, 'view=map&ind=erddap:IMERG_monthly_global_precip:precipitation:mean&pi=coll:places,coll:noaa_nerrs'],
   ['map_selection_places_oceanmetrics_light', 'oceanmetrics', 'light', MAP, 'view=map&ind=obis:species&pi=MRGID:5668,MRGID:8456,NMS:CINMS&grain=decade'],
+  // the order of the rows and columns: the control open, a flat north-to-south order (places in columns, then as rows), a custom order, a drag
+  ['order_panel_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, '', openOrder],
+  ['order_panel_oceanmetrics_dark', 'oceanmetrics', 'dark', DESKTOP, ORDER_NS, openOrder],
+  ['order_panel_mbon_light', 'mbon', 'light', DESKTOP, ORDER_CUSTOM, openOrder],
+  ['order_panel_oceanmetrics_light_390', 'oceanmetrics', 'light', PHONE, ORDER_NS, openOrder],
+  ['order_panel_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PHONE, '', openOrder],
+  ['order_northsouth_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, ORDER_NS],
+  ['order_northsouth_oceanmetrics_dark', 'oceanmetrics', 'dark', DESKTOP, ORDER_NS],
+  ['order_northsouth_placerows_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, ORDER_NS + '&axes=p'],
+  ['order_northsouth_placerows_mbon_dark', 'mbon', 'dark', DESKTOP, ORDER_NS + '&axes=p'],
+  ['order_northsouth_oceanmetrics_light_390', 'oceanmetrics', 'light', PHONE, ORDER_NS],
+  ['order_northsouth_placerows_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PHONE, ORDER_NS + '&axes=p'],
+  ['order_custom_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, ORDER_CUSTOM],
+  ['order_custom_placerows_oceanmetrics_dark', 'oceanmetrics', 'dark', DESKTOP, ORDER_CUSTOM + '&axes=p'],
+  ['order_custom_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PHONE, ORDER_CUSTOM],
+  ['order_drag_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, 'pi=coll:places,coll:noaa_nerrs', dragOver('places', 'NMS:NMSAS', 'NMS:CHNMS')],
+  ['order_drag_refused_oceanmetrics_dark', 'oceanmetrics', 'dark', DESKTOP, 'pi=coll:places,coll:noaa_nerrs&axes=p', dragOver('places', 'NMS:NMSAS', 'NERRS:ACE')],
+  ['order_drag_placerows_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, 'pi=coll:places&axes=p', dragOver('places', 'NMS:CBNMS', 'NMS:FKNMS')],
+  ['order_move_buttons_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, '', focusMove('places', 'item', 'NMS:CINMS')],
+  ['order_move_buttons_placerows_oceanmetrics_dark', 'oceanmetrics', 'dark', DESKTOP, 'axes=p', focusMove('places', 'item', 'NMS:CINMS')],
+  ['order_move_group_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, 'pi=coll:places,coll:noaa_nerrs&axes=p', focusMove('places', 'group', 'places')],
+  // the order in the Report (a Scorecard of the sanctuaries north to south, its indicators in the vocabulary's order) and the Map's table
+  ['order_report_scorecard_oceanmetrics_light', 'oceanmetrics', 'light', REPORT, 'view=report&layout=scorecard&pi=coll:places&ps=ns&pg=0&is=vocab'],
+  ['order_report_scorecard_oceanmetrics_dark_390', 'oceanmetrics', 'dark', REPORT_PHONE, 'view=report&layout=scorecard&pi=coll:places&ps=ns&pg=0&is=vocab'],
+  ['order_map_table_oceanmetrics_light', 'oceanmetrics', 'light', MAP, SST + '&color=status&ps=ns&pg=0'],
   // the Report view
   ['report_scorecard_oceanmetrics_light', 'oceanmetrics', 'light', REPORT, SANCT],
   ['report_scorecard_oceanmetrics_dark', 'oceanmetrics', 'dark', REPORT, SANCT],

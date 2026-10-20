@@ -46,6 +46,15 @@ describe('the indicator tree', () => {
     expect([sst.label, sst.state, sst.hint, sst.children.map(l => [l.key, l.state, l.hint]), sst.more.map(l => [l.key, l.state, l.hint])])
       .toEqual(['Sea surface temperature', 'checked', '2 of 2 places', [['sst', 'checked', '2 of 2 places']], [['sst_max', 'unchecked', '1 of 2 places']]])
   })
+  it('the order of the Select section orders the categories (A to Z, Other last) and the series in them', () => {
+    const t = buildIndicatorPickTree({ ...base, order: { sort: 'az', group: true, custom: [] } })
+    expect(t.map(c => c.key)).toEqual(['drivers', 'water-quality', 'other'])
+    const onlyWq = buildIndicatorPickTree({ ...base, indicators: [...inds, ind({ id: 'a_first', short: 'A first', category: { onms: 'drivers' } })], withValues: new Map([...withValues, ['a_first', new Set(['A'])]]), order: { sort: 'az', group: true, custom: [] } })
+    expect(onlyWq[0].children.map(k => k.key)).toEqual(['a_first', 'sst'])
+    // a custom order lists a category first; the vocabulary order is the default of the function
+    expect(buildIndicatorPickTree({ ...base, order: { sort: 'custom', group: true, custom: ['g:water-quality'] } }).map(c => c.key)).toEqual(['water-quality', 'drivers', 'other'])
+    expect(buildIndicatorPickTree(base).map(c => c.key)).toEqual(['drivers', 'water-quality', 'other'])
+  })
   it('an indicator no place has a value for is left out unless it is chosen or "show indicators without values" is on', () => {
     const keys = (o: object) => buildIndicatorPickTree({ ...base, ...o }).flatMap(c => c.children.flatMap(s => [...s.children, ...s.more].map(l => l.key)))
     expect(keys({})).toEqual(['sst', 'sst_max', 'chl', 'odd'])

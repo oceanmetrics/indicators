@@ -21,7 +21,7 @@ npm run check                                     # svelte-check + tsc
 npm run dev                                       # viewer on http://localhost:5181/ (reads catalog/)
 node viewer/scripts/shoot.mjs [--only <name>]     # screenshots -> docs/shots/; look at them
 node viewer/scripts/shoot.mjs --url https://oceanmetrics.io/indicators/ --out docs/shots/live   # the deployed site
-node viewer/scripts/keys.mjs [--url <site>]       # keyboard: cell -> drawer -> Esc -> focus back; place link -> Place view; default matrix (indicators in rows) cell round trip, places-as-rows (#axes=p), remove button -> xp=/xi=
+node viewer/scripts/keys.mjs [--url <site>]       # keyboard: cell -> drawer -> Esc -> focus back; place link -> Place view; default matrix (indicators in rows) cell round trip, places-as-rows (#axes=p), remove button -> xp=/xi=; the order: Alt+arrow and the Move buttons, a drag, grouping off, the Order control
 npm run icons:paths && npm run icons:build && npm run icons:sheet   # after any change to brand/ sources
 Rscript fixtures/ecoidx/build_iea_sd_fixtures.R ~/Github/noaa-iea/ecoidx   # regenerate the iea-sd cross-check
 ```
@@ -63,8 +63,12 @@ indicators.json + coverage.parquet ──► viewer/ (imports src/status/, src/i
   (`viewer/src/lib/selection.ts`, the Select section above the tabs) is shared by the Matrix, Map, Report and Place views: the report spec's
   own `places` and `indicators` rules, in the hash as `pi`, `px` (place ids, `coll:<slug>`, `set:<id>`; default `coll:places`) and `ii`, `ix`
   (`*` = leads, `all`, `cat:`, `series:`, ids). The old keys (`colls`, `xp`, `xi`, `ai`, `leads`, a Map's `coll`) are read as the same selection on
-  parse. Other hash keys: `q`, `vocab`, `depth`, `cell`, `axes=p`, `empty=1` (README "Matrix view"). The place picker lists every polygon
+  parse. Other hash keys: `q`, `vocab`, `depth`, `cell`, `axes=p`, `empty=1`, and the order `ps pg po is ig io` (README "Matrix view"). The place picker lists every polygon
   collection of the gazetteer; the gazetteer's places are read lazily (`gazetteerPlaces.ts`), never for the default selection.
+- **The order of places and indicators** (`src/report/order.ts`, `ReportSpec.order`) is part of the shared selection: sort key, grouping on or off and a custom id list
+  per axis (`ps pg po` / `is ig io`; `po`/`io` lead with `g:<group id>` entries). One tested ordering function serves the Matrix (`selectionRows`, `groupColumns`), the Report (`buildReport`), the Map's
+  table (`map/tableOrder.ts`) and the pickers; the moves (drag, Alt+arrow) are pure functions there too and `viewer/src/lib/reorder.ts` only wires them to the header cells. `lat`/`lon` (bbox
+  centre, `src/coverage/centre.ts`) are the only way places are ordered by position: never recompute them elsewhere. The default order is left out of `report.json`.
 - **The Map view** (`viewer/src/lib/map/`): every group of the selection is a layered part (`selection.ts`: a group chosen in part is
   restricted to its places); classes, legends and the table come from `classes.ts` (status and trend
   only through `src/status`); reference collections (Marine Regions `mr_*`) are drawn by Marine Regions' own WMS

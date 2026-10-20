@@ -9,6 +9,7 @@
   import { Button, Menu, Notice } from '@marinebon/ui'
   import { Icon } from '../../../../src/icons/index.ts'
   import { LAYOUTS, specId, specJson, specParams } from '../../../../src/report/spec.ts'
+  import { isDefaultAxis } from '../../../../src/report/order.ts'
   import type { Fix, ReportSpec } from '../../../../src/report/spec.ts'
   import type { Catalog, Layers } from '../data.ts'
   import { downloadBlob } from '../download.ts'
@@ -44,7 +45,7 @@
 
   const spec = $derived(view.spec)
   const idx = $derived(indexCoverage(catalog.coverage))
-  const model = $derived(buildReport(catalog, idx, spec, view.vocab))
+  const model = $derived(buildReport(catalog, idx, spec, view.vocab, titles))
   const info = $derived(LAYOUTS[spec.layout])
   const title = $derived(reportTitle(spec))
   // the two layouts that hold a map are loaded when first needed: MapLibre is its own chunk (the Map view's)
@@ -252,7 +253,7 @@
           <QuadPlot {catalog} {idx} {spec} places={s.places} groups={s.groups} depth={view.depth} placeHref={linkToPlace} heading={s.title} {axes} />
         {:else if spec.layout === 'map-sheet'}
           {#if MapSheet}
-            <MapSheet {catalog} {idx} places={s.places} groups={s.groups} {titles} placeHref={linkToPlace} heading={s.title} />
+            <MapSheet {catalog} {idx} places={s.places} groups={s.groups} {titles} placeHref={linkToPlace} heading={s.title} ordered={!isDefaultAxis(spec.order.places)} />
           {:else}
             <p class="status om-note" role="status">Loading the map…</p>
           {/if}

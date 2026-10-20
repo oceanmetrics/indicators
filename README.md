@@ -106,6 +106,7 @@ gazetteer's total and links to it (a group nothing is computed for also links to
 first 300 and says how to narrow it). Opens on the National Marine Sanctuaries (the `places` collection: the `NMS:*` ids; `noaa_sanctuaries` holds the ONMS section ids, another id space). An indicator with no value for
 any place on display is hidden, unless none has a value (places no one has computed yet: all stay, so each empty cell can be asked for).
 A place of a **derived** gazetteer layer (the high seas by FAO area, `fao_high_seas`, which has no geometry of its own) also carries `display_id` in `coverage.parquet`: its index `source_id` (`FAO:21`), the id of the feature of the layer that draws it (`fao_major_areas`); null for any other place.
+Every row also carries `lat` and `lon`, the centre of the place's bbox in the gazetteer index (`src/coverage/centre.ts`: the index writes the bbox of a place that crosses the antimeridian with its east beyond 180, so the longitude is unwrapped before the middle is taken, then put back in -180..180; 4 decimals; null when the index has no bbox). They order places north to south and west to east ("Order" below); the places picked from the whole gazetteer get the same centre from the same function.
 
 **The selection** is one object, shared by the Matrix, Map, Report and Place views, chosen in the **Select section** above the view tabs (every view
 but the Place view's body; the Place view carries it in its hash and its links). It is the report spec's own `places` and `indicators` rules
@@ -114,6 +115,7 @@ but the Place view's body; the Place view carries it in its hash and its links).
   (every computed place). Default `coll:places` (the sanctuaries), written as nothing.
 - `ii` / `ix`: the indicators included and excluded: `*` (each series' lead; the default, written as nothing), `all` (every indicator),
   `cat:<term>`, `series:<id>` (its lead), `series:<id>:*`, or an id.
+- the order: `ps pg po is ig io` (see "The order" below).
 - shared by every view: `vocab`, `depth`, `axes=p` (places as rows; the old `axes=t` reads as the default), `empty=1` (show the indicators without values).
 - Matrix only: `q` (a place search that narrows the selection; the toolbar shows it as a chip) and `cell` (an open drawer: `place|indicator`).
 - **Old links still open on the same places and indicators** (read when the hash is parsed, dropped on the next write): `colls=a,b` is `pi=coll:a,coll:b`
@@ -133,6 +135,32 @@ and opens a popover (a full-width sheet at 600 px and below; Esc closes it and f
 - **Indicators** (`multi` in the Select section, `single` in the Map and the Place view): a search, the vocabulary switch (ONMS, NaMES, GOOS EOVs),
   the "Leads only" switch (`all` against `*`) and "show indicators without values here" switch, and the tree category -> series -> indicator,
   tri-state at each level, with how many of the places chosen have a value. A series ticks its lead; open it for the others.
+
+**The order** of the rows and columns is part of the shared selection (`src/report/order.ts`, one tested implementation for the Matrix, the Report's
+layouts, the Map's table and the pickers; `ReportSpec.order`), chosen with the **Order** control of the Select section (a button that says
+what differs from "A to Z"; its panel loads on the first open) or by moving a header. Hash keys, shared by every view and carried by the tab links;
+the defaults write nothing:
+- `ps`: the place sort, `az` (default: the groups A-Z by title, the places A-Z by name), `ns` (north to south), `sn`, `we` (west to east), `custom`. North, south, west and east
+  are by the centre of the place's bbox (`lat` and `lon`: coverage rows, and for a place picked from the whole gazetteer the same
+  `src/coverage/centre.ts` on the index's bbox; the antimeridian is unwrapped first, so a place across it is centred on the right side); a place with no
+  position goes last. `pg=0`: places not grouped, one flat list in which any place can go anywhere (every place north to south across the sanctuaries and the EEZs).
+- `is`: the indicator sort, `az` (default: grouped by the vocabulary's categories, the groups A-Z by label with "Other" last, the indicators A-Z by short title),
+  `vocab` (the vocabulary's own term order, a series together with its lead first, then the manifest order), `custom`. `ig=0`: indicators not grouped.
+- `po`, `io`: the custom order, read only with `ps=custom` / `is=custom`: a comma list of ids. A grouped axis may begin with **group entries**, `g:<group id>`
+  (`g:places`, `g:mr_eez` for places; `g:<term id>` for indicators, e.g. `g:drivers`), which order the groups; the id entries order the items of each group by their place in
+  the list (an item moves only within its group while the axis is grouped). An id the selection does not hold is ignored; an item or group that is not listed follows the listed ones,
+  in A-Z, so a new indicator or place appears without breaking a custom order. A move writes the shortest list that gives the order (entries that change nothing are dropped:
+  moving one place writes one or two ids, `ps=custom&po=NMS:CINMS`). Choosing another sort key keeps the list in the session, but the URL carries it only for `custom`.
+  The default order leaves `order` out of `report.json`, so the ids of reports made before it hold.
+
+To move a header: **drag** a place, indicator or group header (row or column, whichever orientation) onto another header of its group (a bar shows the side it would land on;
+a header in another group is marked as not droppable); a **group** is dragged by its title onto another group; with grouping off an item goes anywhere. With the keyboard, **Alt+Up/Down**
+(rows) or **Alt+Left/Right** (columns) on any control of a header moves it one place, and a plain arrow does on its Move button (the small button that appears on hover and focus; its
+neighbours move it by a click or a tap, and are always shown on a touch screen, so a phone can reorder too). On a group header the whole group moves. Each move is announced in a polite live region
+("Moved Channel Islands after Chumash Heritage"; "Wells is already first") and focus stays on the control that had it. A move switches that axis to Custom; "Reset the places' order" or
+"Reset both" in the Order panel goes back. The place picker lists a group's places in the order too, and the indicator picker its categories and series. In the Report the places,
+the groups and every layout that lists them follow it; the Scorecard and the Cards keep their exceptions-first order only while the axis has the default order, so an order the reader chose is
+what they see (`style=values` is the way to a plain A-Z Scorecard). The Map's table is by class, then value, until an order is chosen for the places; then it follows it.
 
 **Context carried between views:** every link to another view carries the selection and the shared keys (`hash.ts`: `carryOver`); each view keeps its
 own keys as it was left. Matrix -> Map opens the indicator and place of the last opened cell; Map -> Matrix opens the drawer on the cell of the
@@ -308,6 +336,9 @@ At the first deploy (2026-10-20) the entry was 86.5 kB and the CSS 6.7 kB. The m
 MapLibre is about 230 kB gzip and is loaded only when the Map view is opened. With the two pickers (2026-10-20) the entry is 107.0 kB and the CSS 14.98 kB (107.6 and 15.0 with the place sets: their code is the Map's or lives in the lazy panels, and their rules reuse `om-*` classes): the picker panels and their rules load on the first open, and rules that several components repeated live once in `viewer/src/app.css` as `om-*` classes (gzip is per file, so each copy cost bytes). Nothing was raised for the pickers. With the globe and full screen (2026-10-20) the entry is 108.1 kB (the hash key, three icons and the overlay tokens, which live in the inlined theme files) and the CSS 14.99 kB: the `--map-sea` and `--overlay-*` tokens and the Menu rule are in `brand/themes/*.css` (inlined in the JS), not in the entry CSS. Nothing was raised. With the shared selection and the Select section (2026-10-20) the entry was 109.7 kB and the CSS 14.9 kB before the merge with the globe and the report layouts (the toggling rules of `report/tree.ts` load with the first tick or removal, the gazetteer's index loader and the picker panels on first use; the Tree's look-alike CSS moved rather than grew).  After the three merges of 2026-10-20 (globe, report layouts, shared selection) the entry was 111.3 kB, over budget; the
 icon map was 31.5 kB of it, 19.4 kB of that the traced eov- paths, which most views never draw. The generator now writes them
 to `src/icons/icon-paths-eov.ts`, loaded the first time an eov- glyph draws, and the entry is 92.6 kB. Raise a budget only with the reason here.
+
+With the order (2026-10-20: the ordering rules, the Matrix's drag and drop and keys, the hash keys) the entry is 96.7 kB of 110 (+4.1), the CSS 14.5 kB of 15 (+1.5: the move buttons, the drop bars and the touch rules of the Matrix, the Order control reuses `om-*` classes), the other JS 195.9 kB of 200 (the Order panel, the picker orders and the table order; the map chunk 290.7 kB);
+the Order panel (`OrderPanel.svelte`) is a lazy chunk. Nothing was raised.
 
 With the report layouts and maps (2026-10-20) the entry is 107.9 kB (the spec's `ys` key) and nothing in the entry's CSS changed. The
 budget script now counts three things differently, and one budget is new: (1) `MapCanvas-*` (MapLibre, pmtiles) and `MapTable-*` count

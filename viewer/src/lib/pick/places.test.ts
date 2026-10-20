@@ -44,6 +44,14 @@ describe('the groups the place picker lists', () => {
     ])
     expect(groups[0].places.map(p => p.id)).toEqual(['NMS:A', 'NMS:B'])
   })
+  it('a group lists its places in the order of the Select section, the computed ones first', () => {
+    const at = [{ ...idx.places[0], lat: 10, lon: 5 }, { ...idx.places[1], lat: 30, lon: -5 }]
+    const g = (order: Parameters<typeof placeGroups>[3]) => placeGroups(at, idx, layers, order)[0].places.map(p => p.id)
+    expect(g({ order: { sort: 'ns', group: true, custom: [] } })).toEqual(['NMS:B', 'NMS:A'])
+    expect(g({ order: { sort: 'we', group: true, custom: [] } })).toEqual(['NMS:B', 'NMS:A'])
+    expect(g({ order: { sort: 'custom', group: true, custom: ['NMS:B'] } })).toEqual(['NMS:B', 'NMS:A'])
+    expect(g({})).toEqual(['NMS:A', 'NMS:B'])
+  })
   it('the total is null while layers.json has not loaded', () => {
     expect(placeGroups(idx.places, idx).map(g => g.total)).toEqual([null, null, null])
   })

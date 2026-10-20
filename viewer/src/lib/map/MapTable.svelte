@@ -1,9 +1,10 @@
 <script lang="ts">
   // the map as a table: every place with its value, period and class, sorted by class then value. this is the
-  // accessible version of the map, and the way to read the places the map draws too small to see.
+  // accessible version of the map, and the way to read the places the map draws too small to see. an order the reader chose in the
+  // Select section (or a report's own order) orders it instead (`inOrder`, tableOrder.ts); the class order is the default.
   import { Icon } from '../../../../src/icons/index.ts'
   import { tableOrder } from './classes.ts'
-  import type { MapModel } from './classes.ts'
+  import type { MapItem, MapModel } from './classes.ts'
 
   interface Props {
     model: MapModel
@@ -11,9 +12,11 @@
     placeHref: (placeId: string) => string
     selected: string | null
     caption: string
+    /** the items in an order of the reader's choosing; absent = by class, then value */
+    inOrder?: ((items: MapItem[]) => MapItem[]) | null
   }
-  let { model, placeHref, selected, caption }: Props = $props()
-  const rows = $derived(tableOrder(model.items))
+  let { model, placeHref, selected, caption, inOrder = null }: Props = $props()
+  const rows = $derived(inOrder ? inOrder(model.items) : tableOrder(model.items))
 </script>
 
 <details class="table" open>

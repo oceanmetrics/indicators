@@ -240,3 +240,12 @@ def test_coverage_status_words(tmp_path):
   p = tmp_path / "coverage.parquet"
   pq.write_table(pa.Table.from_pylist([cov_row(status="good")]), p)
   assert c.validate_coverage(p) == [f"{p}: row 0: status: 'good' is not one of ['above', 'within', 'below', None]"]
+
+
+def test_coverage_lat_lon_are_optional_and_bounded(tmp_path):
+  """lat and lon (the centre of the place's bbox, for ordering by position) may be absent, null, or inside the globe."""
+  p = tmp_path / "coverage.parquet"
+  pq.write_table(pa.Table.from_pylist([cov_row(), cov_row(place_id="NMS:B", lat=37.0, lon=-123.0), cov_row(place_id="NMS:C", lat=None, lon=None)]), p)
+  assert c.validate_coverage(p) == []
+  pq.write_table(pa.Table.from_pylist([cov_row(lat=95.0, lon=181.0)]), p)
+  assert c.validate_coverage(p) == [f"{p}: row 0: lat: 95.0 is greater than the maximum of 90", f"{p}: row 0: lon: 181.0 is greater than the maximum of 180"]

@@ -14,6 +14,7 @@
   import type { GazLayer } from '../../map/gazetteer.ts'
   import MapLegend from '../../map/MapLegend.svelte'
   import MapTable from '../../map/MapTable.svelte'
+  import { byIdOrder } from '../../map/tableOrder.ts'
   import { buildParts, partsBbox } from '../../map/parts.ts'
   import type { PlaceRow } from '../../valuesData.ts'
   import { loadSheetValues, sheetCoverage, sheetGroups } from './maps.ts'
@@ -28,8 +29,10 @@
     titles: (coll: string) => string
     placeHref: (placeId: string, coll: string) => string
     heading?: string | null
+    /** the reader chose an order for the places: the table follows it (else it is by class, then value) */
+    ordered?: boolean
   }
-  let { catalog, idx, places, groups, titles, placeHref, heading = null }: Props = $props()
+  let { catalog, idx, places, groups, titles, placeHref, heading = null, ordered = false }: Props = $props()
 
   const th = watchTheme()
   const ind = $derived<Indicator | undefined>(groups.flatMap(g => g.indicators)[0])
@@ -127,7 +130,7 @@
       </div>
       <aside class="side"><MapLegend {model} unit={ind.unit_label ?? ''} /></aside>
     </div>
-    <MapTable {model} placeHref={id => placeHref(id, places.find(p => p.id === id)?.coll ?? '')} selected={null} caption={`${ind.title}: value, period and class of every chosen place`} />
+    <MapTable {model} inOrder={ordered ? (items => byIdOrder(items, places.map(p => p.id))) : null} placeHref={id => placeHref(id, places.find(p => p.id === id)?.coll ?? '')} selected={null} caption={`${ind.title}: value, period and class of every chosen place`} />
   {/if}
 </section>
 

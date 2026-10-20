@@ -1,6 +1,7 @@
 // the coverage builder: exact rows from small synthetic values, one test per rule.
 import { describe, expect, it } from 'vitest'
-import { coverageOf, displayIds, encodeSpark, homeColl, placeHomes, SPARK_PERIODS } from './build.ts'
+import { coverageOf, displayIds, encodeSpark, homeColl, placeCentres, placeHomes, SPARK_PERIODS } from './build.ts'
+import { bboxCentre } from './centre.ts'
 import type { ManifestIndicator, ValueRow } from './build.ts'
 import { coverageParquet, derivedLayers, layerOrder } from './cli.ts'
 import { parquetReadObjects } from 'hyparquet'
@@ -177,6 +178,42 @@ describe('display_id: the feature that draws a place of a derived layer', () => 
     const rows = coverageOf([...years(2020, [1, 2], { place_id: 'FAOHS:21', coll: 'fao_high_seas' }), row({ place_id: 'NMS:A' })], SST, new Map(), homes, display)
     expect(rows.map(r => [r.place_id, r.place_coll, r.display_id])).toEqual([['FAOHS:21', 'fao_high_seas', 'FAO:21'], ['NMS:A', 'places', null]])
     expect(coverageOf(years(2020, [1]), SST, names)[0].display_id).toBeNull()
+  })
+})
+
+describe('lat and lon: the centre of the place bbox, for ordering by position', () => {
+  it('is the middle of the bbox, 4 decimals', () => {
+    expect(bboxCentre({ xmin: -125, ymin: 36, xmax: -121, ymax: 38 })).toEqual({ lat: 37, lon: -123 })
+    expect(bboxCentre({ xmin: -80.5, ymin: 24.5, xmax: -80.123456, ymax: 25.5 })).toEqual({ lat: 25, lon: -80.3117 })
+  })
+  it('a bbox that crosses the antimeridian (the index writes the east beyond 180) is centred on the right side', () => {
+    // Aleutian Arc planning area: 167.64 .. 195 is 167.64 E to 165 W, centred at 181.32, which is -178.68
+    expect(bboxCentre({ xmin: 167.64, ymin: 47.8, xmax: 195, ymax: 54.0 })).toEqual({ lat: 50.9, lon: -178.68 })
+    // a plain bbox in the western Pacific stays east of 180 minus nothing
+    expect(bboxCentre({ xmin: 140, ymin: 10, xmax: 150, ymax: 20 })).toEqual({ lat: 15, lon: 145 })
+  })
+  it('a bbox written the RFC 7946 way (west > east) is unwrapped the same', () => {
+    expect(bboxCentre({ xmin: 177.8, ymin: -15.4, xmax: -170, ymax: -10 })).toEqual({ lat: -12.7, lon: -176.1 })
+  })
+  it('a missing or non-finite bbox has no centre', () => {
+    expect(bboxCentre(null)).toBeNull()
+    expect(bboxCentre({ xmin: 1, ymin: 2, xmax: Number.NaN, ymax: 3 })).toBeNull()
+    expect(bboxCentre({ xmin: 1, ymin: 2 })).toBeNull()
+  })
+  it('placeCentres reads the home collection row of each place, and skips a place with no bbox', () => {
+    const entries = [
+      { place_id: 'NMS:A', collection: 'places', bbox: { xmin: -125, ymin: 36, xmax: -121, ymax: 38 } },
+      { place_id: 'NMS:A', collection: 'zz_other', bbox: { xmin: 0, ymin: 0, xmax: 2, ymax: 2 } },
+      { place_id: 'NMS:B', collection: 'places', bbox: null },
+    ]
+    const centres = placeCentres(entries, placeHomes(entries, ['places', 'zz_other']))
+    expect(Object.fromEntries(centres)).toEqual({ 'NMS:A': { lat: 37, lon: -123 } })
+  })
+  it('coverageOf writes them on every row of the place, null for a place with none', () => {
+    const centres = new Map([['NMS:A', { lat: 37, lon: -123 }]])
+    const rows = coverageOf([...years(2020, [1, 2], { place_id: 'NMS:A' }), row({ place_id: 'NMS:B' })], SST, new Map(), null, null, centres)
+    expect(rows.map(r => [r.place_id, r.lat, r.lon])).toEqual([['NMS:A', 37, -123], ['NMS:B', null, null]])
+    expect(coverageOf(years(2020, [1]), SST, names)[0].lat).toBeNull()
   })
 })
 

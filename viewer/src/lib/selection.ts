@@ -7,27 +7,35 @@
 // on the same places and indicators.
 import { DEFAULT_SPEC, expandIndicators, expandPlaces } from '../../../src/report/spec.ts'
 import type { IndicatorLike, PlaceLike, PlaceSetLike, ReportSpec } from '../../../src/report/spec.ts'
+import type { OrderSpec } from '../../../src/report/order.ts'
 
 export type PlaceSel = ReportSpec['places']
 export type IndSel = ReportSpec['indicators']
 export interface Selection {
   places: PlaceSel
   indicators: IndSel
+  /** the order the selection is shown in (sort keys, grouping, a custom order): shared by every view like the selection */
+  order: OrderSpec
 }
 
 /** the selection of anything that holds a spec (a view state) */
-export const selectionOf = (s: { spec: ReportSpec }): Selection => ({ places: s.spec.places, indicators: s.spec.indicators })
+export const selectionOf = (s: { spec: ReportSpec }): Selection => ({ places: s.spec.places, indicators: s.spec.indicators, order: s.spec.order })
 
 /** the same thing with another selection (the spec's other keys, the Report's own, stay) */
 export function withSelection<T extends { spec: ReportSpec }>(s: T, sel: Partial<Selection>): T {
-  return { ...s, spec: { ...s.spec, places: sel.places ?? s.spec.places, indicators: sel.indicators ?? s.spec.indicators } }
+  return { ...s, spec: { ...s.spec, places: sel.places ?? s.spec.places, indicators: sel.indicators ?? s.spec.indicators, order: sel.order ?? s.spec.order } }
 }
+
+/** a spec holding only the selection and its order (the Report's own keys at their defaults): what every other view carries */
+export const selectionSpec = (spec: ReportSpec): ReportSpec =>
+  withSelection({ spec: DEFAULT_SPEC }, { places: { ...spec.places, context: false }, indicators: spec.indicators, order: spec.order }).spec
 
 
 /** the selection of one place group (`coll:<slug>`), the indicators kept: what a link to "this group" opens */
 export const groupSelection = (sel: Selection, group: string): Selection => ({
   places: { include: [group.startsWith('set:') ? group : `coll:${group}`], exclude: [], context: sel.places.context },
   indicators: sel.indicators,
+  order: sel.order,
 })
 
 // ---- the leads switch ----

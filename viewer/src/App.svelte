@@ -6,6 +6,8 @@
   import type { Catalog, Indicator, Layers } from './lib/data.ts'
   import { carryOver, DEFAULT_STATE, groupHref, mapToMatrixHref, matrixHref, matrixToMapHref, parseHash, placeHref, placeToMapHref, serializeHash } from './lib/hash.ts'
   import type { ViewState } from './lib/hash.ts'
+  import { indicatorsCustom, placesCustom } from '../../src/report/order.ts'
+  import type { Shown } from '../../src/report/order.ts'
   import { expandIndicators, expandPlaces } from '../../src/report/spec.ts'
   import { cellModel, groupColumns, indexCoverage, matrixStats, pickRow, selectionRows, withValues } from './lib/matrix.ts'
   import { producerCredits } from './lib/delivery.ts'
@@ -103,8 +105,11 @@
   const universe = $derived(idx ? placeUniverse(idx, gaz, layers) : [])
   const chosen = $derived(expandPlaces(view.spec.places, universe, sets))
   const selected = $derived(catalog ? expandIndicators(view.spec.indicators, catalog.manifest.indicators) : [])
-  const rows = $derived(idx ? selectionRows(chosen, idx, view.q) : [])
-  const allCols = $derived(catalog ? groupColumns(selected, catalog.manifest.vocabularies, view.vocab) : [])
+  // the order the selection is shown in (the Select section's Order, or a drag): places grouped by collection and indicators by the
+  // vocabulary's categories, both A-Z by default
+  const order = $derived(view.spec.order)
+  const rows = $derived(idx ? selectionRows(chosen, idx, view.q, order.places, title) : [])
+  const allCols = $derived(catalog ? groupColumns(selected, catalog.manifest.vocabularies, view.vocab, order.indicators) : [])
   // an indicator with no value for any place on display is hidden, unless the reader asks for it or named it by hand
   const cols = $derived(idx && !view.showEmpty ? withValues(allCols, rows, idx, namedIndicators(view.spec.indicators)) : allCols)
   const nHidden = $derived(allCols.reduce((n, g) => n + g.indicators.length, 0) - cols.reduce((n, g) => n + g.indicators.length, 0))
@@ -169,6 +174,15 @@
     const { toggleIndicator, togglePlace } = await import('./lib/report/tree.ts')
     if (kind === 'place') patch({ spec: withSelection(view, { places: togglePlace(view.spec.places, universe, id, false, sets) }).spec })
     else if (catalog) patch({ spec: withSelection(view, { indicators: toggleIndicator(view.spec.indicators, catalog.manifest.indicators, id, false) }).spec })
+  }
+
+  // ---- moving a header: the arrangement now on display becomes that axis's custom order ----
+  function move(axis: 'places' | 'indicators', shown: Shown[]) {
+    if (!catalog) return
+    const next = axis === 'places'
+      ? { ...order, places: placesCustom(displayed, shown, order.places, title) }
+      : { ...order, indicators: indicatorsCustom(cols.flatMap(g => g.indicators), shown, order.indicators, view.vocab, catalog.manifest.vocabularies[view.vocab].terms) }
+    patch({ spec: withSelection(view, { order: next }).spec })
   }
 
   // ---- the drawer ----
@@ -256,8 +270,8 @@
         </span>
       </p>
       <MatrixLegend vocab={view.vocab} />
-      <Matrix {catalog} {idx} {cols} {rows} vocab={view.vocab} depth={view.depth} axes={view.axes} titles={title} totals={total} open={view.cell} onopen={open}
-        onhide={hide} placeHref={linkToPlace} />
+      <Matrix {catalog} {idx} {cols} {rows} vocab={view.vocab} depth={view.depth} axes={view.axes} {order} titles={title} totals={total} open={view.cell} onopen={open}
+        onhide={hide} placeHref={linkToPlace} onmove={move} />
     {/if}
   </div>
 </main>

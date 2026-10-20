@@ -6,6 +6,7 @@
   import type { Layers, PlaceSet } from '../data.ts'
   import type { CoverageIndex, Place } from '../matrix.ts'
   import type { PickMode } from './places.ts'
+  import type { AxisOrder, PlaceSort } from '../../../../src/report/order.ts'
 
   interface Props {
     mode: PickMode
@@ -29,8 +30,10 @@
     gazetteer?: boolean
     loading?: boolean
     ongazetteer?: () => void
+    /** multi: the order of the places (a group lists its places in it) */
+    order?: AxisOrder<PlaceSort>
   }
-  let { mode, idx, universe, layers, label, chosen = new Set(), ontoggle, current = null, onchoose, kicker = mode === 'place' ? 'Place' : 'Places', sets = [], gazetteer = false, loading = false, ongazetteer }: Props = $props()
+  let { mode, idx, universe, layers, label, chosen = new Set(), ontoggle, current = null, onchoose, kicker = mode === 'place' ? 'Place' : 'Places', sets = [], gazetteer = false, loading = false, ongazetteer, order }: Props = $props()
 
   // the panel is its own chunk: nothing of it is fetched until the button is first pressed
   let Panel = $state.raw<typeof import('./PlacePanel.svelte').default | null>(null)
@@ -40,7 +43,7 @@
 <Popover {label} {kicker} icon="view-place" onopen={load}>
   {#snippet children(close)}
     {#if Panel}
-      <Panel {mode} {idx} {universe} {layers} {sets} {chosen} {ontoggle} {current} {onchoose} {gazetteer} {loading} {ongazetteer} {close} />
+      <Panel {mode} {idx} {universe} {layers} {sets} {chosen} {ontoggle} {current} {onchoose} {gazetteer} {loading} {ongazetteer} {order} {close} />
     {:else}
       <p role="status">Loading the places…</p>
     {/if}

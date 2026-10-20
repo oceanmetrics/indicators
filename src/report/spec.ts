@@ -8,6 +8,8 @@
 //   write the same pi, px, ii and ix keys); the other keys belong to the Report.
 // - in a URL the spec is flat, readable keys (`pi`, `px`, `ii`, `ix`, `ctx`, `layout`, `status`, `recent`, `base`,
 //   `grain`, `from`, `to`, `split`, `ys`, `asof`, `title`); defaults are left out, so the default spec writes nothing.
+// - the order of the places and indicators (`order`, src/report/order.ts) is shared like the selection: `ps pg po` for the places and
+//   `is ig io` for the indicators (a sort key, grouping off, a custom id list); the default (groups A-Z, items A-Z) writes nothing.
 // - `ys=free` gives each Small multiples panel its own y axis (the default is one axis shared by a row). `ctx` (context
 //   extents) is still read so an old link does not break, but no layout shows it.
 // - the layouts (LAYOUTS below): Cards and Scorecard, Small multiples (one sparkline-sized chart per place for each of up to
@@ -15,6 +17,8 @@
 //   (one indicator as a choropleth with a time slider) and Dossier (paged for print: figure, caption, method, citation and
 //   Reproduce for every place and indicator). every report also carries a locator map (except the Map sheet, which is one).
 import type { Grain, MethodId, Status, Trend } from '../status/index.ts'
+import { DEFAULT_ORDER, isDefaultOrder, orderFromParams, orderParams } from './order.ts'
+import type { OrderSpec } from './order.ts'
 
 export type Layout = 'cards' | 'scorecard' | 'small-multiples' | 'quad' | 'map-sheet' | 'dossier'
 export type Depth = 'skim' | 'swim' | 'dive'
@@ -25,6 +29,8 @@ const GRAINS: Grain[] = ['all', 'decade', 'year', 'month', 'day']
 export interface ReportSpec {
   places: { include: string[]; exclude: string[]; context: boolean }
   indicators: { include: string[]; exclude: string[] }
+  /** the order of the places and the indicators: shared by every view with the selection (src/report/order.ts) */
+  order: OrderSpec
   layout: Layout
   /** sections, when a fix split an over-budget report: one per place or one per category; null = one report */
   split: 'place' | 'category' | null
@@ -40,6 +46,7 @@ export interface ReportSpec {
 export const DEFAULT_SPEC: ReportSpec = {
   places: { include: ['coll:places'], exclude: [], context: false },
   indicators: { include: ['*'], exclude: [] },
+  order: DEFAULT_ORDER,
   layout: 'cards',
   split: null,
   yaxis: 'shared',
@@ -68,6 +75,7 @@ export function specFromParams(kv: Map<string, string>, depth: Depth = DEFAULT_S
   return {
     places: { include: pi.length ? pi : d.places.include, exclude: list(kv.get('px')), context: kv.get('ctx') === '1' },
     indicators: { include: ii.length ? ii : d.indicators.include, exclude: list(kv.get('ix')) },
+    order: orderFromParams(kv),
     layout: LAYOUT_IDS.includes(layout) ? layout : d.layout,
     split: kv.get('split') === 'place' || kv.get('split') === 'category' ? (kv.get('split') as 'place' | 'category') : null,
     yaxis: kv.get('ys') === 'free' ? 'free' : d.yaxis,
@@ -92,6 +100,7 @@ export function specParams(s: ReportSpec): [string, string][] {
   if (s.places.context) out.push(['ctx', '1'])
   if (!same(s.indicators.include, d.indicators.include)) out.push(['ii', s.indicators.include.join(',')])
   if (s.indicators.exclude.length) out.push(['ix', s.indicators.exclude.join(',')])
+  out.push(...orderParams(s.order ?? d.order))
   if (s.layout !== d.layout) out.push(['layout', s.layout])
   if (s.style.status !== d.style.status) out.push(['status', s.style.status])
   if (s.style.recent !== d.style.recent) out.push(['recent', String(s.style.recent)])
@@ -108,6 +117,11 @@ export function specParams(s: ReportSpec): [string, string][] {
 
 /** the canonical report.json text: keys in the spec's order, two-space indent */
 export function specJson(s: ReportSpec): string {
+  // the default order is left out, so a report that never set one keeps the id (and the file) it had before the order existed
+  if (!s.order || isDefaultOrder(s.order)) {
+    const { order: _order, ...rest } = s
+    return JSON.stringify(rest, null, 2)
+  }
   return JSON.stringify(s, null, 2)
 }
 

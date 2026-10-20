@@ -10,6 +10,7 @@
   import type { Indicator, Vocab, VocabId } from '../data.ts'
   import { arrowNav } from './nav.ts'
   import type { CoverageIndex, Place } from '../matrix.ts'
+  import type { AxisOrder, IndicatorSort } from '../../../../src/report/order.ts'
   import { buildIndicatorPickTree, placesWithValue } from './indicatorsTree.ts'
   import { VOCAB_LABELS } from './indicators.ts'
 
@@ -33,9 +34,10 @@
     canShowEmpty?: boolean
     hintOf?: (ind: Indicator) => string
     onother?: () => void
+    order?: AxisOrder<IndicatorSort>
     close: () => void
   }
-  let { mode, indicators, vocabs, vocab, onvocab, chosen, idx, places, withValues: counted, nPlaces: counts, ontoggle, onchoose, leads = false, onleads, showEmpty = false, onempty, canShowEmpty = false, hintOf, onother, close }: Props = $props()
+  let { mode, indicators, vocabs, vocab, onvocab, chosen, idx, places, withValues: counted, nPlaces: counts, ontoggle, onchoose, leads = false, onleads, showEmpty = false, onempty, canShowEmpty = false, hintOf, onother, order, close }: Props = $props()
 
   let query = $state('')
   let root = $state<HTMLDivElement>()
@@ -46,7 +48,7 @@
   const withValues = $derived(counted ?? placesWithValue(idx!, places ?? [], indicators))
   const nPlaces = $derived(counts ?? places?.length ?? 0)
   const tree = $derived(buildIndicatorPickTree({
-    indicators, vocab, terms: vocabs[vocab].terms, chosen, withValues, nPlaces, showEmpty: empties, query, hintOf,
+    indicators, vocab, terms: vocabs[vocab].terms, chosen, withValues, nPlaces, showEmpty: empties, query, hintOf, order,
   }))
   const pick = (n: TreeNode, on: boolean) => {
     if (mode === 'multi') ontoggle?.(n, on)

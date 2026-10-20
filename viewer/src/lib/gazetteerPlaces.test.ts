@@ -23,8 +23,20 @@ const ROWS = [
 afterEach(() => clearGazetteerPlaces())
 
 describe('the gazetteer index as places', () => {
-  it('reads the three columns the viewer needs and nothing else', () => {
-    expect(INDEX_COLUMNS).toEqual(['place_id', 'name', 'collection'])
+  it('reads the four columns the viewer needs and nothing else', () => {
+    expect(INDEX_COLUMNS).toEqual(['place_id', 'name', 'collection', 'bbox'])
+  })
+  it('a place carries the centre of its bbox, the same number the coverage builder writes; a place with no bbox has none', () => {
+    const g = placesByCollection([
+      { place_id: 'X:1', name: 'Aleutian', collection: 'c', bbox: { xmin: 167.64, ymin: 47.8, xmax: 195, ymax: 54 } },
+      { place_id: 'X:2', name: 'Wells', collection: 'c', bbox: { xmin: -70.7, ymin: 43.2, xmax: -70.3, ymax: 43.4 } },
+      { place_id: 'X:3', name: 'Nowhere', collection: 'c', bbox: null },
+      { place_id: 'X:4', name: 'Nobbox', collection: 'c' },
+    ])
+    const at = (id: string) => g.get('c')!.find(p => p.id === id)!
+    expect([at('X:1').lat, at('X:1').lon]).toEqual([50.9, -178.68])
+    expect([at('X:2').lat, at('X:2').lon]).toEqual([43.3, -70.5])
+    expect([at('X:3').lat, at('X:3').lon, at('X:4').lat]).toEqual([undefined, undefined, undefined])
   })
   it('groups rows by collection, by name; a row without an id or a collection is skipped; a missing name is the id', () => {
     const g = placesByCollection([...ROWS, { place_id: 'NERRS:X', name: null, collection: 'noaa_nerrs' }])
