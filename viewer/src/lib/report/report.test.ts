@@ -74,6 +74,16 @@ describe('the report a spec chooses', () => {
     expect(ids(r.indicators)).toEqual(['sst', 'oisst'])
     expect(r.nonLeads).toBe(true)
   })
+  it('a place set in the selection (set:<id>, from the manifest) is the places of its groups; the selection is the Matrix\'s', () => {
+    const withSets = { manifest: { ...manifest, place_sets: [{ id: 'political', title: 'P', groups: ['mr_eez'] }] } as Manifest, coverage: COVERAGE }
+    const r = buildReport(withSets, idx, spec({ places: { include: ['set:political'], exclude: [], context: false } }), 'onms')
+    expect(ids(r.places)).toEqual(['MRGID:1'])
+    expect(ids(buildReport(catalog, idx, spec({ places: { include: ['set:political'], exclude: [], context: false } }), 'onms').places)).toEqual([])
+  })
+  it('the indicators `all` rule includes the non-leads, as the Matrix with leads off', () => {
+    const r = buildReport(catalog, idx, spec({ indicators: { include: ['all'], exclude: [] } }), 'onms')
+    expect(ids(r.indicators)).toEqual(['sst', 'oisst', 'chl', 'sdg'])
+  })
   it('orders places by collection, then name', () => {
     const r = buildReport(catalog, idx, spec({ places: { include: ['MRGID:1', 'NMS:B', 'NMS:A'], exclude: [], context: false } }), 'onms')
     expect(ids(r.places)).toEqual(['NMS:A', 'NMS:B', 'MRGID:1'])

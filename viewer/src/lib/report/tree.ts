@@ -194,7 +194,7 @@ export function toggleCollection<T extends TreePlace>(sel: PlaceSel, all: T[], c
 }
 
 /**
- * a place set on: `set:<id>` joins include and the excludes of it, of its groups and of their places go. off: it and its
+ * a place set on: `set:<id>` joins include (its groups' rules, redundant now, leave) and the excludes of it, of its groups and of their places go. off: it and its
  * groups leave include, and `set:<id>` is excluded when another rule (`*`, another set) still holds a place of it.
  */
 export function toggleSet<T extends TreePlace>(sel: PlaceSel, all: T[], set: PlaceSetLike, on: boolean, sets: readonly PlaceSetLike[] = []): PlaceSel {
@@ -204,6 +204,8 @@ export function toggleSet<T extends TreePlace>(sel: PlaceSel, all: T[], set: Pla
   const ids = all.filter(p => groups.has(p.coll)).map(p => p.id)
   let { include, exclude } = sel
   if (on) {
+    // the set holds its groups, so their own rules (and the places of them named by id) are redundant
+    include = without(include, [...rules, ...ids])
     if (!include.includes(rule)) include = [...include, rule]
     exclude = without(exclude, [rule, ...rules, ...ids])
   } else {

@@ -24,7 +24,6 @@
   import { loadGazetteerPlaces, placeUniverse, selectionNeedsGazetteer } from './lib/gazetteerPlaces.ts'
   import type { GazetteerPlaces } from './lib/gazetteerPlaces.ts'
   import { groupSelection, includeIndicator, includePlace, namedIndicators, selectionOf, withSelection } from './lib/selection.ts'
-  import { toggleIndicator, togglePlace } from './lib/report/tree.ts'
   import { SOURCE_HREF } from './lib/credits.ts'
 
   let { brand }: { brand: Brand } = $props()
@@ -165,7 +164,9 @@
   const linkToPlace = (placeId: string, coll: string) => placeHref(view, placeId, coll)
 
   // ---- removing from the display: a place goes in px, an indicator in ix (or out of the rules that hold it) ----
-  function hide(kind: 'place' | 'indicator', id: string) {
+  // (the toggling rules load with the first removal, as with the pickers' ticks)
+  async function hide(kind: 'place' | 'indicator', id: string) {
+    const { toggleIndicator, togglePlace } = await import('./lib/report/tree.ts')
     if (kind === 'place') patch({ spec: withSelection(view, { places: togglePlace(view.spec.places, universe, id, false, sets) }).spec })
     else if (catalog) patch({ spec: withSelection(view, { indicators: toggleIndicator(view.spec.indicators, catalog.manifest.indicators, id, false) }).spec })
   }
@@ -249,9 +250,9 @@
       <p class="summary" role="status" aria-live="polite">
         <Icon name="view-matrix" size={18} />
         <span>
-          {stats?.places} places × {stats?.indicators} indicators on display ·
+          {stats?.places} {stats?.places === 1 ? 'place' : 'places'} × {stats?.indicators} {stats?.indicators === 1 ? 'indicator' : 'indicators'} on display ·
           {stats?.withValue} of {stats?.cells} cells have a value · {stats?.withStatus} have a status{#if nHidden}
-          · {nHidden} {nHidden === 1 ? 'indicator' : 'indicators'} hidden: no value for these places (turn on "Show indicators without values here"){/if}
+          {' '}· {nHidden} {nHidden === 1 ? 'indicator' : 'indicators'} hidden: no value for these places (turn on "Show indicators without values here"){/if}
         </span>
       </p>
       <MatrixLegend vocab={view.vocab} />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupSelection, includeIndicator, includePlace, isDefaultIndicators, isDefaultPlaces, leadsOnly, migrateSelectionKeys, namedIndicators, selectionOf, setLeadsOnly, withSelection } from './selection.ts'
+import { groupSelection, includeIndicator, includePlace, leadsOnly, migrateSelectionKeys, namedIndicators, selectionOf, setLeadsOnly, withSelection } from './selection.ts'
 import { DEFAULT_SPEC } from '../../../src/report/spec.ts'
 
 const kv = (s: string) => new Map(s.split('&').filter(Boolean).map(p => { const i = p.indexOf('='); return [p.slice(0, i), p.slice(i + 1)] as [string, string] }))
@@ -15,10 +15,8 @@ describe('the selection of a state', () => {
     expect(t.spec.places).toEqual(DEFAULT_SPEC.places)
   })
   it('the default places are the sanctuaries and the default indicators each series lead', () => {
-    expect(isDefaultPlaces(DEFAULT_SPEC.places)).toBe(true)
-    expect(isDefaultPlaces({ include: ['coll:places'], exclude: ['NMS:A'], context: false })).toBe(false)
-    expect(isDefaultIndicators({ include: ['*'], exclude: [] })).toBe(true)
-    expect(isDefaultIndicators({ include: ['all'], exclude: [] })).toBe(false)
+    expect(DEFAULT_SPEC.places).toEqual({ include: ['coll:places'], exclude: [], context: false })
+    expect(DEFAULT_SPEC.indicators).toEqual({ include: ['*'], exclude: [] })
   })
   it('groupSelection is one group or set, the indicators kept', () => {
     const sel = { places: DEFAULT_SPEC.places, indicators: { include: ['all'], exclude: ['x:y'] } }

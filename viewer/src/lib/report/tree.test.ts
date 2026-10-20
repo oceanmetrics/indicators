@@ -164,6 +164,9 @@ describe('ticking a place set', () => {
     expect(s).toEqual({ include: ['coll:places', 'set:political'], exclude: [], context: false })
     expect(ids(s)).toEqual(['NMS:A', 'NMS:B', 'NMS:C', 'MRGID:1', 'FAO:HS1', 'FAO:HS2'])
   })
+  it('on: the rules of its groups it holds leave include', () => {
+    expect(toggleSet({ ...base, include: ['coll:places', 'coll:mr_eez', 'MRGID:1'] }, ALLP, SETS[0], true, SETS).include).toEqual(['coll:places', 'set:political'])
+  })
   it('off: it and its groups leave include; the places of other rules stay', () => {
     const s = toggleSet({ ...base, include: ['coll:places', 'set:political', 'coll:mr_eez'] }, ALLP, SETS[0], false, SETS)
     expect(s).toEqual({ include: ['coll:places'], exclude: [], context: false })

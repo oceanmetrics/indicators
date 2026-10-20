@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CoverageRow } from '../../../src/coverage/build.ts'
 import type { Indicator } from './data.ts'
-import { indexCoverage } from './matrix.ts'
+import { cellModel, indexCoverage, pickRow } from './matrix.ts'
 import {
   canComputeNow, COMPUTE_NOTE, computeHref, computedGroups, datasetCoverage, erddapPlacesHref, erddapVariable, REQUEST_NOTE, requestHref,
 } from './nextSteps.ts'
@@ -93,5 +93,23 @@ describe('the notes under the two actions', () => {
   it('compute it now stays in the browser and leaves the cell empty; a request fills the cell for everyone', () => {
     expect(COMPUTE_NOTE).toContain('nothing is saved, so this cell stays empty')
     expect(REQUEST_NOTE).toContain('this cell fills for everyone')
+  })
+})
+
+describe('a place that is not in the coverage at all (a gazetteer place nobody has computed)', () => {
+  const sst = ind({ id: 'erddap:dhw_5km:CRW_SST:mean' })
+  const place = { id: 'MC:monuments:alice-springs', name: 'Alice Springs (Mariana Trench)', coll: 'noaa_marine_monuments' }
+  const idx = indexCoverage([])
+  it('its cell is "not computed yet" for an indicator erddap-places makes, and "not offered" for another producer\'s', () => {
+    expect(cellModel(sst, place, pickRow(idx, place.id, sst)).kind).toBe('live')
+    expect(cellModel(ind({ id: 'sdg:x', producer: { name: 'sdg' } }), place, null).kind).toBe('na')
+  })
+  it('regression: the compute link and the request link are built from the place id and its group alone', () => {
+    expect(computeHref(sst, place)).toBe('https://oceanmetrics.io/erddap-places/#place=MC:monuments:alice-springs&dataset=dhw_5km&variable=CRW_SST')
+    expect(requestHref({ placeId: place.id, placeName: place.name, collection: place.coll, indicatorId: sst.id, short: 'SST' }))
+      .toContain('place=MC:monuments:alice-springs&collection=noaa_marine_monuments&indicator=erddap:dhw_5km:CRW_SST:mean')
+  })
+  it('no group has a value for it, so a "not offered" indicator lists none to switch to', () => {
+    expect(computedGroups(idx, sst)).toEqual([])
   })
 })

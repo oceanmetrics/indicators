@@ -26,7 +26,7 @@
   const isLeaf = (n: TreeNode) => n.kind === 'indicator' || n.kind === 'place'
   const kids = (n: TreeNode) => (n.kind === 'series' ? (pick ? [...n.children, ...n.more] : n.more) : n.children)
   const expandable = (n: TreeNode) => (pick ? !isLeaf(n) && (kids(n).length > 0 || !!n.lazy) : n.children.length > 0 && n.kind !== 'series' || n.more.length > 0 || !!n.lazy)
-  const dflt = (n: TreeNode) => (pick ? n.kind === 'category' || n.state !== 'unchecked' : n.kind === 'category' || (n.kind === 'collection' && !n.lazy && n.children.length <= 30))
+  const dflt = (n: TreeNode) => (pick ? n.kind === 'category' || n.state !== 'unchecked' : n.kind === 'category' || (n.kind === 'collection' && n.state !== 'unchecked' && !n.lazy && n.children.length <= 30))
   const isOpen = (n: TreeNode) => expandAll || (open[id(n)] ?? dflt(n))
   const flip = (n: TreeNode) => {
     open[id(n)] = !isOpen(n)
@@ -91,7 +91,7 @@
   .disc { flex: none; display: inline-grid; place-items: center; width: 1.5rem; height: 1.75rem; padding: 0; border: 0; background: none; color: var(--text-body); border-radius: var(--radius-sm); cursor: pointer; }
   button.disc:hover { background: var(--control-hover); color: var(--text-strong); }
   .cb {
-    flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-2);
+    flex: 1 1 12rem; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); padding: var(--space-1) var(--space-2);
     border: 0; border-radius: var(--radius-sm); background: none; text-align: left; cursor: pointer; color: var(--text-strong); font: var(--type-small);
   }
   .cb:hover { background: var(--control-hover); }
@@ -101,7 +101,8 @@
   }
   .cb[data-state='checked'] .box, .cb[data-state='mixed'] .box { background: var(--brand); border-color: var(--brand); }
   .dash { width: 0.5rem; height: 2px; background: var(--on-brand); border-radius: 1px; }
-  .lab { min-width: 0; overflow-wrap: anywhere; }
+  .row { flex-wrap: wrap; }
+  .lab { flex: 1 1 8rem; min-width: 0; overflow-wrap: anywhere; }
   .desc { display: block; font: var(--type-small); font-size: 0.75rem; color: var(--text-body); }
   .note { padding: var(--space-1) var(--space-2); }
   .node[data-kind='category'] > .row .lab { font-weight: var(--fw-semibold); }
@@ -109,5 +110,6 @@
   .cb[aria-current='true'] { background: var(--control-hover); }
   .picking .hint { white-space: normal; }
   .lk { flex: none; display: inline-flex; align-items: center; gap: 2px; padding: 0 var(--space-1); font: var(--type-small); white-space: nowrap; }
+  @media (max-width: 600px) { .hint { white-space: normal; max-width: 100%; margin-left: 0; text-align: left; padding-left: 0; } }
   .empty { margin: 0; padding: var(--space-3); font: var(--type-small); color: var(--text-body); }
 </style>

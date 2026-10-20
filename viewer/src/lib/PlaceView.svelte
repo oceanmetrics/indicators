@@ -120,7 +120,7 @@
 <div class="pv">
   {#if !place}
     <p class="crumb"><a class="back" href={backHref}><Icon name="ui-prev" size={16} />Back to the matrix</a></p>
-    <Notice kind="warn">No indicator has data for <code>{view.place}</code> in this catalog. <a href={backHref}>Back to the matrix</a> to pick a place.</Notice>
+    <Notice kind="warn">No indicator is computed yet for <code>{view.place}</code> in this catalog. <a href={backHref}>Back to the matrix</a>: each empty cell of this place can be computed in erddap-places or asked for.</Notice>
   {:else}
     <nav class="crumb" aria-label="Breadcrumb">
       <ol>

@@ -29,13 +29,3 @@ export function expandGroups(refs: readonly string[], sets: readonly PlaceSet[])
   }
   return out
 }
-
-/** the groups of a reference that have computed places (`available`, in the order of the reference); a group is its own */
-export function groupsOf(ref: string, sets: readonly PlaceSet[], available: readonly string[]): string[] {
-  return expandGroups([ref], sets).filter(g => available.includes(g))
-}
-
-/** the sets that have at least one group with computed places, in the manifest's order */
-export function availableSets(sets: readonly PlaceSet[], available: readonly string[]): PlaceSet[] {
-  return sets.filter(s => s.groups.some(g => available.includes(g)))
-}

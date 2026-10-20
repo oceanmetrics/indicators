@@ -23,9 +23,6 @@ export function withSelection<T extends { spec: ReportSpec }>(s: T, sel: Partial
   return { ...s, spec: { ...s.spec, places: sel.places ?? s.spec.places, indicators: sel.indicators ?? s.spec.indicators } }
 }
 
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
-export const isDefaultPlaces = (p: PlaceSel) => same(p.include, DEFAULT_SPEC.places.include) && p.exclude.length === 0
-export const isDefaultIndicators = (i: IndSel) => same(i.include, DEFAULT_SPEC.indicators.include) && i.exclude.length === 0
 
 /** the selection of one place group (`coll:<slug>`), the indicators kept: what a link to "this group" opens */
 export const groupSelection = (sel: Selection, group: string): Selection => ({

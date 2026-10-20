@@ -31,7 +31,7 @@
     open: { place: string; indicator: string } | null
     onopen: (placeId: string, indicator: string) => void
     /** remove a place or an indicator from the display */
-    onhide: (kind: 'place' | 'indicator', id: string) => void
+    onhide: (kind: 'place' | 'indicator', id: string) => void | Promise<void>
     /** the href of a place's view */
     placeHref: (placeId: string, coll: string) => string
   }
@@ -56,7 +56,7 @@
   async function hide(kind: 'place' | 'indicator', id: string) {
     const all = () => [...(box?.querySelectorAll<HTMLButtonElement>(`button.x[data-kind="${kind}"]`) ?? [])]
     const at = all().findIndex(b => b.dataset.id === id)
-    onhide(kind, id)
+    await onhide(kind, id)
     await tick()
     const left = all()
     ;(left[Math.min(at, left.length - 1)] ?? box)?.focus({ preventScroll: true })
@@ -207,7 +207,7 @@
   .ind .t { display: flex; align-items: flex-start; gap: var(--space-1); font: var(--fw-semibold) var(--text-sm) / 1.2 var(--font-sans); color: var(--text-strong); }
   .ind .t :global(svg) { margin-top: 1px; color: var(--label-color); flex: none; }
   .ind .u { display: block; margin-top: 2px; font: var(--fw-regular) 0.6875rem / 1.3 var(--font-mono); color: var(--text-body); }
-  .pn { display: block; font: var(--fw-medium) var(--text-sm) / 1.25 var(--font-sans); color: var(--text-strong); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+  .pn { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; font: var(--fw-medium) var(--text-sm) / 1.25 var(--font-sans); color: var(--text-strong); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
   .pn:hover { color: var(--link); text-decoration-color: currentColor; }
   .pid { display: block; margin-top: 2px; font: var(--fw-regular) 0.6875rem / 1.3 var(--font-mono); color: var(--text-body); overflow-wrap: anywhere; }
   tr.band .gh { position: sticky; left: var(--space-3); }
