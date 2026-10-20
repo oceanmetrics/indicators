@@ -255,10 +255,18 @@ def test_every_published_cmems_variable_is_configured_with_status_iea_sd():
   from om_indicators.adapters import eco_indicators as eco
   entries, _ = m.load_config()
   ids = {eco.indicator_id(d, v) for d, vs in eco.DATASETS.items() for v in vs}
-  assert {i for i in entries if i.startswith("cmems:")} == ids and len(ids) == 15
+  assert {i for i in entries if i.startswith("cmems:")} == ids and len(ids) == 25     # 15 + the BGC hindcast's 10
   assert all(entries[i]["status_method"] == "iea-sd" and entries[i]["min_periods"] == 10 for i in ids)
   assert entries["cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:thetao:mean"]["lead"]
   assert entries["cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:CHL:mean"]["lead"]
+
+
+def test_the_bgc_hindcast_leads_the_carbonate_oxygen_nutrient_and_plankton_series():
+  entries, _ = m.load_config()
+  bgc = "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:{}:mean"
+  for var, series in (("ph", "cmems-carbonate"), ("o2", "cmems-oxygen"), ("no3", "cmems-nutrients"), ("phyc", "cmems-plankton")):
+    lead = [e["id"] for e in entries.values() if e["series"] == series and e["lead"]]
+    assert lead == [bgc.format(var)], series
 
 
 def test_long_cmems_records_are_preferred_over_the_short_erddap_ones_of_the_same_variable():
@@ -266,6 +274,29 @@ def test_long_cmems_records_are_preferred_over_the_short_erddap_ones_of_the_same
   for long_id, short_id in (("cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:bottomT:mean", "erddap:cmems_altimetry:tob:mean"),
                             ("cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:mlotst:mean", "erddap:cmems_altimetry:mlotst:mean"),
                             ("cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:so:mean", "erddap:cmems_salinity:so:mean"),
-                            ("cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:CHL:mean", "erddap:cmems_biogeochem_phyto:chl:mean")):
+                            ("cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:CHL:mean", "erddap:cmems_biogeochem_phyto:chl:mean"),
+                            *((f"cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:{v}:mean", short) for v, short in (
+                              ("ph", "erddap:cmems_biogeochem_carbon:ph:mean"), ("spco2", "erddap:cmems_biogeochem_co2:spco2:mean"),
+                              ("o2", "erddap:cmems_biogeochem_pp:o2:mean"), ("no3", "erddap:cmems_biogeochem_nutrients:no3:mean"),
+                              ("po4", "erddap:cmems_biogeochem_nutrients:po4:mean"), ("si", "erddap:cmems_biogeochem_nutrients:si:mean"),
+                              ("fe", "erddap:cmems_biogeochem_nutrients:fe:mean"), ("phyc", "erddap:cmems_biogeochem_phyto:phyc:mean")))):
     assert entries[long_id]["variable"] == entries[short_id]["variable"]
     assert entries[long_id]["preferred"] and not entries[short_id]["preferred"]
+
+
+def test_the_satellite_records_stay_preferred_over_the_bgc_models_chlorophyll_and_npp():
+  entries, _ = m.load_config()
+  for model, satellite in (("cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:chl:mean", "cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:CHL:mean"),
+                           ("cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:nppv:mean", "erddap:moda_npp_mo_glob:npp:mean")):
+    assert entries[model]["variable"] == entries[satellite]["variable"]
+    assert entries[satellite]["preferred"] and not entries[model]["preferred"]
+
+
+def test_regression_every_configured_short_fits_the_schemas_max_length():
+  # "Chlorophyll-a (model, 2021–25)" (30 > 28) passed the config tests and failed only at the manifest build, 2026-10-20
+  import json
+  from pathlib import Path
+  schema = json.loads((Path(__file__).parents[1] / "schema/indicators.schema.json").read_text())
+  limit = schema["$defs"]["indicator"]["properties"]["short"]["maxLength"]
+  entries, _ = m.load_config()
+  assert {i: e["short"] for i, e in entries.items() if len(e["short"]) > limit} == {}

@@ -107,19 +107,21 @@ indicators:
     eov_match: exact
 
   # ---- erddap-places: CMEMS Global Biogeochemistry (monthly, surface 0.5 m) ----
+  # the CMEMS analysis-forecast on the IMaRS ERDDAP (2021-10 to 2025-02): each variable that the long BGC hindcast
+  # (eco-indicators, 1993-) also carries is not preferred, and the hindcast leads the series.
   - id: "erddap:cmems_biogeochem_carbon:ph:mean"
-    title: pH (CMEMS, 0.5 m)
-    short: pH
+    title: pH (CMEMS analysis, 0.5 m)
+    short: pH (2021–25)
     variable: ph
+    preferred: false
     series: cmems-carbonate
     series_title: Carbonate system (CMEMS)
-    lead: true
     unit_label: ""
     decimals: 3
     category: {onms: water-quality, names: physical-chemical, eov: inorganic-carbon}
     eov_match: exact
   - id: "erddap:cmems_biogeochem_carbon:dissic:mean"
-    title: Dissolved inorganic carbon (CMEMS, 0.5 m)
+    title: Dissolved inorganic carbon (CMEMS analysis, 0.5 m)
     short: DIC
     variable: dic
     series: cmems-carbonate
@@ -128,86 +130,90 @@ indicators:
     category: {onms: water-quality, names: physical-chemical, eov: inorganic-carbon}
     eov_match: exact
   - id: "erddap:cmems_biogeochem_co2:spco2:mean"
-    title: Surface pCO₂ (CMEMS)
-    short: pCO₂
+    title: Surface pCO₂ (CMEMS analysis)
+    short: pCO₂ (2021–25)
     variable: pco2
+    preferred: false
     series: cmems-carbonate
     unit_label: Pa
     decimals: 1
     category: {onms: water-quality, names: physical-chemical, eov: inorganic-carbon}
     eov_match: exact
   - id: "erddap:cmems_biogeochem_pp:o2:mean"
-    title: Dissolved oxygen (CMEMS, 0.5 m)
-    short: Oxygen
+    title: Dissolved oxygen (CMEMS analysis, 0.5 m)
+    short: Oxygen (2021–25)
     variable: oxygen
+    preferred: false
     series: cmems-oxygen
     series_title: Oxygen (CMEMS)
-    lead: true
     unit_label: "mmol m⁻³"
     decimals: 1
     category: {onms: water-quality, names: physical-chemical, eov: oxygen}
     eov_match: exact
   - id: "erddap:cmems_biogeochem_nutrients:no3:mean"
-    title: Nitrate (CMEMS, 0.5 m)
-    short: Nitrate
+    title: Nitrate (CMEMS analysis, 0.5 m)
+    short: Nitrate (2021–25)
     variable: nitrate
+    preferred: false
     series: cmems-nutrients
     series_title: Nutrients (CMEMS)
-    lead: true
     unit_label: "mmol m⁻³"
     decimals: 2
     category: {onms: water-quality, names: physical-chemical, eov: nutrients}
     eov_match: exact
   - id: "erddap:cmems_biogeochem_nutrients:po4:mean"
-    title: Phosphate (CMEMS, 0.5 m)
-    short: Phosphate
+    title: Phosphate (CMEMS analysis, 0.5 m)
+    short: Phosphate (2021–25)
     variable: phosphate
+    preferred: false
     series: cmems-nutrients
     unit_label: "mmol m⁻³"
     decimals: 3
     category: {onms: water-quality, names: physical-chemical, eov: nutrients}
     eov_match: exact
   - id: "erddap:cmems_biogeochem_nutrients:si:mean"
-    title: Silicate (CMEMS, 0.5 m)
-    short: Silicate
+    title: Silicate (CMEMS analysis, 0.5 m)
+    short: Silicate (2021–25)
     variable: silicate
+    preferred: false
     series: cmems-nutrients
     unit_label: "mmol m⁻³"
     decimals: 2
     category: {onms: water-quality, names: physical-chemical, eov: nutrients}
     eov_match: exact
   - id: "erddap:cmems_biogeochem_nutrients:fe:mean"
-    title: Dissolved iron (CMEMS, 0.5 m)
-    short: Iron
+    title: Dissolved iron (CMEMS analysis, 0.5 m)
+    short: Iron (2021–25)
     variable: iron
+    preferred: false
     series: cmems-nutrients
     unit_label: "mmol m⁻³"
     decimals: 5
     category: {onms: water-quality, names: physical-chemical, eov: nutrients}
     eov_match: exact
   - id: "erddap:cmems_biogeochem_phyto:chl:mean"
-    title: Chlorophyll-a (CMEMS, 0.5 m)
-    short: Chlorophyll-a
+    title: Chlorophyll-a (CMEMS analysis, 0.5 m)
+    short: Chl-a (model, 2021–25)
     variable: chl
     preferred: false
     series: cmems-plankton
     series_title: Plankton and production (CMEMS)
-    lead: true
     unit_label: "mg m⁻³"
     decimals: 2
     category: {onms: water-quality, names: biological, eov: ocean-colour}
     eov_match: exact
   - id: "erddap:cmems_biogeochem_phyto:phyc:mean"
-    title: Phytoplankton carbon (CMEMS, 0.5 m)
-    short: Phytoplankton
+    title: Phytoplankton carbon (CMEMS analysis, 0.5 m)
+    short: Phytoplankton (2021–25)
     variable: phytoplankton
+    preferred: false
     series: cmems-plankton
     unit_label: "mmol m⁻³"
     decimals: 2
     category: {onms: living-resources, names: biological, eov: phytoplankton}
     eov_match: exact
   - id: "erddap:cmems_biogeochem_zoo:zooc:mean"
-    title: Zooplankton carbon (CMEMS, 0.5 m)
+    title: Zooplankton carbon (CMEMS analysis, 0.5 m)
     short: Zooplankton
     variable: zooplankton
     series: cmems-plankton
@@ -216,8 +222,8 @@ indicators:
     category: {onms: living-resources, names: biological, eov: zooplankton}
     eov_match: exact
   - id: "erddap:cmems_biogeochem_pp:nppv:mean"
-    title: Primary production (CMEMS, 0.5 m)
-    short: Primary production
+    title: Primary production (CMEMS analysis, 0.5 m)
+    short: NPP (model, 2021–25)
     variable: npp
     preferred: false
     series: cmems-plankton
@@ -474,6 +480,128 @@ indicators:
     series: cmems-ocean-colour
     unit_label: "mg m⁻³"
     decimals: 3
+    category: {onms: living-resources, names: biological, eov: phytoplankton}
+    eov_match: exact
+
+  # ---- eco-indicators: Copernicus Marine biogeochemistry hindcast, 1/4 degree, top level 0.5 m (monthly, 1993-) ----
+  # GLOBAL_MULTIYEAR_BGC_001_029 (doi:10.48670/moi-00019), added to eco-indicators' copernicus.qmd 2026-10-20. it leads
+  # the carbonate, oxygen, nutrient and plankton series and is preferred for every variable the short CMEMS forecast
+  # records carry, except chlorophyll-a and NPP, where the satellite records (ocean colour, VGPM) stay preferred.
+  # at 1/4 degree the smallest sanctuaries (no grid cell centre inside the polygon) have no values.
+  - id: "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:ph:mean"
+    title: pH (CMEMS hindcast, 0.5 m)
+    short: pH
+    description: >-
+      Monthly sea water pH (total scale) at 0.5 m from the Copernicus Marine global ocean biogeochemistry hindcast (1993-), averaged over the place.
+    variable: ph
+    series: cmems-carbonate
+    lead: true
+    unit_label: ""
+    decimals: 3
+    category: {onms: water-quality, names: physical-chemical, eov: inorganic-carbon}
+    eov_match: exact
+  - id: "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:spco2:mean"
+    title: Surface pCO₂ (CMEMS hindcast)
+    short: pCO₂
+    description: >-
+      Monthly surface partial pressure of CO₂ in sea water from the Copernicus Marine global ocean biogeochemistry hindcast (1993-), averaged over the place.
+    variable: pco2
+    series: cmems-carbonate
+    unit_label: "Pa"
+    decimals: 1
+    category: {onms: water-quality, names: physical-chemical, eov: inorganic-carbon}
+    eov_match: exact
+  - id: "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:o2:mean"
+    title: Dissolved oxygen (CMEMS hindcast, 0.5 m)
+    short: Oxygen
+    description: >-
+      Monthly dissolved oxygen at 0.5 m from the Copernicus Marine global ocean biogeochemistry hindcast (1993-), averaged over the place.
+    variable: oxygen
+    series: cmems-oxygen
+    lead: true
+    unit_label: "mmol m⁻³"
+    decimals: 1
+    category: {onms: water-quality, names: physical-chemical, eov: oxygen}
+    eov_match: exact
+  - id: "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:no3:mean"
+    title: Nitrate (CMEMS hindcast, 0.5 m)
+    short: Nitrate
+    description: >-
+      Monthly nitrate at 0.5 m from the Copernicus Marine global ocean biogeochemistry hindcast (1993-), averaged over the place.
+    variable: nitrate
+    series: cmems-nutrients
+    lead: true
+    unit_label: "mmol m⁻³"
+    decimals: 2
+    category: {onms: water-quality, names: physical-chemical, eov: nutrients}
+    eov_match: exact
+  - id: "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:po4:mean"
+    title: Phosphate (CMEMS hindcast, 0.5 m)
+    short: Phosphate
+    description: >-
+      Monthly phosphate at 0.5 m from the Copernicus Marine global ocean biogeochemistry hindcast (1993-), averaged over the place.
+    variable: phosphate
+    series: cmems-nutrients
+    unit_label: "mmol m⁻³"
+    decimals: 3
+    category: {onms: water-quality, names: physical-chemical, eov: nutrients}
+    eov_match: exact
+  - id: "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:si:mean"
+    title: Silicate (CMEMS hindcast, 0.5 m)
+    short: Silicate
+    description: >-
+      Monthly silicate at 0.5 m from the Copernicus Marine global ocean biogeochemistry hindcast (1993-), averaged over the place.
+    variable: silicate
+    series: cmems-nutrients
+    unit_label: "mmol m⁻³"
+    decimals: 2
+    category: {onms: water-quality, names: physical-chemical, eov: nutrients}
+    eov_match: exact
+  - id: "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:fe:mean"
+    title: Dissolved iron (CMEMS hindcast, 0.5 m)
+    short: Iron
+    description: >-
+      Monthly dissolved iron at 0.5 m from the Copernicus Marine global ocean biogeochemistry hindcast (1993-), averaged over the place.
+    variable: iron
+    series: cmems-nutrients
+    unit_label: "mmol m⁻³"
+    decimals: 5
+    category: {onms: water-quality, names: physical-chemical, eov: nutrients}
+    eov_match: exact
+  - id: "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:phyc:mean"
+    title: Phytoplankton carbon (CMEMS hindcast, 0.5 m)
+    short: Phytoplankton
+    description: >-
+      Monthly phytoplankton carbon at 0.5 m from the Copernicus Marine global ocean biogeochemistry hindcast (1993-), averaged over the place.
+    variable: phytoplankton
+    series: cmems-plankton
+    lead: true
+    unit_label: "mmol m⁻³"
+    decimals: 2
+    category: {onms: living-resources, names: biological, eov: phytoplankton}
+    eov_match: exact
+  - id: "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:chl:mean"
+    title: Chlorophyll-a (CMEMS hindcast, 0.5 m)
+    short: Chlorophyll-a (model)
+    description: >-
+      Monthly chlorophyll-a at 0.5 m from the Copernicus Marine global ocean biogeochemistry hindcast (1993-), averaged over the place.
+    variable: chl
+    preferred: false
+    series: cmems-plankton
+    unit_label: "mg m⁻³"
+    decimals: 2
+    category: {onms: water-quality, names: biological, eov: ocean-colour}
+    eov_match: exact
+  - id: "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:nppv:mean"
+    title: Primary production (CMEMS hindcast, 0.5 m)
+    short: Primary production (model)
+    description: >-
+      Monthly net primary production of biomass as carbon at 0.5 m from the Copernicus Marine global ocean biogeochemistry hindcast (1993-), averaged over the place.
+    variable: npp
+    preferred: false
+    series: cmems-plankton
+    unit_label: "mg m⁻³ d⁻¹"
+    decimals: 1
     category: {onms: living-resources, names: biological, eov: phytoplankton}
     eov_match: exact
 

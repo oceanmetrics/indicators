@@ -15,8 +15,8 @@ rules (each one a named function below, each tested):
   places     `place_id()`: eco-indicators' NMS code -> the gazetteer id `NMS:<code>`, with CPNMS (Chumash Proposed
              Action) mapped to NMS:CHNMS (Chumash Heritage); the Monterey Bay sub-areas MBNMS-david and MBNMS-main are
              dropped (`DROPPED`); any other code raises, so a new sanctuary is a decision, not a silent loss.
-  variables  `VARIABLES`: the physics and plankton variables kept, per dataset. the myint (interim) physics dataset
-             duplicates the my record and is dropped, as are the `*_uncertainty` and `flags` variables.
+  variables  `DATASETS`: the physics, biogeochemistry and plankton variables kept, per dataset. the myint (interim)
+             physics dataset duplicates the my record and is dropped, as are the `*_uncertainty` and `flags` variables.
   month      `month_rows()`: value = the monthly mean, n = 1, x_sd = the spatial SD; a month with no mean gets no row.
   year       `year_rows()`: only for years with all 12 month rows; value = mean of the 12 monthly means, n = 12.
   pin        `resolve_commit()`: the latest commit on main that touched data/copernicus.csv (GitHub API, unauthenticated),
@@ -67,12 +67,14 @@ DATASETS = {
   "cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M": (
     "CHL", "DIATO", "DINO", "GREEN", "HAPTO", "MICRO", "NANO", "PICO", "PROCHLO", "PROKAR"),
   "cmems_obs-oc_glo_bgc-pp_my_l4-multi-4km_P1M": ("PP",),
+  "cmems_mod_glo_bgc_my_0.25deg_P1M-m": ("chl", "fe", "no3", "nppv", "o2", "ph", "phyc", "po4", "si", "spco2"),
 }
 # the product DOIs (DataCite, checked 2026-10-20 against the product titles of copernicus_variables.csv); the CSV and
 # eco-indicators' copernicus.bib (papers only) carry none
 PRODUCT_DOIS = {
   "GLOBAL_MULTIYEAR_PHY_001_030": "https://doi.org/10.48670/moi-00021",
   "OCEANCOLOUR_GLO_BGC_L4_MY_009_104": "https://doi.org/10.48670/moi-00281",
+  "GLOBAL_MULTIYEAR_BGC_001_029": "https://doi.org/10.48670/moi-00019",
 }
 PRODUCER_NAME = REPO
 METHOD = (

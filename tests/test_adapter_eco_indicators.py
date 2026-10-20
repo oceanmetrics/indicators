@@ -18,6 +18,7 @@ SHA = "0dbf817bfc54c644315e1f4ba97d4d43498f5527"
 PHY = "cmems_mod_glo_phy_my_0.083deg_P1M-m"
 MYINT = "cmems_mod_glo_phy_myint_0.083deg_P1M-m"
 PLK = "cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M"
+BGC = "cmems_mod_glo_bgc_my_0.25deg_P1M-m"
 THETAO = f"cmems:{PHY}:thetao:mean"
 
 
@@ -80,6 +81,8 @@ def test_depth_suffix_is_cleaned():
   assert eco.clean_var("thetao_depth=0.49402499") == "thetao"
   assert eco.clean_var("so_depth=0.49402499") == "so"
   assert eco.clean_var("bottomT") == "bottomT" and eco.clean_var("CHL") == "CHL"
+  assert eco.clean_var("o2_depth=0.5057600140571594") == "o2"     # the BGC hindcast's top level
+  assert eco.clean_var("spco2") == "spco2"                        # a surface field has no depth
 
 
 @pytest.mark.parametrize("dataset, var, kept", [
@@ -87,6 +90,7 @@ def test_depth_suffix_is_cleaned():
   (MYINT, "thetao", False),                       # duplicates the my record
   (PLK, "CHL_uncertainty", False), (PLK, "flags", False), ("cmems_obs-oc_glo_bgc-pp_my_l4-multi-4km_P1M", "flags", False),
   (PHY, "uo", False),                             # not a variable we publish
+  (BGC, "ph", True), (BGC, "o2", True), (BGC, "no3", True), (BGC, "spco2", True), (BGC, "phyc", True),
 ])
 def test_which_variables_are_kept(dataset, var, kept):
   assert eco.keep(dataset, var) is kept
@@ -145,6 +149,13 @@ def test_a_variable_missing_from_the_variables_csv_raises():
   text = csv_text(year_of_means("CINMS", PHY, "mlotst", 2000, 30.0))
   with pytest.raises(ValueError, match="not in copernicus_variables.csv"):
     eco.indicator_rows(eco.read_means(text), eco.read_variables(variables_text()))
+
+
+def test_the_bgc_hindcast_cites_its_own_doi():
+  meta = eco.dataset_meta("GLOBAL_MULTIYEAR_BGC_001_029", "Global Ocean Biogeochemistry Hindcast")
+  assert meta["doi"] == "https://doi.org/10.48670/moi-00019"
+  assert meta["citation"] == ("E.U. Copernicus Marine Service Information; Global Ocean Biogeochemistry Hindcast; "
+                              "https://doi.org/10.48670/moi-00019")
 
 
 def test_dataset_meta_is_the_product_with_its_doi_and_licence():
@@ -281,7 +292,8 @@ def _api_reachable() -> bool:
 @pytest.mark.network
 @pytest.mark.skipif(os.environ.get("OM_OFFLINE") == "1", reason="OM_OFFLINE=1")
 def test_published_products_match_their_dois_and_titles(tmp_path):
-  """the product DOIs are typed here (the CSV and the bib carry none): DataCite must title each one as the CSV does."""
+  """the product DOIs are typed here (the CSV and the bib carry none): DataCite must title each one as the CSV does,
+  ignoring case."""
   if not _api_reachable():
     pytest.skip("github api unreachable")
   f = eco.ep.Fetcher(tmp_path)
@@ -291,4 +303,5 @@ def test_published_products_match_their_dois_and_titles(tmp_path):
     f.read_bytes(f"{eco.RAW}/{sha}/{eco.PATH_VARIABLES}").decode()).values()}
   for product, doi in eco.PRODUCT_DOIS.items():
     got = json.loads(f.read_bytes("https://api.datacite.org/dois/" + doi.removeprefix("https://doi.org/")))
-    assert got["data"]["attributes"]["titles"][0]["title"] == titles[product]
+    # DataCite's case differs for some (BGC: "Global ocean biogeochemistry hindcast")
+    assert got["data"]["attributes"]["titles"][0]["title"].casefold() == titles[product].casefold()
