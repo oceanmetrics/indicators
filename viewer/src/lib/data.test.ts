@@ -8,8 +8,8 @@ describe('resolveDataBase', () => {
   })
   it('defaults to the repo catalog in dev and the published bucket in a build', () => {
     expect(resolveDataBase('', true)).toBe('./catalog/')
-    expect(resolveDataBase('?brand=mbon', false)).toBe('https://storage.oceanmetrics.io/indicators/')
-    expect(resolveDataBase('?data=', false)).toBe('https://storage.oceanmetrics.io/indicators/')
+    expect(resolveDataBase('?brand=mbon', false)).toBe('https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/')
+    expect(resolveDataBase('?data=', false)).toBe('https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/')
   })
   it('a relative base is made absolute against the page', () => {
     expect(absoluteBase('./catalog/', 'http://localhost:5181/index.html')).toBe('http://localhost:5181/catalog/')
