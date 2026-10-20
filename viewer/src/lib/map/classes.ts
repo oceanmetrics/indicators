@@ -24,6 +24,8 @@ export interface MapOpts {
   method: MethodId | null
   /** the class `share` maps; the most frequent class when null */
   cls: string | null
+  /** the grain read, when the reader chose one (OBIS by decade); else the status grain, as mapGrain picks */
+  grain?: Grain | null
 }
 
 export interface LegendEntry {
@@ -106,9 +108,10 @@ const GRAIN_FALLBACK: Grain[] = ['year', 'month', 'decade', 'day', 'all']
  * the grain the map reads: the indicator's status grain, or, when no place has a value there (an indicator whose
  * record is monthly), the first other grain that does, as the Matrix picks a cell's row
  */
-export function mapGrain(ind: Pick<Indicator, 'status_grain'>, coverage: Pick<CoverageRow, 'time_grain' | 'last_value' | 'last_class'>[]): Grain {
+export function mapGrain(ind: Pick<Indicator, 'status_grain'>, coverage: Pick<CoverageRow, 'time_grain' | 'last_value' | 'last_class'>[], want: Grain | null = null): Grain {
   const has = (g: Grain) => coverage.some(r => r.time_grain === g && (r.last_value != null || r.last_class != null))
-  return [ind.status_grain, ...GRAIN_FALLBACK].find(has) ?? ind.status_grain
+  // a chosen grain wins when some place has a value at it
+  return [...(want ? [want] : []), ind.status_grain, ...GRAIN_FALLBACK].find(has) ?? ind.status_grain
 }
 
 /** a hash `t` ("2024", "2024-07") as the start of the period it names at a grain ("2024-01-01"); null if it is not a date */
@@ -266,7 +269,7 @@ function periodsOf(places: P[], grain: Grain): string[] {
  */
 export function mapModel(ind: Indicator, coverage: CoverageRow[], values: Map<string, PlaceRow[]> | null, opts: MapOpts): MapModel {
   const mine = coverage.filter(r => r.indicator === ind.id && (!opts.coll || r.coll === opts.coll))
-  const grain = mapGrain(ind, mine)
+  const grain = mapGrain(ind, mine, opts.grain ?? null)
   const byPlace = new Map<string, CoverageRow[]>()
   for (const r of mine) byPlace.set(r.place_id, [...(byPlace.get(r.place_id) ?? []), r])
   const places: P[] = [...byPlace.entries()].map(([id, rs]) => {

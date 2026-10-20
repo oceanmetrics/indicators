@@ -6,13 +6,14 @@
 // - Place: place (a place_id), coll (its collection, only to tell apart a place_id that lives in two), method
 //   (iea-sd | names-pct | values: overrides every continuous card's status method), ind (an indicator to scroll to).
 // - Map: ind (the indicator), coll (the collection), color (value | departure | status | trend | record | class |
-//   share), t (the period shown: "2024", "2024-07"; none = the latest), cls (the class of `share`), method.
+//   share), t (the period shown: "2024", "2024-07"; none = the latest), cls (the class of `share`), grain (year |
+//   decade | month: the grain read; the indicator's status grain when absent), method.
 // - Report: the report spec's own flat keys (src/report/spec.ts: pi, px, ctx, ii, ix, layout, status, recent, base,
 //   grain, from, to, asof, title).
 // vocab and depth are shared. defaults are left out. `?brand=` and `?theme=` are query switches, never hash keys. an
 // old Matrix or Place permalink has none of the new keys and parses to the same state as before.
 import type { VocabId } from './data.ts'
-import type { MethodId } from '../../../src/status/index.ts'
+import type { Grain, MethodId } from '../../../src/status/index.ts'
 import { DEFAULT_SPEC, specFromParams, specParams } from '../../../src/report/spec.ts'
 import type { ReportSpec } from '../../../src/report/spec.ts'
 
@@ -25,6 +26,7 @@ export type Axes = 'places' | 'indicators'
 /** what the Map colours each place by */
 export type MapColor = 'value' | 'departure' | 'status' | 'trend' | 'record' | 'class' | 'share'
 export const MAP_COLORS: MapColor[] = ['value', 'departure', 'status', 'trend', 'record', 'class', 'share']
+const MAP_GRAINS: Grain[] = ['decade', 'year', 'month', 'day', 'all']
 
 export interface ViewState {
   view: ViewKind
@@ -45,6 +47,8 @@ export interface ViewState {
   color: MapColor | null
   t: string | null
   cls: string | null
+  /** the Map's grain (the indicator's status grain when null) */
+  grain: Grain | null
   /** the Report view's spec (the default spec in every other view) */
   spec: ReportSpec
 }
@@ -52,7 +56,7 @@ export interface ViewState {
 export const DEFAULT_STATE: ViewState = {
   view: 'matrix', colls: [], q: '', vocab: 'onms', leads: true, depth: 'swim', cell: null,
   place: null, coll: null, method: null, ind: null,
-  axes: 'places', hidePlaces: [], hideInds: [], addInds: [], color: null, t: null, cls: null, spec: DEFAULT_SPEC,
+  axes: 'places', hidePlaces: [], hideInds: [], addInds: [], color: null, t: null, cls: null, grain: null, spec: DEFAULT_SPEC,
 }
 
 // keep the readable characters of ids (NMS:FKNMS, erddap:dhw_5km:CRW_SST:mean, a|b) out of percent-encoding
@@ -95,6 +99,7 @@ export function parseHash(hash: string): ViewState {
     color: MAP_COLORS.includes(color as MapColor) ? (color as MapColor) : null,
     t: /^\d{4}(-\d{2}(-\d{2})?)?$/.test(t) ? t : null,
     cls: kv.get('cls') || null,
+    grain: MAP_GRAINS.includes(kv.get('grain') as Grain) ? (kv.get('grain') as Grain) : null,
     spec: kv.get('view') === 'report' ? specFromParams(kv, depth === 'skim' || depth === 'dive' ? depth : 'swim') : DEFAULT_SPEC,
   }
 }
@@ -130,6 +135,7 @@ export function serializeHash(s: ViewState): string {
     if (s.color) parts.push('color=' + s.color)
     if (s.t) parts.push('t=' + s.t)
     if (s.cls) parts.push('cls=' + enc(s.cls))
+    if (s.grain) parts.push('grain=' + s.grain)
     shared()
     if (s.method) parts.push('method=' + s.method)
     return parts.join('&')

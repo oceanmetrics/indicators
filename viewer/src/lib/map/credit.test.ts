@@ -24,5 +24,6 @@ describe('the credit lines', () => {
     // no licence of its own, or "other": none is claimed (the catalog's CC BY 4.0 is for the values, not the dataset)
     expect(dataCredit({ ...ind, dataset: { ...ind.dataset, license: undefined, providers: [] } } as unknown as Indicator)).toBe('Data: CRW SST')
     expect(dataCredit({ ...ind, dataset: { ...ind.dataset, license: 'other' } } as unknown as Indicator)).toBe('Data: CRW SST (NOAA CRW)')
+    expect(dataCredit({ ...ind, dataset: { ...ind.dataset, license: 'various' } } as unknown as Indicator)).toBe('Data: CRW SST (NOAA CRW)')
   })
 })

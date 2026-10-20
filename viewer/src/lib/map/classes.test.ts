@@ -303,6 +303,15 @@ describe('an indicator whose record is not at its status grain', () => {
     const ind = cont()
     expect(mapGrain(ind, covOf(A, ind))).toBe('year')
   })
+  it('a chosen grain wins when a place has a value at it, and is read with values only', () => {
+    const ind = cont()
+    const decades: PlaceRow[] = [2000, 2010].map((y, i) => ({ ...row('D', y, 10 + i), time_grain: 'decade', time: `${y}-01-01` }) as PlaceRow)
+    const cov = covOf([...A, ...decades], ind)
+    expect([mapGrain(ind, cov, 'decade'), mapGrain(ind, cov, 'month')]).toEqual(['decade', 'year'])
+    const m = mapModel(ind, cov, groupByPlace(decades), opts({ grain: 'decade', color: 'status', t: '2000' }))
+    expect([m.grain, m.color, m.modes.join(',')]).toEqual(['decade', 'value', 'value,record'])
+    expect(m.items.find(i => i.placeId === 'D')?.value).toBe(10)
+  })
 })
 
 // ---- categorical ----

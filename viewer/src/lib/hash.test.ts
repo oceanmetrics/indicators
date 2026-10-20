@@ -107,6 +107,13 @@ describe('the Map view hash', () => {
     expect(parseHash('#view=map')).toEqual({ ...DEFAULT_STATE, view: 'map' })
     expect(serializeHash({ ...DEFAULT_STATE, view: 'map' })).toBe('view=map')
   })
+  it('the grain is a Map key: written after cls, dropped when unknown, never in a Matrix hash', () => {
+    const s: ViewState = { ...DEFAULT_STATE, view: 'map', ind: 'obis:species:fish', coll: 'mr_eez', t: '2010', grain: 'decade' }
+    expect(serializeHash(s)).toBe('view=map&ind=obis:species:fish&coll=mr_eez&t=2010&grain=decade')
+    expect(parseHash('#' + serializeHash(s))).toEqual(s)
+    expect(parseHash('#view=map&grain=week').grain).toBeNull()
+    expect(serializeHash({ ...DEFAULT_STATE, grain: 'decade' })).toBe('')
+  })
   it('an unknown color or a malformed period is dropped', () => {
     const s = parseHash('#view=map&ind=a:b&color=rainbow&t=last')
     expect(s.color).toBeNull()

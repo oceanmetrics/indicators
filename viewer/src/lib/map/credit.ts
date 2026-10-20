@@ -21,7 +21,8 @@ export function layerCredit(layer: Pick<GazLayer, 'title' | 'attribution'> | nul
 export function dataCredit(ind: Pick<Indicator, 'dataset'>): string {
   const who = ind.dataset.providers.filter(p => p.roles.some(r => r === 'producer' || r === 'licensor')).map(p => p.name)
   const own = ind.dataset.license
-  // the dataset's own licence; the catalog's (CC BY 4.0) is for the values and says nothing about the dataset
-  const lic = own && own.toLowerCase() !== 'other' ? own : ''
+  // the dataset's own licence; the catalog's (CC BY 4.0) is for the values and says nothing about the dataset. "other"
+  // and "various" (OBIS: each source dataset has its own) name no licence, so none is claimed
+  const lic = own && !['other', 'various'].includes(own.toLowerCase()) ? own : ''
   return `Data: ${ind.dataset.title}${who.length ? ` (${who.join('; ')})` : ''}${lic ? `, ${lic}` : ''}`
 }

@@ -23,6 +23,7 @@
   import { layerFor } from './gazetteer.ts'
   import type { GazLayer } from './gazetteer.ts'
   import { mappable, pickMap } from './pick.ts'
+  import { familyId, familyOf, foldFamily } from './family.ts'
   import MapCanvas from './MapCanvas.svelte'
   import MapLegend from './MapLegend.svelte'
   import MapTable from './MapTable.svelte'
@@ -47,10 +48,15 @@
   // the hash always names what is shown, so the view is a permalink even when it opened on the defaults
   $effect(() => { if (ind && coll && (view.ind !== ind.id || view.coll !== coll)) onpatch({ ind: ind.id, coll }) })
 
-  const indicatorOptions = $derived(
+  const indicatorOptions = $derived(foldFamily(
     groupColumns(mappable(m.indicators, catalog.coverage), m.vocabularies, view.vocab, false)
       .flatMap(g => g.indicators.map(i => ({ value: i.id, label: i.short, group: g.term.label }))),
-  )
+    ind?.id ?? null,
+  ))
+  // the OBIS indicators are one choice above, then a metric and an EOV (family.ts)
+  const family = $derived(ind ? familyOf(ind, mappable(m.indicators, catalog.coverage)) : null)
+  // by year or by decade, when the indicator has both
+  const grains = $derived(ind ? (['year', 'decade'] as const).filter(g => ind.time_grains.includes(g)) : [])
 
   // ---- the values file: the slider's periods, departure, past statuses ----
   let values = $state.raw<Map<string, PlaceRow[]> | null>(null)
@@ -86,7 +92,7 @@
 
   // ---- the model ----
   const model = $derived(
-    ind ? mapModel(ind, catalog.coverage, values, { coll, color: view.color, t: view.t, method: view.method, cls: view.cls }) : null,
+    ind ? mapModel(ind, catalog.coverage, values, { coll, color: view.color, t: view.t, method: view.method, cls: view.cls, grain: view.grain }) : null,
   )
   const method = $derived<MethodId | null>(ind ? defaultMethod(ind) : null)
 
@@ -151,8 +157,28 @@
   <section class="controls" aria-label="Map controls">
     <div class="group wide">
       <Select label="Indicator" value={ind.id} options={indicatorOptions}
-        onchange={(v: string) => onpatch({ ind: v, coll: null, color: null, t: null, cls: null, method: null })} />
+        onchange={(v: string) => onpatch({ ind: v, coll: null, color: null, t: null, cls: null, method: null, grain: null })} />
     </div>
+    {#if family}
+      <div class="group">
+        <Select label="Metric" value={family.metric} options={family.metrics.map(c => ({ value: c.id, label: c.label }))}
+          onchange={(v: string) => onpatch({ ind: familyId(v, family.eov), color: null, cls: null })} />
+      </div>
+      <div class="group">
+        <Select label="EOV" value={family.eov} options={family.eovs.map(c => ({ value: c.id, label: c.label }))}
+          onchange={(v: string) => onpatch({ ind: familyId(family.metric, v), color: null, cls: null })} />
+      </div>
+    {/if}
+    {#if grains.length > 1}
+      <div class="group" role="group" aria-label="Time grain">
+        <span class="mbon-label">By</span>
+        <div class="row">
+          {#each grains as g (g)}
+            <Button variant="quiet" size="sm" pressed={model.grain === g} onclick={() => onpatch({ grain: g === ind.status_grain ? null : g, t: null })}>{g}</Button>
+          {/each}
+        </div>
+      </div>
+    {/if}
     <div class="group" role="group" aria-label="Places">
       <span class="mbon-label">Places</span>
       <div class="row">

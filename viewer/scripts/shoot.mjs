@@ -63,6 +63,9 @@ const SHOTS = [
   ['map_sst_departure_oceanmetrics_light', 'oceanmetrics', 'light', MAP, SST + '&color=departure'],
   ['map_sdg1451_value_oceanmetrics_light', 'oceanmetrics', 'light', MAP, MPA],
   ['map_sdg1451_value_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, MPA],
+  // OBIS, the CoastWatch OBIS replacement: species of fish per EEZ, by year and by decade
+  ['map_obis_fish_year_oceanmetrics_light', 'oceanmetrics', 'light', MAP, 'view=map&ind=obis:species:fish&coll=mr_eez'],
+  ['map_obis_fish_decade_mbon_dark', 'mbon', 'dark', MAP, 'view=map&ind=obis:species:fish&coll=mr_eez&grain=decade&t=2010'],
 ]
 
 async function alive(url) { try { return (await fetch(url)).ok } catch { return false } }
