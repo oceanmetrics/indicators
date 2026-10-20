@@ -1,5 +1,6 @@
 // screenshots with the real catalog: the Matrix (matrix_<brand>_<theme>[_390].png, places as rows matrix_*_placerows*,
-// the place and indicator pickers open matrix_*_places_picker and matrix_*_indicators_picker, the drawer), the Place view (place_<place>_<brand>_<theme>[_390].png), the
+// the place and indicator pickers open matrix_*_places_picker and matrix_*_indicators_picker, the Select section select_*, a group
+// nothing is computed for uncomputed_*, the drawer), the Place view (place_<place>_<brand>_<theme>[_390].png), the
 // Map view (map_<indicator>_<color>_<theme>[_390].png), the Report view (report_*: the Scorecard, the Cards report, the
 // open builder over budget, the print preview) and the embed route (embed_*).
 // headless Chrome through puppeteer-core, against the dev server (started here when nothing answers on the port).
@@ -29,15 +30,15 @@ const PLACE_PHONE = { width: 390, height: 2000, deviceScaleFactor: 2, isMobile: 
 // the Map view: shot when the map container says data-state=done (the map is idle with the data layer on it)
 const MAP = { width: 1440, height: 1500, deviceScaleFactor: 2 }
 const MAP_PHONE = { width: 390, height: 2400, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
-const SST = 'view=map&ind=erddap:dhw_5km:CRW_SST:mean&coll=places'
-const MPA = 'view=map&ind=sdg:ER_MRN_MPA&coll=mr_eez&color=value'
+const SST = 'view=map&ind=erddap:dhw_5km:CRW_SST:mean&pi=coll:places'
+const MPA = 'view=map&ind=sdg:ER_MRN_MPA&pi=coll:mr_eez&color=value'
 const FKNMS = 'view=place&place=NMS:FKNMS'
 const FKNMS_SST = 'cell=NMS:FKNMS|erddap:dhw_5km:CRW_SST:mean'
 // the way forward from an empty cell: Wells (a NERRS reserve) has no sea surface temperature computed (not computed yet), and the
 // SDG series is not offered for a reserve; an EEZ opened on an indicator it has no values for
-const WELLS = 'colls=noaa_nerrs,places'
-const LIVE = 'cell=NERRS:WEL|erddap:dhw_5km:CRW_SST:mean&colls=places,noaa_nerrs'
-const NA = 'cell=NERRS:WEL|sdg:ER_MRN_MPA&colls=places,noaa_nerrs&empty=1'
+const WELLS = 'pi=coll:places,coll:noaa_nerrs'
+const LIVE = 'pi=coll:places,coll:noaa_nerrs&cell=NERRS:WEL|erddap:dhw_5km:CRW_SST:mean'
+const NA = 'pi=coll:places,coll:noaa_nerrs&cell=NERRS:WEL|sdg:ER_MRN_MPA&empty=1'
 const OPENED = 'view=place&place=NMS:FKNMS&ind=erddap:dhw_5km:CRW_SST:mean'
 const UNCOMPUTED = 'view=place&place=MRGID:8405&ind=erddap:IMERG_monthly_global_precip:precipitation:mean'
 
@@ -45,35 +46,39 @@ const UNCOMPUTED = 'view=place&place=MRGID:8405&ind=erddap:IMERG_monthly_global_
 const REPORT = { width: 1440, height: 1500, deviceScaleFactor: 2 }
 const REPORT_PHONE = { width: 390, height: 2000, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
 const PAPER = { width: 794, height: 1123, deviceScaleFactor: 2 }
-const SANCT = 'view=report&pi=coll:places&layout=scorecard&title=Sanctuary%20condition'
+const SANCT = 'view=report&layout=scorecard&title=Sanctuary%20condition'
 const CINMS = 'view=report&pi=NMS:CINMS&title=One%20sanctuary%3A%20Channel%20Islands'
-const OVER = 'view=report&pi=coll:places&layout=cards&title=Too%20many%20cards'
+const OVER = 'view=report&layout=cards&title=Too%20many%20cards'
 const CARD = { width: 760, height: 1000, deviceScaleFactor: 2 }
 const CARD_PHONE = { width: 390, height: 1000, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
 const EMBED_HASH = 'card=NMS:CINMS|erddap:dhw_5km:CRW_SST:mean'
 const print = async page => { await page.emulateMediaType('print') }
 
-const REMOVED = 'xp=NMS:NMSAS,NMS:FKNMS&xi=erddap:IMERG_monthly_global_precip:precipitation:mean'
+const REMOVED = 'px=NMS:NMSAS,NMS:FKNMS&ix=erddap:IMERG_monthly_global_precip:precipitation:mean'
 const scrollRight = async page => { await page.evaluate(() => { const b = document.querySelector('.box'); b.scrollLeft = b.scrollWidth }) }
-// a picker's button is found by the small word above it (Places, Indicators, Place, Place group); the panel loads on the first open
-const openPicker = kicker => async page => {
-  await page.evaluate(k => [...document.querySelectorAll('.pk')].find(p => p.querySelector('.mbon-label')?.textContent === k)?.querySelector('button.trig')?.click(), kicker)
+// a picker's button is found by the small word above it (Places, Indicators, Place); `scope` is the section it is in ('.select' for the
+// Select section, 'section.controls' for a view's own controls); the panel loads on the first open
+const openPicker = (kicker, scope = '') => async page => {
+  await page.evaluate(([sc, k]) => [...document.querySelectorAll(`${sc} .pk`)].find(p => p.querySelector('.mbon-label')?.textContent === k)?.querySelector('button.trig')?.click(), [scope, kicker])
   await page.waitForSelector('.pop .body input[type=search]', { timeout: 10000 })
   await new Promise(r => setTimeout(r, 300))
 }
-
-// the Map's group picker, and choosing a group the indicator has no values in (sea surface temperature -> the reserves: the notice)
-const choosePickerRow = key => async page => {
-  await page.evaluate(k => document.querySelector(`.pop button.cb[data-key="${k}"]`)?.click(), key)
-  await page.waitForSelector('.map[data-state=done]', { timeout: 60000 })
-  await new Promise(r => setTimeout(r, 500))
+// the places picker with a collection nothing is computed for opened: the gazetteer's index is read, its places listed
+const openUncomputed = label => async page => {
+  await openPicker('Places', '.select')(page)
+  await page.evaluate(() => document.querySelector('.pop button.disc[aria-label="Collapse National Marine Sanctuaries"]')?.click())
+  await page.evaluate(l => document.querySelector(`.pop button.disc[aria-label="Expand ${l}"]`)?.click(), label)
+  await page.waitForFunction(l => !!document.querySelector(`.pop li.node[data-kind=collection] .kids li.node[data-kind=place]`) && !/Loading/.test(document.querySelector('.pop')?.textContent ?? ''), { timeout: 30000 }, label).catch(() => {})
+  await page.evaluate(l => document.querySelector(`.pop button.disc[aria-label="Collapse ${l}"]`)?.closest('li.node')?.scrollIntoView({ block: 'start' }), label)
+  await new Promise(r => setTimeout(r, 400))
 }
-const NERRS_PRECIP = 'view=map&ind=erddap:IMERG_monthly_global_precip:precipitation:mean&coll=noaa_nerrs&place=NERRS:WEL'
-const NERRS_MEMBER = 'view=map&ind=erddap:IMERG_monthly_global_precip:precipitation:mean&coll=noaa_nerrs&place=NERRS:ACE'
-const EEZ_OBIS = 'view=map&ind=obis:species&coll=mr_eez'
+
+const NERRS_PRECIP = 'view=map&ind=erddap:IMERG_monthly_global_precip:precipitation:mean&pi=coll:noaa_nerrs&place=NERRS:WEL'
+const NERRS_MEMBER = 'view=map&ind=erddap:IMERG_monthly_global_precip:precipitation:mean&pi=coll:noaa_nerrs&place=NERRS:ACE'
+const EEZ_OBIS = 'view=map&ind=obis:species&pi=coll:mr_eez'
 // the political ocean: the EEZs (Marine Regions' WMS) over the high seas by FAO area (the FAO major areas' PMTiles), one scale
-const NERRS_ALL = 'view=map&ind=erddap:IMERG_monthly_global_precip:precipitation:mean&coll=noaa_nerrs'
-const POLITICAL = 'view=map&ind=obis:species&coll=set:political&grain=decade'
+const NERRS_ALL = 'view=map&ind=erddap:IMERG_monthly_global_precip:precipitation:mean&pi=coll:noaa_nerrs'
+const POLITICAL = 'view=map&ind=obis:species&pi=set:political&grain=decade'
 // a real click at a longitude and latitude of the world view: the map opens framed on [-180, -85, 180, 85] with 24 px of padding,
 // so the click is placed from the canvas size by the Web Mercator formulae. then wait for the selected place to be named
 const clickAt = (lon, lat) => async page => {
@@ -113,15 +118,15 @@ const SHOTS = [
   ['matrix_oceanmetrics_dark_placerows', 'oceanmetrics', 'dark', DESKTOP, 'axes=p'],
   ['matrix_oceanmetrics_light_placerows_390', 'oceanmetrics', 'light', PHONE, 'axes=p'],
   // the pickers open: places (groups, "n of N", the gazetteer links, not computed yet) and indicators (a place and an indicator removed)
-  ['matrix_oceanmetrics_light_places_picker', 'oceanmetrics', 'light', DESKTOP, REMOVED, openPicker('Places')],
-  ['matrix_oceanmetrics_dark_places_picker', 'oceanmetrics', 'dark', DESKTOP, REMOVED, openPicker('Places')],
-  ['matrix_mbon_light_places_picker', 'mbon', 'light', DESKTOP, REMOVED, openPicker('Places')],
-  ['matrix_oceanmetrics_light_places_picker_390', 'oceanmetrics', 'light', PHONE, REMOVED, openPicker('Places')],
-  ['matrix_oceanmetrics_dark_places_picker_390', 'oceanmetrics', 'dark', PHONE, REMOVED, openPicker('Places')],
-  ['matrix_oceanmetrics_light_indicators_picker', 'oceanmetrics', 'light', DESKTOP, REMOVED, openPicker('Indicators')],
-  ['matrix_oceanmetrics_dark_indicators_picker', 'oceanmetrics', 'dark', DESKTOP, REMOVED, openPicker('Indicators')],
-  ['matrix_mbon_dark_indicators_picker', 'mbon', 'dark', DESKTOP, REMOVED, openPicker('Indicators')],
-  ['matrix_oceanmetrics_light_indicators_picker_390', 'oceanmetrics', 'light', PHONE, REMOVED, openPicker('Indicators')],
+  ['matrix_oceanmetrics_light_places_picker', 'oceanmetrics', 'light', DESKTOP, REMOVED, openPicker('Places', '.select')],
+  ['matrix_oceanmetrics_dark_places_picker', 'oceanmetrics', 'dark', DESKTOP, REMOVED, openPicker('Places', '.select')],
+  ['matrix_mbon_light_places_picker', 'mbon', 'light', DESKTOP, REMOVED, openPicker('Places', '.select')],
+  ['matrix_oceanmetrics_light_places_picker_390', 'oceanmetrics', 'light', PHONE, REMOVED, openPicker('Places', '.select')],
+  ['matrix_oceanmetrics_dark_places_picker_390', 'oceanmetrics', 'dark', PHONE, REMOVED, openPicker('Places', '.select')],
+  ['matrix_oceanmetrics_light_indicators_picker', 'oceanmetrics', 'light', DESKTOP, REMOVED, openPicker('Indicators', '.select')],
+  ['matrix_oceanmetrics_dark_indicators_picker', 'oceanmetrics', 'dark', DESKTOP, REMOVED, openPicker('Indicators', '.select')],
+  ['matrix_mbon_dark_indicators_picker', 'mbon', 'dark', DESKTOP, REMOVED, openPicker('Indicators', '.select')],
+  ['matrix_oceanmetrics_light_indicators_picker_390', 'oceanmetrics', 'light', PHONE, REMOVED, openPicker('Indicators', '.select')],
   // place groups, the legend, the ways forward from an empty cell, and the Place view opened on an indicator
   ['matrix_oceanmetrics_light_groups', 'oceanmetrics', 'light', DESKTOP, WELLS, scrollRight],
   ['matrix_oceanmetrics_dark_groups', 'oceanmetrics', 'dark', DESKTOP, WELLS],
@@ -149,17 +154,11 @@ const SHOTS = [
   ['map_sdg1451_value_oceanmetrics_light', 'oceanmetrics', 'light', MAP, MPA],
   ['map_sdg1451_value_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, MPA],
   // OBIS, the CoastWatch OBIS replacement: species of fish per EEZ, by year and by decade
-  ['map_obis_fish_year_oceanmetrics_light', 'oceanmetrics', 'light', MAP, 'view=map&ind=obis:species:fish&coll=mr_eez'],
-  ['map_obis_fish_decade_mbon_dark', 'mbon', 'dark', MAP, 'view=map&ind=obis:species:fish&coll=mr_eez&grain=decade&t=2010'],
-  // the Map's pickers: the group list (values first, the others marked), the switch notice, the reserves (Wells coloured, the others faint)
-  ['map_groups_picker_oceanmetrics_light', 'oceanmetrics', 'light', MAP, SST + '&color=status', openPicker('Place group')],
-  ['map_groups_picker_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, SST + '&color=status', openPicker('Place group')],
-  ['map_groups_picker_mbon_light', 'mbon', 'light', MAP, SST + '&color=status', openPicker('Place group')],
-  ['map_groups_picker_oceanmetrics_light_390', 'oceanmetrics', 'light', PHONE, SST + '&color=status', openPicker('Place group')],
-  ['map_indicators_picker_oceanmetrics_light', 'oceanmetrics', 'light', MAP, SST + '&color=status', openPicker('Indicators')],
-  ['map_indicators_picker_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PHONE, SST + '&color=status', openPicker('Indicators')],
-  ['map_switch_notice_oceanmetrics_light', 'oceanmetrics', 'light', MAP, SST + '&color=status', async page => { await openPicker('Place group')(page); await choosePickerRow('noaa_nerrs')(page) }],
-  ['map_switch_notice_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, SST + '&color=status', async page => { await openPicker('Place group')(page); await choosePickerRow('noaa_nerrs')(page) }],
+  ['map_obis_fish_year_oceanmetrics_light', 'oceanmetrics', 'light', MAP, 'view=map&ind=obis:species:fish&pi=coll:mr_eez'],
+  ['map_obis_fish_decade_mbon_dark', 'mbon', 'dark', MAP, 'view=map&ind=obis:species:fish&pi=coll:mr_eez&grain=decade&t=2010'],
+  // the Map's indicator chooser (the selection's indicators), the reserves (Wells coloured, the others faint)
+  ['map_indicators_picker_oceanmetrics_light', 'oceanmetrics', 'light', MAP, SST + '&color=status', openPicker('Indicators', 'section.controls')],
+  ['map_indicators_picker_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PHONE, SST + '&color=status', openPicker('Indicators', 'section.controls')],
   ['map_nerrs_wells_oceanmetrics_light', 'oceanmetrics', 'light', MAP, NERRS_PRECIP],
   ['map_nerrs_wells_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, NERRS_PRECIP],
   ['map_nerrs_member_oceanmetrics_light', 'oceanmetrics', 'light', MAP, NERRS_MEMBER],
@@ -176,9 +175,7 @@ const SHOTS = [
   ['map_political_click_highseas_oceanmetrics_light', 'oceanmetrics', 'light', MAP, POLITICAL, clickAt(-105, -45)],
   ['map_political_click_highseas_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, POLITICAL, clickAt(-105, -45)],
   ['map_political_click_eez_oceanmetrics_light', 'oceanmetrics', 'light', MAP, POLITICAL, clickAt(-109, -27)],
-  // the group picker lists the set above the groups
-  ['map_sets_picker_oceanmetrics_light', 'oceanmetrics', 'light', MAP, POLITICAL, openPicker('Place group')],
-  ['matrix_sets_picker_oceanmetrics_dark', 'oceanmetrics', 'dark', DESKTOP, '', openPicker('Places')],
+  ['matrix_sets_picker_oceanmetrics_dark', 'oceanmetrics', 'dark', DESKTOP, '', openPicker('Places', '.select')],
   // the NERRs at continental zoom: Wells coloured, the 29 others as faint outlines and small hollow circles
   ['map_nerrs_continental_oceanmetrics_light', 'oceanmetrics', 'light', MAP, NERRS_ALL],
   ['map_nerrs_continental_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, NERRS_ALL],
@@ -186,6 +183,24 @@ const SHOTS = [
   ['place_place_picker_oceanmetrics_light', 'oceanmetrics', 'light', PLACE, FKNMS, openPicker('Place')],
   ['place_place_picker_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PLACE_PHONE, FKNMS, openPicker('Place')],
   ['place_indicator_picker_oceanmetrics_light', 'oceanmetrics', 'light', PLACE, FKNMS, openPicker('Indicators')],
+  // the Select section above the tabs: the same selection on the Matrix, the Map and the Report; the whole gazetteer in the place picker
+  ['select_matrix_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, ''],
+  ['select_map_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, SST + '&color=status'],
+  ['select_report_mbon_light', 'mbon', 'light', REPORT, SANCT],
+  ['select_matrix_oceanmetrics_light_390', 'oceanmetrics', 'light', PHONE, ''],
+  ['select_map_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, SST + '&color=status'],
+  ['select_report_oceanmetrics_dark_390', 'oceanmetrics', 'dark', REPORT_PHONE, SANCT],
+  ['select_places_picker_gazetteer_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, '', openUncomputed('Marine National Monuments')],
+  ['select_places_picker_gazetteer_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PHONE, '', openUncomputed('Marine National Monuments')],
+  // a group nothing is computed for: a column of "not computed yet" cells per place, and a group too large to list shows its first 300
+  ['uncomputed_monuments_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, 'pi=coll:noaa_marine_monuments'],
+  ['uncomputed_monuments_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PHONE, 'pi=coll:noaa_marine_monuments'],
+  ['uncomputed_nerrs_mbon_light', 'mbon', 'light', DESKTOP, 'pi=coll:noaa_nerrs&axes=p'],
+  ['uncomputed_large_group_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, 'pi=coll:protectedseas_mpa'],
+  ['uncomputed_drawer_oceanmetrics_light', 'oceanmetrics', 'light', TALL, 'pi=coll:noaa_marine_monuments&cell=MC:monuments:alice-springs|erddap:dhw_5km:CRW_SST:mean'],
+  // the Map of a selection of several groups, and of some places of one
+  ['map_selection_groups_oceanmetrics_light', 'oceanmetrics', 'light', MAP, 'view=map&ind=erddap:IMERG_monthly_global_precip:precipitation:mean&pi=coll:places,coll:noaa_nerrs'],
+  ['map_selection_places_oceanmetrics_light', 'oceanmetrics', 'light', MAP, 'view=map&ind=obis:species&pi=MRGID:5668,MRGID:8456,NMS:CINMS&grain=decade'],
   // the Report view
   ['report_scorecard_oceanmetrics_light', 'oceanmetrics', 'light', REPORT, SANCT],
   ['report_scorecard_oceanmetrics_dark', 'oceanmetrics', 'dark', REPORT, SANCT],
@@ -201,7 +216,7 @@ const SHOTS = [
   // the CoastWatch-OBIS embed: the political set, species richness by decade
   ['embed_map_political_mbon_light', 'mbon', 'light', { width: 900, height: 1100, deviceScaleFactor: 1 }, POLITICAL],
   // the Matrix of the set: its groups, places as rows
-  ['matrix_political_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, 'colls=set:political&axes=p'],
+  ['matrix_political_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, 'pi=set:political&axes=p'],
 ]
 
 async function alive(url) { try { return (await fetch(url)).ok } catch { return false } }

@@ -111,8 +111,8 @@ if (cell3) {
   }
 }
 
-// Tab to the first remove button of a kind, press Enter: the hash gets xp= (place) or xi= (indicator), focus stays on a button
-for (const [kind, key] of [['place', 'xp='], ['indicator', 'xi=']]) {
+// Tab to the first remove button of a kind, press Enter: the hash gets px= (place) or ix= (indicator), focus stays on a button
+for (const [kind, key] of [['place', 'px='], ['indicator', 'ix=']]) {
   await page.goto('about:blank')   // a fresh load: a hash-only change would keep the page, and the focus, as it was
   await page.goto(`${URL_BASE}${Q}`, { waitUntil: 'networkidle0' })
   await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
@@ -129,8 +129,7 @@ for (const [kind, key] of [['place', 'xp='], ['indicator', 'xi=']]) {
   }
 }
 
-// the Report view: Tab reaches Edit, Enter opens the builder, Tab reaches a tree checkbox (role=checkbox), Space toggles it
-// and the hash changes (every report is a permalink)
+// the Report view: Tab reaches Edit, Enter opens the builder (preset, layout, style: no trees, the Select section above the tabs chooses)
 await page.goto('about:blank')
 await page.goto(`${URL_BASE}${Q}#view=report&pi=coll:places&layout=scorecard`, { waitUntil: 'networkidle0' })
 await page.waitForSelector('.lens[data-state=done] .rv', { timeout: 30000 })
@@ -139,16 +138,7 @@ check(!!edit, `report: Tab reaches the Edit button${edit ? ` (${edit.presses} pr
 if (edit) {
   await page.keyboard.press('Enter')
   check(await page.waitForSelector('.builder', { timeout: 5000 }).then(() => true, () => false), 'report: Enter opens the builder')
-  const box = await tabUntil(f => f.role === 'checkbox', 60)
-  check(!!box, `report: Tab reaches a tree checkbox${box ? ` ("${box.f.label}")` : ''}`)
-  if (box) {
-    const before = await page.evaluate(() => ({ hash: location.hash, on: document.activeElement.getAttribute('aria-checked') }))
-    await page.keyboard.press('Space')
-    await page.waitForFunction(h => location.hash !== h, { timeout: 5000 }, before.hash).catch(() => {})
-    const after = await page.evaluate(() => ({ hash: location.hash, on: document.activeElement?.getAttribute('aria-checked') }))
-    check(after.hash !== before.hash, `report: Space toggles it and the hash changes (${before.hash} -> ${after.hash})`)
-    check(after.on !== before.on, `report: aria-checked follows (${before.on} -> ${after.on})`)
-  }
+  check(await page.evaluate(() => !document.querySelector('.builder [role=checkbox]')), 'report: the builder has no selection tree of its own')
 }
 
 // the pickers, keys only: Tab to the button, Enter opens the panel (focus in its search box), arrows move through the tree or the
@@ -176,7 +166,7 @@ const closeWithEsc = async (t, what) => {
 }
 const hashChanged = (was, k) => page.waitForFunction((w, key) => location.hash !== w && location.hash.includes(key), { timeout: 5000 }, was, k).then(() => true, () => false)
 
-// Matrix, places: search "channel", arrow to the result, Enter takes it off the display (xp=)
+// Matrix, places: search "channel", arrow to the result, Enter takes it off the selection (px=)
 await fresh('')
 let was = await page.evaluate(() => location.hash)
 let t = await openWith(/places?\b/, 'places picker')
@@ -186,10 +176,10 @@ if (t) {
   check(await page.evaluate(() => document.activeElement?.matches('.pop button.cb')), 'places picker: ArrowDown moves from the search box to the first group in the results')
   await page.keyboard.press('ArrowDown')   // the first result under it
   await page.keyboard.press('Enter')
-  check(await hashChanged(was, 'xp='), `places picker: Enter on a result toggles it (${await page.evaluate(() => location.hash)})`)
+  check(await hashChanged(was, 'px='), `places picker: Enter on a result toggles it (${await page.evaluate(() => location.hash)})`)
   await closeWithEsc(t, 'places picker')
 }
-// Matrix, indicators: arrow to the first box in the tree, Space unticks it (xi=)
+// Matrix, indicators: arrow to the first box in the tree, Space unticks it (ix=)
 await fresh('')
 was = await page.evaluate(() => location.hash)
 t = await openWith(/indicators?\b/, 'indicators picker')
@@ -198,32 +188,60 @@ if (t) {
   const box = await tabUntil(f => f.role === 'checkbox', 12)
   check(!!box, `indicators picker: Tab reaches a tree checkbox${box ? ` ("${box.f.label}")` : ''}`)
   await page.keyboard.press('Space')
-  check(await hashChanged(was, 'xi='), `indicators picker: Space unticks it (${await page.evaluate(() => location.hash)})`)
+  check(await hashChanged(was, 'ix='), `indicators picker: Space unticks it (${await page.evaluate(() => location.hash)})`)
   await closeWithEsc(t, 'indicators picker')
 }
-// Map, group: the place set is the first row, then the groups; ArrowDown to the second group, Enter chooses it, the panel closes and focus returns to the button
-await fresh('#view=map&ind=erddap:dhw_5km:CRW_SST:mean&coll=places')
-was = await page.evaluate(() => location.hash)
-t = await openWith(/places?\b/, 'group picker')
-if (t) {
-  await page.keyboard.press('ArrowDown')
-  await page.keyboard.press('ArrowDown')
-  await page.keyboard.press('ArrowDown')
-  await page.keyboard.press('Enter')
-  check(await hashChanged(was, 'coll='), `group picker: Enter chooses a group (${await page.evaluate(() => location.hash)})`)
-  check(await page.waitForSelector('.pop', { hidden: true, timeout: 5000 }).then(() => true, () => false), 'group picker: choosing closes the panel')
-  check(/trig/.test((await focused())?.cls ?? ''), 'group picker: focus returns to its button')
+// the Select section is above every tab but the Place view's: the same two pickers, with the same keys, on the Map and the Report
+for (const [view, hash] of [['map', '#view=map&ind=erddap:dhw_5km:CRW_SST:mean'], ['report', '#view=report&layout=scorecard']]) {
+  await fresh(hash)
+  check(await page.evaluate(() => !!document.querySelector('section.select')), `${view}: the Select section is there`)
+  was = await page.evaluate(() => location.hash)
+  t = await openWith(/places?\b/, `${view}: places picker`)
+  if (t) {
+    await page.keyboard.type('channel')
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Enter')
+    check(await hashChanged(was, 'px='), `${view}: places picker: Enter on a result toggles it (${await page.evaluate(() => location.hash)})`)
+    await closeWithEsc(t, `${view}: places picker`)
+  }
 }
-// Map, group picker: the place set is the first row; Enter on it writes coll=set:political
-await fresh('#view=map&ind=obis:species&coll=mr_eez')
+// the place set is the first row of the places picker: Enter on it writes pi=...set:political; Esc closes and focus returns to the button
+await fresh('#view=map&ind=obis:species&pi=coll:mr_eez')
 was = await page.evaluate(() => location.hash)
 t = await openWith(/Exclusive Economic Zones/, 'set picker')
 if (t) {
   await page.keyboard.press('ArrowDown')
   await page.keyboard.press('Enter')
-  check(await hashChanged(was, 'coll=set:political'), `set picker: Enter on the place set (${await page.evaluate(() => location.hash)})`)
-  check(await page.waitForSelector('.pop', { hidden: true, timeout: 5000 }).then(() => true, () => false), 'set picker: choosing closes the panel')
-  check(/trig/.test((await focused())?.cls ?? ''), 'set picker: focus returns to its button')
+  check(await hashChanged(was, 'set:political'), `set picker: Enter on the place set (${await page.evaluate(() => location.hash)})`)
+  await closeWithEsc(t, 'set picker')
+}
+// the Map's own indicator chooser lists the selection's indicators; "another indicator" opens the Select section's picker
+await fresh('#view=map&ind=erddap:dhw_5km:CRW_SST:mean')
+was = await page.evaluate(() => location.hash)
+t = await openWith(/SST/, 'map indicator chooser')
+if (t) {
+  // the tree opens its categories and series: arrow down to an indicator other than the one shown (its key has a colon), then Enter
+  for (let i = 0; i < 40; i++) {
+    await page.keyboard.press('ArrowDown')
+    const at = await page.evaluate(() => ({ key: document.activeElement?.getAttribute('data-key') ?? '', closed: document.activeElement?.getAttribute('aria-expanded') === 'false' }))
+    if (/:/.test(at.key) && at.key !== 'erddap:dhw_5km:CRW_SST:mean') break
+    if (at.closed) await page.keyboard.press('Enter')   // a closed series: open it, the next ArrowDown reaches its first indicator
+  }
+  await page.keyboard.press('Enter')
+  check(await hashChanged(was, 'ind='), `map indicator chooser: Enter chooses an indicator (${await page.evaluate(() => location.hash)})`)
+  check(await page.waitForSelector('.pop', { hidden: true, timeout: 5000 }).then(() => true, () => false), 'map indicator chooser: choosing closes the panel')
+  check(/trig/.test((await focused())?.cls ?? ''), 'map indicator chooser: focus returns to its button')
+}
+await fresh('#view=map&ind=erddap:dhw_5km:CRW_SST:mean')
+t = await openWith(/SST/, 'map indicator chooser (another)')
+if (t) {
+  const other = await tabUntil(f => f.tag === 'BUTTON' && /^Another indicator/.test(f.label ?? ''), 80)
+  check(!!other, 'map indicator chooser: Tab reaches "Another indicator"')
+  if (other) {
+    await page.keyboard.press('Enter')
+    check(await page.waitForFunction(() => document.querySelector('.pop input[type=search]') && !!document.querySelector('.select .pop'), { timeout: 5000 }).then(() => true, () => false), '"Another indicator" opens the Select section\'s indicator picker')
+  }
 }
 // Place view, place: type "channel", ArrowDown, Enter goes to that place
 await fresh('#view=place&place=NMS:FKNMS')
