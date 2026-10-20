@@ -39,6 +39,8 @@ export interface Indicator {
   decimals?: number
   kind: 'continuous' | 'categorical'
   classes?: Record<string, string>
+  /** categorical: the classes are ordered (alert levels), so the map ramps them instead of giving each a hue */
+  ordinal?: boolean
   category: Partial<Record<VocabId, string>>
   series: string
   series_title?: string

@@ -9,7 +9,7 @@
   import type { Catalog, Indicator, VocabId } from './data.ts'
   import { configHash, configLines, badgeUrl } from './delivery.ts'
   import { EOV_GLYPH_CREDIT, GOOS_CREDIT, STATUS_NOTE } from './credits.ts'
-  import { placeHref } from './hash.ts'
+  import { mapHref, placeHref } from './hash.ts'
   import type { Depth } from './hash.ts'
   import { classText, STATUS_WORDS, TREND_WORDS, periodText, valueText } from './matrix.ts'
   import type { CellModel, Place } from './matrix.ts'
@@ -84,6 +84,9 @@
   <p class="toplace">
     <a class="plink" href={placeHref({ vocab, depth, method: null }, place.id, place.coll, ind.id)}>
       <Icon name="view-place" size={16} />Open in place view <span class="mbon-sr-only">: {place.name}, {ind.short}</span>
+    </a>
+    <a class="plink" href={mapHref({ vocab, depth, method: null }, ind.id, place.coll)}>
+      <Icon name="view-map" size={16} />Open in map view <span class="mbon-sr-only">: {ind.short}</span>
     </a>
   </p>
 
@@ -173,7 +176,7 @@
   .cap { margin: 0; font: var(--type-small); color: var(--text-body); }
 
   .config, .cite, .goos { background: var(--bg-tint); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); min-width: 0; }
-  .toplace { margin: 0; }
+  .toplace { margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
   .plink { display: inline-flex; align-items: center; gap: var(--space-2); font: var(--fw-semibold) var(--text-sm) / 1.2 var(--font-sans); }
   .k { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-2); font: var(--type-label); text-transform: uppercase; letter-spacing: var(--ls-label); }
   .config .k, .cite .k { color: var(--text-body); }

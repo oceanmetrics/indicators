@@ -102,10 +102,23 @@ Rscript fixtures/ecoidx/build_iea_sd_fixtures.R ~/Github/noaa-iea/ecoidx   # the
 - **Viewer:** `.github/workflows/pages.yml` tests, builds (`VITE_BASE=/indicators/`) and checks the size budget on
   every push touching the viewer, then deploys to https://oceanmetrics.io/indicators/.
 
+## Map view
+
+`#view=map` colours one indicator over one collection of places: by its value (five quantile classes), its departure
+from the place's own mean (in SD), its status or trend (iea-sd or names-pct, computed by `src/status` as of the period
+shown), the length of its record, or, for a categorical indicator, its largest class or the share of one class. A slider
+walks the periods. Hash keys: `ind`, `coll`, `color` (`value|departure|status|trend|record|class|share`), `t` (`2024` or
+`2024-07`; none = each place's latest), `cls` (the class `share` maps) and `method`. Vector collections (`places`) are
+drawn from the gazetteer's PMTiles; reference collections (`mr_eez`) are drawn by Marine Regions' own WMS, one request per
+tile, coloured by an SLD and the request's `ENV`, so no Marine Regions geometry is hosted by us. The legend and "The map
+as a table" carry every class in words and glyphs, so nothing depends on colour.
+
 ## Size budget
 
-`node scripts/size-budget.mjs` after `npm run build`, in gzip: entry JS ≤ 110 kB, all JS ≤ 200 kB, CSS ≤ 15 kB.
-At the first deploy (2026-10-20) the entry was 86.5 kB and the CSS 6.7 kB. Raise a budget only with the reason here.
+`node scripts/size-budget.mjs` after `npm run build`, in gzip: entry JS ≤ 110 kB, all JS except the map chunk ≤ 200 kB,
+the map chunk (MapLibre, pmtiles and the map components) ≤ 330 kB, CSS except the map's ≤ 15 kB, the map's CSS ≤ 15 kB.
+At the first deploy (2026-10-20) the entry was 86.5 kB and the CSS 6.7 kB. The map chunk has its own budget because
+MapLibre is about 230 kB gzip and is loaded only when the Map view is opened. Raise a budget only with the reason here.
 
 ## Brand and icons
 

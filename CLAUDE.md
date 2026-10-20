@@ -50,6 +50,9 @@ indicators.json + coverage.parquet ──► viewer/ (imports src/status/, src/i
   itself with 1 SD rather than its departure from the long-term mean (`R/plot.R:167-168`), and its +/− captions are
   reversed. The recent window is the last `recent` rows of the series (NA rows count), the SD is the sample SD, a
   change of exactly 1 SD is not a change.
+- **The Map view** (`viewer/src/lib/map/`): classes, legends and the table come from `classes.ts` (status and trend
+  only through `src/status`); reference collections (Marine Regions `mr_*`) are drawn by Marine Regions' own WMS
+  (`wms.ts`: an SLD plus `ENV`, one request per tile) and never from geometry we host.
 - **Statuses are statistical, never better/worse.** No ONMS colours, no ▲ ▬ ▼; glyphs `st-above|within|below`,
   `tr-up|flat|down` differ in shape, and captions say "relative to its own record".
 - **The contract** (`schema/values.schema.json`, `om_indicators/contract.py`): every adapter writes through
