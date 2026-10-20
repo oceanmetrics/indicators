@@ -2,12 +2,13 @@
 made-up polygons, a stand-in catalogue entry. nothing here touches the network or a Copernicus login."""
 import datetime as dt
 
-import numpy as np
 import pytest
 
+# the `cmems` dependency group: without it every module importing this fixture is skipped, never an import error
+# (regression, 2026-10-20: a top-level `import numpy` failed the collection of `uv run --group dev pytest -q`)
+np = pytest.importorskip("numpy")
 xr = pytest.importorskip("xarray")
 shapely = pytest.importorskip("shapely")
-pytest.importorskip("numpy")
 
 NO3 = "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:no3:mean"
 LAYERS = {"layers": [
