@@ -62,20 +62,43 @@ WHERE time_grain = 'year' ORDER BY place_id, time;
 ## Commands
 
 ```sh
-uv sync --group dev && npm ci
-uv run --group dev pytest -q                 # contract, adapters, manifest
-npm test                                     # status methods (ecoidx cross-check), coverage, icons, viewer
+uv sync --group dev --group brand && npm ci
+uv run --group dev pytest -q                 # contract, adapters, manifest, GOOS badges and traced glyphs
+npm test                                     # status (incl. the ecoidx cross-check), coverage, icons, favicons, viewer
 npm run check                                # svelte-check + tsc
 
 # build the catalog from what the producers have published
-uv run om-ind erddap-places --out catalog    # gazetteer/stats -> month and year rows
+uv run om-ind erddap-places --out catalog    # gazetteer/stats -> complete month and year rows
 uv run om-ind sdg --values ../places/proto/eez_indicators/data/values.json --out catalog
 uv run om-ind manifest --out catalog         # catalog/indicators.json
-npm run coverage:build -- catalog            # catalog/coverage.parquet
-uv run om-ind validate catalog               # every values file against the contract
+npm run coverage:build -- catalog            # catalog/coverage.parquet (statuses from src/status)
+uv run om-ind validate catalog               # every values file and coverage.parquet against the schemas
 
 npm run dev                                  # the viewer on http://localhost:5181/, reading catalog/
+node viewer/scripts/shoot.mjs                # screenshots -> docs/shots/ (both themes, both brands, 390 px)
+
+# brand: icons and favicons (no path or colour typed by hand)
+uv run --group brand brand/eov_trace.py --task all   # GOOS badges -> WebP, traced eov- glyphs, review sheet
+python3 brand/glyphs.py                      # bespoke glyphs from primitives -> brand/glyphs/bespoke.json
+npm run icons:paths && npm run icons:build   # src/icons/icon-paths.ts; brand/v1/icons/{om-icons.svg, icons.css, index.html}
+npm run icons:sheet                          # contact sheet screenshots -> docs/shots/icons_*.png
+node brand/build-favicons.mjs                # brand/favicons/{oceanmetrics,mbon}/ incl. head.html to paste verbatim
+Rscript fixtures/ecoidx/build_iea_sd_fixtures.R ~/Github/noaa-iea/ecoidx   # the iea-sd cross-check
 ```
+
+## Brand and icons
+
+- **Themes** (`brand/themes/`): `oceanmetrics` maps the [Ocean Metrics brand v1](https://oceanmetrics.io/brand/v1/)
+  onto the semantic tokens of [`@marinebon/ui`](https://marinebon.org/ui/) (teal brand, one sun action with dark ink);
+  `mbon` is the kit's own tokens. The viewer switches with `?brand=oceanmetrics|mbon` and `?theme=light|dark`.
+- **Icons** (108 glyphs in the families `ui- view- el- depth- onms- eov- place- st- tr- cell-`): published at
+  [oceanmetrics.io/brand/v1/icons/](https://oceanmetrics.io/brand/v1/icons/) as a `<symbol>` sprite
+  (`om-icons.svg`), CSS masks usable from any page (`icons.css`: `<i class="om-i om-i-st-above"></i>`) and the
+  contact sheet. Glyphs from `brand/v1/` stay byte-identical (`brand/icons.lock.json`); new ones are additive.
+- **Statuses** are statistical, relative to the place's own record: `st-above`, `st-within`, `st-below`, `st-none`
+  and `tr-up`, `tr-flat`, `tr-down` differ in shape and read without colour. They are not ONMS condition ratings.
+- **Favicons** (`brand/favicons/<theme>/`): an SVG mark, ICO, 16/32 px PNG, apple-touch, maskable icons, an og:image
+  and a `head.html` to paste verbatim. MBON publishes only a 48 px favicon, so its larger icons are upscales.
 
 ## Credits
 

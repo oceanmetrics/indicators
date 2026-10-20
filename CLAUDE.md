@@ -12,15 +12,21 @@ The plan is `~/Github/bbest/notes/om/plans_todo/2026-10-19_indicator-matrix_plan
 ## Commands
 
 ```sh
-uv sync --group dev && npm ci
-uv run --group dev pytest -q                      # contract, adapters, manifest (must be green to commit)
+uv sync --group dev --group brand && npm ci
+uv run --group dev pytest -q                      # contract, adapters, manifest, GOOS (must be green to commit)
 uv run --group dev pytest -q tests/test_contract.py -k round_trip
-npm test                                          # vitest: status methods, coverage, icons, viewer (must be green)
-npx vitest run src/status/ieaSd.test.ts           # one file
+npm test                                          # vitest: status, coverage, icons, favicons, viewer (must be green)
+npx vitest run src/status/ecoidx.test.ts          # one file
 npm run check                                     # svelte-check + tsc
 npm run dev                                       # viewer on http://localhost:5181/ (reads catalog/)
+node viewer/scripts/shoot.mjs [--only <name>]     # screenshots -> docs/shots/; look at them
+npm run icons:paths && npm run icons:build && npm run icons:sheet   # after any change to brand/ sources
 Rscript fixtures/ecoidx/build_iea_sd_fixtures.R ~/Github/noaa-iea/ecoidx   # regenerate the iea-sd cross-check
 ```
+
+The catalog build (adapters → manifest → coverage → validate) is in README.md "Commands". The icon set is published by
+copying `brand/v1/icons/{om-icons.svg,icons.css,index.html}` to `oceanmetrics.github.io/static/brand/v1/icons/`
+(served at https://oceanmetrics.io/brand/v1/icons/) after `npm test` is green; never change a locked glyph.
 
 In a sandbox set `TMPDIR` to a writable directory or vitest cannot start. `OM_OFFLINE=1` skips tests that read the
 published gazetteer over HTTP.
