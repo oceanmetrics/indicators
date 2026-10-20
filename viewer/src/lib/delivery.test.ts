@@ -31,6 +31,12 @@ describe('delivery', () => {
     expect(licenceText(ind({}))).toBe('values CC-BY-4.0; source data CC0-1.0')
     expect(licenceText(ind({ license: 'CC0-1.0' }))).toBe('CC0-1.0')
   })
+  it('a dataset licence of "other" or "various" is not printed as a licence', () => {
+    for (const l of ['other', 'various']) {
+      const i = ind({})
+      expect(licenceText({ ...i, dataset: { ...i.dataset, license: l } })).toBe("values CC-BY-4.0; source data under the provider's own terms")
+    }
+  })
   it('data credits: per producer, provider names once, without ours and without NA', () => {
     const mk = (producer: string, names: [string, string[]][]) => ind({ producer: { name: producer }, dataset: { id: 'd', title: 'D', providers: names.map(([name, roles]) => ({ name, roles })) } })
     const c = producerCredits({ indicators: [

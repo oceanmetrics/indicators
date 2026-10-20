@@ -44,7 +44,7 @@ describe.skipIf(!have)('the real catalog', async () => {
         expect(cellAria(ind, p, m).length).toBeGreaterThan(10)
       }
     }
-  })
+  }, 60_000)   // 110 indicators × ~300 places × 6 ways (OBIS made it ~10 s)
   it('the default matrix has the places and the cells with a status the coverage promises', () => {
     const s = matrixStats(groupRows(idx, [], ''), groupColumns(manifest.indicators, manifest.vocabularies, 'onms', true), idx)
     expect(s.places).toBe(new Set(rows.map(r => r.place_id)).size)

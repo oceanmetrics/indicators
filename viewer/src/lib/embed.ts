@@ -1,4 +1,5 @@
-// the embed route's hash: `#card=<place_id>|<indicator>&method=<iea-sd|names-pct|values>&depth=<skim|swim|dive>[&vocab=][&coll=]`.
+// the embed route's hash: `#card=<place_id>|<indicator>&method=<iea-sd|names-pct|values>&depth=<skim|swim|dive>[&vocab=][&coll=][&fig=1]`.
+// fig=1 draws the card as a still figure (no buttons, table, downloads or elements): what the figure job saves as PNG.
 // one IndicatorCard with no app chrome, for iframes (SanctuaryWatch figures, ONMS and MBON pages) and for the figure job.
 import { DEPTHS, METHOD_IDS } from './hash.ts'
 import type { Depth } from './hash.ts'
@@ -12,6 +13,8 @@ export interface EmbedState {
   method: MethodId | null
   depth: Depth
   vocab: VocabId
+  /** a still figure: the card without its controls */
+  still: boolean
 }
 
 const dec = (s: string) => { try { return decodeURIComponent(s) } catch { return s } }
@@ -36,6 +39,7 @@ export function parseEmbedHash(hash: string): EmbedState | null {
     method: METHOD_IDS.includes(method) ? method : null,
     depth: DEPTHS.includes(depth) ? depth : 'swim',
     vocab: vocab === 'names' || vocab === 'eov' ? vocab : 'onms',
+    still: kv.get('fig') === '1',
   }
 }
 
@@ -46,6 +50,7 @@ export function embedHash(s: Pick<EmbedState, 'place' | 'indicator'> & Partial<E
   if (s.method) parts.push('method=' + s.method)
   if (s.depth && s.depth !== 'swim') parts.push('depth=' + s.depth)
   if (s.vocab && s.vocab !== 'onms') parts.push('vocab=' + s.vocab)
+  if (s.still) parts.push('fig=1')
   return parts.join('&')
 }
 

@@ -4,7 +4,7 @@
 // bundle's text and data come from src/report/sanctuarywatch.ts, which the viewer's Export uses too.
 //   node --experimental-strip-types scripts/sanctuarywatch_bundle.ts --place NMS:CINMS [--catalog catalog]
 //     [--out <catalog>/sanctuarywatch] [--viewer https://oceanmetrics.io/indicators/] [--png]
-// --png opens <viewer>embed/#card=<place>|<indicator> headless (the same component the viewer draws) and saves it;
+// --png opens <viewer>embed/#card=<place>|<indicator>&fig=1 (a still card) headless (the same component the viewer draws) and saves it;
 // the daily job runs it so each figure.png keeps a stable URL under indicators/sanctuarywatch/.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path'
@@ -104,7 +104,7 @@ if (args.includes('--png')) {
   for (const f of figures) {
     const dir = join(OUT, swFolder(PLACE, f.indicator.id))
     await page.goto('about:blank')
-    await page.goto(`${VIEWER}embed/?theme=light#card=${PLACE}|${f.indicator.id}`, { waitUntil: 'networkidle0' })
+    await page.goto(`${VIEWER}embed/?theme=light#card=${PLACE}|${f.indicator.id}&fig=1`, { waitUntil: 'networkidle0' })
     await page.waitForSelector('[data-state=done]', { timeout: 30000 })
     await (await page.$('[data-state=done]'))!.screenshot({ path: join(dir, 'figure.png') })
     const svg = await page.evaluate(() => document.querySelector('[data-state=done] svg')?.outerHTML ?? '')

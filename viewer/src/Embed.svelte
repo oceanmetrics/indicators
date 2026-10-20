@@ -75,7 +75,7 @@
   {:else if catalog && want && ind && place && idx && term}
     {#key want.place + '|' + want.indicator}
       <IndicatorCard {catalog} {ind} {place} collTitle={collTitle(place.coll)} {term} vocab={want.vocab} depth={want.depth} method={want.method}
-        cov={pickRow(idx, place.id, ind)} onsettled={drawn} />
+        cov={pickRow(idx, place.id, ind)} onsettled={drawn} still={want.still} />
     {/key}
     <p class="credit">{credit} <a href={home} target="_top">View in Ocean Metrics Indicators</a></p>
   {/if}

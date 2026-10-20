@@ -57,7 +57,7 @@ describe.skipIf(!have)('the Place view on the real catalog', () => {
     }
     expect(checked).toBeGreaterThan(100)
     expect(withStatus).toBeGreaterThan(20)
-  })
+  }, 60_000)   // every status-grain row of the real catalog (17k with OBIS)
 
   it('FKNMS has a card for every indicator the matrix has a cell for, each with a sentence, in every vocabulary', () => {
     const { place, rows } = placeCoverage(cov, 'NMS:FKNMS')

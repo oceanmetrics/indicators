@@ -69,10 +69,17 @@ export function producerCredits(m: Pick<Manifest, 'indicators'>): Credit[] {
 /** the dataset's source link: its landing page, else the producer STAC */
 export const datasetLink = (ind: Indicator) => ind.dataset.via ?? ind.dataset.stac ?? ind.producer.url ?? null
 
-/** the licence line: the values' licence and the dataset's own, when they differ */
+/**
+ * the licence line: the values' licence and the dataset's own, when they differ. a dataset licence of "other"
+ * (Copernicus Marine's own terms) or "various" (OBIS: one per source dataset) names none, so the source's terms are
+ * pointed to instead of printed as a word
+ */
 export function licenceText(ind: Indicator): string {
   const values = ind.license ?? ''
-  const own = ind.dataset.license ?? ''
+  const raw = ind.dataset.license ?? ''
+  const unnamed = ['other', 'various'].includes(raw.toLowerCase())
+  const own = unnamed ? '' : raw
+  if (values && unnamed) return `values ${values}; source data under the provider's own terms`
   if (values && own && values !== own) return `values ${values}; source data ${own}`
   return values || own || 'not stated'
 }

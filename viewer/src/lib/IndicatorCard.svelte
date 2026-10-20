@@ -47,8 +47,10 @@
     opts?: Pick<CardOptions, 'recent' | 'baseline' | 'from' | 'to'>
     /** a prefix for the card's element ids, when the same indicator is drawn for several places on one page */
     uid?: string
+    /** a still figure (the embed route's fig=1): title, sentence, glyphs, chart and citation, no controls */
+    still?: boolean
   }
-  let { catalog, ind, place, collTitle, term, vocab, depth, method, cov, focused = false, onsettled, opts = {}, uid = "" }: Props = $props()
+  let { catalog, ind, place, collTitle, term, vocab, depth, method, cov, focused = false, onsettled, opts = {}, uid = "", still = false }: Props = $props()
 
   type Load = { s: 'loading' } | { s: 'ok'; rows: PlaceRow[] } | { s: 'error'; msg: string }
   let load = $state.raw<Load>({ s: 'loading' })
@@ -132,7 +134,7 @@
         <TimeChart {model} {unit} recent={opts.recent ?? ind.recent} />
       {/if}
 
-      {#if model.kind !== 'empty'}
+      {#if model.kind !== 'empty' && !still}
         <div class="controls">
           {#if model.grains.length > 1}
             <div class="ctl" role="group" aria-label="Time grain">
@@ -175,6 +177,7 @@
         </div>
       {/if}
 
+      {#if !still}
       <div class="actions" role="group" aria-label="Downloads for this place and indicator">
         <Button variant="quiet" size="sm" onclick={csv}><Icon name="ui-download" size={16} />CSV</Button>
         <Button variant="quiet" size="sm" onclick={parquet}><Icon name="ui-download" size={16} />Parquet</Button>
@@ -185,10 +188,11 @@
         <summary><span class="mbon-label">Dataset · place · method · delivery</span></summary>
         <Elements {catalog} {ind} {place} {collTitle} row={model.stat} {depth} method={model.method} grain={model.grain ?? ind.status_grain} />
       </details>
+      {/if}
 
       <div class="cite">
         <p class="citation"><span class="mbon-label">Cite</span> {citation}</p>
-        <CopyButton text={citation} label="Copy citation" />
+        {#if !still}<CopyButton text={citation} label="Copy citation" />{/if}
       </div>
       {#if vocab === 'eov' && eov}
         <p class="credit">GOOS EOV: {eov.label}. Badge used unmodified. {GOOS_CREDIT}</p>
