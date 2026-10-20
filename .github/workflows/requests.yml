@@ -1,0 +1,121 @@
+# indicator requests (plan §4, Phase 6): an issue from the form .github/ISSUE_TEMPLATE/indicator-request.yml is
+# triaged on a GitHub runner (om_indicators/requests.py: label auto / already / needs-review, and a comment saying
+# why), and an `auto` job runs on the self-hosted macmini runner: erddap-places computes the one place, publishes it,
+# the catalog is rebuilt and published, the issue gets the link and is closed.
+#
+# the issue is untrusted input: its body reaches the triage only as a file written from an environment variable, never
+# through ${{ }} in a script; the run job re-checks the job (check-job) and passes each value as an environment
+# variable. the run job is off until the repository variable REQUESTS_AUTORUN is `on`, and at most
+# REQUESTS_PER_DAY (default 10) jobs run in 24 h. requesters are answered on the issue only: no email (yet).
+name: requests
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  triage:
+    if: github.event.issue.state == 'open' && contains(github.event.issue.labels.*.name, 'request')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: request-triage-${{ github.event.issue.number }}
+      cancel-in-progress: true
+    outputs:
+      label: ${{ steps.triage.outputs.label }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: triage
+        id: triage
+        env:
+          BODY: ${{ github.event.issue.body }}
+          NUM: ${{ github.event.issue.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s' "$BODY" > body.md
+          uv run python -m om_indicators.requests triage --body body.md --out triage.json --comment comment.md
+          label=$(jq -r .label triage.json)
+          echo "label=$label" >> "$GITHUB_OUTPUT"
+          for l in auto already needs-review; do
+            gh label create "$l" --color ededed --force >/dev/null 2>&1 || true
+            [ "$l" = "$label" ] || gh issue edit "$NUM" --remove-label "$l" >/dev/null 2>&1 || true
+          done
+          gh issue edit "$NUM" --add-label "$label"
+          gh issue comment "$NUM" --body-file comment.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: triage
+          path: triage.json
+          retention-days: 7
+
+  run:
+    needs: triage
+    if: needs.triage.outputs.label == 'auto' && vars.REQUESTS_AUTORUN == 'on'
+    runs-on: [self-hosted, macmini]
+    concurrency:
+      group: requests-run           # one job at a time on the runner, never cancelled mid-run
+      cancel-in-progress: false
+    timeout-minutes: 180
+    env:
+      AWS_DEFAULT_REGION: us-east-1
+      NUM: ${{ github.event.issue.number }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: triage
+      - name: check the job again
+        run: |
+          export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+          jq '.job' triage.json > job.json
+          uv run python -m om_indicators.requests check-job job.json >> "$GITHUB_ENV"
+      - name: daily cap
+        id: cap
+        run: |
+          since=$(date -u -v-1d +%Y-%m-%dT%H:%M:%SZ)
+          n=$(gh issue list --label auto-done --state closed --search "closed:>$since" --json number --jq length)
+          echo "done in 24 h: $n of ${REQUESTS_PER_DAY:-10}"
+          if [ "$n" -ge "${REQUESTS_PER_DAY:-10}" ]; then
+            gh issue comment "$NUM" --body "Today's automatic runs are used up; this one will run when a maintainer starts it."
+            echo "over=1" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          REQUESTS_PER_DAY: ${{ vars.REQUESTS_PER_DAY }}
+      - uses: actions/checkout@v4
+        if: steps.cap.outputs.over != '1'
+        with:
+          repository: oceanmetrics/erddap-places
+          path: erddap-places
+      - name: compute the place (erddap-places precompute)
+        if: steps.cap.outputs.over != '1'
+        run: |
+          export PATH="/opt/homebrew/bin:$PATH"
+          (cd erddap-places/app && npm ci --no-audit --no-fund)
+          cd erddap-places/precompute && npm ci --no-audit --no-fund
+          npx tsx src/precompute.ts --gazetteer "$REQ_COLL" --place "$REQ_PLACE" --dataset "$REQ_DATASET" --publish
+      - name: rebuild and publish the catalog
+        if: steps.cap.outputs.over != '1'
+        run: |
+          export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+          npm ci --no-audit --no-fund
+          scripts/build_catalog.sh
+          scripts/publish_catalog.sh
+      - name: answer the issue
+        if: steps.cap.outputs.over != '1'
+        run: |
+          link="https://oceanmetrics.io/indicators/#view=place&place=${REQ_PLACE}&coll=${REQ_COLL}&ind=${REQ_INDICATOR}"
+          gh label create auto-done --color 0e8a16 --force >/dev/null 2>&1 || true
+          gh issue comment "$NUM" --body "Done: the values are published. Place view: $link"
+          gh issue edit "$NUM" --add-label auto-done
+          gh issue close "$NUM" --reason completed
+      - name: say so when it failed
+        if: failure()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue comment "$NUM" --body "The automatic run failed; a maintainer will look at it. Run log: $RUN_URL"
