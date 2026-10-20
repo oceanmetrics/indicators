@@ -2,7 +2,8 @@
   // the Scorecard layout: places x indicators, each cell a status glyph and a trend glyph (the value too from the
   // swimmer level on). statuses are read from the coverage rows; when the spec's method, window, baseline or years differ
   // from an indicator's own, they are recomputed here from the place's values with src/status. with a status method on,
-  // places and indicators are sorted exceptions first. on a phone the table becomes one card per place.
+  // places and indicators are sorted exceptions first. `axes` says which are the rows (indicators by default, as the Matrix
+  // has them). on a phone the table becomes one card per row: per indicator, or per place.
   import { onMount } from 'svelte'
   import { Icon } from '../../../../src/icons/index.ts'
   import type { StatusResult } from '../../../../src/status/index.ts'
@@ -31,8 +32,10 @@
     placeHref: (placeId: string, coll: string) => string
     /** a heading above the table, when the report is split into sections */
     heading?: string | null
+    /** what the rows are: 'indicators' (indicators in rows, places in columns: the Matrix's default) or 'places' */
+    axes?: 'places' | 'indicators'
   }
-  let { catalog, idx, spec, places, groups, depth, vocab, titles, placeHref, heading = null }: Props = $props()
+  let { catalog, idx, spec, places, groups, depth, vocab, titles, placeHref, heading = null, axes = 'indicators' }: Props = $props()
 
   const key = (p: Place, i: Indicator) => `${p.id}\u0000${i.id}`
   const inds = $derived(groups.flatMap(g => g.indicators))
@@ -92,7 +95,9 @@
     })
   })
 
-  // ---- a phone gets one card per place ----
+  const flatPlaces = $derived(rows.flatMap(r => r.places))
+
+  // ---- a phone gets one card per row ----
   let narrow = $state(false)
   onMount(() => {
     const mq = matchMedia('(max-width: 640px)')
@@ -121,7 +126,28 @@
   {#if pending > 0}<p class="note om-note" role="status">Recomputing statuses for this style ({pending} of {inds.length} indicators to go)…</p>{/if}
   {#if failed > 0}<p class="note om-note" role="status">{failed} cells kept their default status: their values could not be read.</p>{/if}
 
-  {#if narrow}
+  {#if narrow && axes === 'indicators'}
+    <div class="cards">
+      {#each shownGroups as g (g.term.id)}
+        <h4 class="coll mbon-label">{g.term.label} · {g.indicators.length}</h4>
+        {#each g.indicators as i (i.id)}
+          <article class="pc">
+            <h5>{i.short}</h5>
+            <ul>
+              {#each rows as r (r.coll)}
+                {#each r.places as p (p.id)}
+                  {@const c = cell(p, i)}
+                  {#if c.kind === 'value' || c.kind === 'class'}
+                    <li>{@render glyphs(c)}<a class="it" href={placeHref(p.id, p.coll)}>{p.name}</a></li>
+                  {/if}
+                {/each}
+              {/each}
+            </ul>
+          </article>
+        {/each}
+      {/each}
+    </div>
+  {:else if narrow}
     <div class="cards">
       {#each rows as r (r.coll)}
         <h4 class="coll mbon-label">{titles(r.coll)} · {r.places.length}</h4>
@@ -142,7 +168,38 @@
     </div>
   {:else}
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-    <div class="box" role="region" aria-label="{heading ?? 'Scorecard'}: places by indicators" tabindex="0">
+    <div class="box" role="region" aria-label="{heading ?? 'Scorecard'}: {axes === 'indicators' ? 'indicators by places' : 'places by indicators'}" tabindex="0">
+      {#if axes === 'indicators'}
+      <table class="om-t" class:wide={depth !== 'skim'}>
+        <thead>
+          <tr class="groups">
+            <th class="corner" scope="col" rowspan="2"><span class="mbon-label">Indicator</span></th>
+            {#each rows as r (r.coll)}
+              <th scope="colgroup" colspan={r.places.length} class="group"><span class="gh2"><span class="mbon-label">{titles(r.coll)} · {r.places.length}</span></span></th>
+            {/each}
+          </tr>
+          <tr class="heads">
+            {#each flatPlaces as p (p.id)}
+              <th scope="col" class="ih" title={p.name}><span class="t"><a href={placeHref(p.id, p.coll)}>{p.name}</a></span></th>
+            {/each}
+          </tr>
+        </thead>
+        <tbody>
+          {#each shownGroups as g (g.term.id)}
+            {@const gi = asIcon(g.term.glyph)}
+            <tr class="band"><th scope="colgroup" colspan={flatPlaces.length + 1}><span class="gh">{#if gi}<Icon name={gi} size={16} />{/if}<span class="mbon-label">{g.term.label} · {g.indicators.length}</span></span></th></tr>
+            {#each g.indicators as i (i.id)}
+              <tr>
+                <th scope="row" class="rh" title={i.title}>{i.short}</th>
+                {#each flatPlaces as p (p.id)}
+                  <td data-kind={cell(p, i).kind}>{@render glyphs(cell(p, i))}</td>
+                {/each}
+              </tr>
+            {/each}
+          {/each}
+        </tbody>
+      </table>
+      {:else}
       <table class="om-t" class:wide={depth !== 'skim'}>
         <thead>
           <tr class="groups">
@@ -172,6 +229,7 @@
           {/each}
         </tbody>
       </table>
+      {/if}
     </div>
   {/if}
   <p class="note om-note">{ex} Statuses are relative to each place's own record, not better or worse.</p>
@@ -188,6 +246,9 @@
   .gh { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--label-color); position: sticky; left: 12rem; white-space: nowrap; }
   .gh :global(svg) { color: var(--label-color); }
   .ih .t { display: block; writing-mode: vertical-rl; transform: rotate(180deg); max-height: 8.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 auto; font: var(--fw-semibold) var(--text-xs) / 1.2 var(--font-sans); color: var(--text-strong); }
+  .gh2 { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--label-color); white-space: nowrap; }
+  .ih .t a { color: var(--text-strong); text-decoration: none; }
+  .ih .t a:hover { color: var(--link); text-decoration: underline; }
   th.corner, th.rh { position: sticky; left: 0; min-width: 12rem; width: 12rem; max-width: 12rem; padding: var(--space-2) var(--space-3); background: var(--bg-surface); border-right: 1px solid var(--border); }
   thead th.corner { z-index: 4; top: 0; vertical-align: bottom; }
   th.rh { z-index: 2; font: var(--fw-medium) var(--text-sm) / 1.25 var(--font-sans); }

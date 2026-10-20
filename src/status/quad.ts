@@ -49,6 +49,14 @@ export const QUADRANT_WORDS: Record<Quadrant, string> = {
   'below-falling': 'recent mean below its long-term mean, falling',
 }
 
+/** the same captions short enough for a phone's corners */
+export const QUADRANT_SHORT: Record<Quadrant, string> = {
+  'above-rising': 'above, rising',
+  'above-falling': 'above, falling',
+  'below-rising': 'below, rising',
+  'below-falling': 'below, falling',
+}
+
 const sd1 = (v: number) => `${fmt(Math.abs(v), 1)} SD`
 const side = (v: number, hi: string, lo: string) => (v >= 0 ? hi : lo)
 

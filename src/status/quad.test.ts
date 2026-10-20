@@ -1,7 +1,7 @@
 // one test per rule of the quad plot's coordinates and words, on small hand-checked series.
 import { describe, expect, it } from 'vitest'
 import { ieaSd, namesPct, values } from './index.ts'
-import { QUADRANT_WORDS, quadAlt, quadPoint, quadrantOf, quadWhy, quadWords } from './quad.ts'
+import { QUADRANT_SHORT, QUADRANT_WORDS, quadAlt, quadPoint, quadrantOf, quadWhy, quadWords } from './quad.ts'
 import type { StatusResult } from './types.ts'
 import type { Point } from './types.ts'
 
@@ -86,6 +86,13 @@ describe('quadrants and words', () => {
   it('the corner captions are statistical: never better, worse, good or bad', () => {
     for (const w of Object.values(QUADRANT_WORDS)) {
       expect(w).toMatch(/^recent mean (above|below) its long-term mean, (rising|falling)$/)
+      expect(w).not.toMatch(/better|worse|good|bad/)
+    }
+  })
+  it('the short captions name the same four quadrants, still statistical', () => {
+    expect(Object.keys(QUADRANT_SHORT)).toEqual(Object.keys(QUADRANT_WORDS))
+    for (const [q, w] of Object.entries(QUADRANT_SHORT)) {
+      expect(w).toBe(q.replace('-', ', '))
       expect(w).not.toMatch(/better|worse|good|bad/)
     }
   })

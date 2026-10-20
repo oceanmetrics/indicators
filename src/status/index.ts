@@ -10,7 +10,7 @@ import type { MethodId, Point, StatusOptions, StatusResult, TextContext } from '
 export * from './types.ts'
 export { completeGrid, nextPeriod, periodLabel, periodX, spanLabel, grainNoun } from './grid.ts'
 export { categoricalAlt, categoricalSentence, collapseRuns, fmt, noValues } from './text.ts'
-export { QUADRANT_WORDS, quadAlt, quadPoint, quadrantOf, quadWhy, quadWords } from './quad.ts'
+export { QUADRANT_SHORT, QUADRANT_WORDS, quadAlt, quadPoint, quadrantOf, quadWhy, quadWords } from './quad.ts'
 export type { QuadLabelled, QuadPoint, Quadrant } from './quad.ts'
 export { ieaSd, namesPct, values }
 
