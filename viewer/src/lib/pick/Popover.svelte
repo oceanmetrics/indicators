@@ -83,8 +83,8 @@
   .val { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pop {
     position: absolute; z-index: 40; top: calc(100% + var(--space-1)); left: 0; display: grid; grid-template-rows: auto minmax(0, 1fr);
-    width: min(34rem, calc(100vw - 2 * var(--space-4))); max-height: min(34rem, 72dvh); background: var(--bg-surface);
-    border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-md);
+    width: min(34rem, calc(100vw - 2 * var(--space-4))); max-height: min(34rem, 72dvh); background: var(--overlay-bg);
+    border: 1px solid var(--overlay-border); border-radius: var(--radius-md); box-shadow: var(--overlay-shadow);
   }
   .hd { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-3); }
   .body { display: grid; gap: var(--space-3); align-content: start; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: var(--space-3); }
