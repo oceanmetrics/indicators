@@ -35,11 +35,12 @@ jobs:
         run: |
           export PATH=/opt/homebrew/bin:$PATH
           uv --version; node --version; aws --version
-      - run: uv sync --group dev
+      # cmems: the Copernicus Marine place producer's scientific stack, so its tests run here too (they skip without it)
+      - run: uv sync --group dev --group cmems
       - run: npm ci
       - name: tests (contract, adapters, manifest, status, coverage)
         run: |
-          uv run --group dev pytest -q
+          uv run --group dev --group cmems pytest -q
           npx vitest run src
       - name: build the catalog (erddap-places, eco-indicators and obis rebuilt, SDG pulled from the published catalog)
         run: scripts/build_catalog.sh catalog

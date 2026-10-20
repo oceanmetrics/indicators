@@ -3,12 +3,18 @@
 # why), and an `auto` job runs on the self-hosted macmini runner: erddap-places computes the one place, publishes it,
 # the catalog is rebuilt and published, the issue gets the link and is closed.
 #
+# a Copernicus Marine request (cmems: indicators) is never `auto`: it uses a maintainer's personal Copernicus Marine
+# login. triage marks it `needs-review` with approvable=true when the place producer can do it, and a maintainer's `run`
+# label then starts the same run job with the Copernicus Marine place producer (om_indicators/producers/cmems_place.py,
+# `uv run --group cmems`) in place of erddap-places; the catalog rebuild and the closing comment are the same. which
+# producer runs is decided in the job from the checked indicator id (check-job prints REQ_FAMILY), never from the issue.
+#
 # the issue is untrusted input: its body reaches the triage only as a file written from an environment variable, never
 # through ${{ }} in a script; the run job re-checks the job (check-job) and passes each value as an environment
 # variable. an `auto` job runs by itself while the repository variable REQUESTS_AUTORUN is `on` (at most
 # REQUESTS_PER_DAY, default 10, in 24 h); otherwise, or past the cap, a maintainer starts it by adding the `run` label
-# (only people with triage access can add labels, and labels this workflow's own token adds start no run). requesters
-# are answered on the issue only: no email (yet).
+# (only people with triage access can add labels, and labels this workflow's own token adds start no run; REQUESTS_AUTORUN
+# never starts a Copernicus Marine request). requesters are answered on the issue only: no email (yet).
 name: requests
 
 on:
@@ -30,6 +36,7 @@ jobs:
       cancel-in-progress: true
     outputs:
       label: ${{ steps.triage.outputs.label }}
+      approvable: ${{ steps.triage.outputs.approvable }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -41,12 +48,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           AUTORUN: ${{ vars.REQUESTS_AUTORUN }}
           ACTION: ${{ github.event.action }}
+          LABEL: ${{ github.event.label.name }}
         run: |
           printf '%s' "$BODY" > body.md
           uv run python -m om_indicators.requests triage --body body.md --out triage.json --comment comment.md \
             --autorun "${AUTORUN:-off}"
           label=$(jq -r .label triage.json)
+          approvable=$(jq -r '.approvable // false' triage.json)
           echo "label=$label" >> "$GITHUB_OUTPUT"
+          echo "approvable=$approvable" >> "$GITHUB_OUTPUT"
           for l in auto already needs-review; do
             gh label create "$l" --color ededed --force >/dev/null 2>&1 || true
             [ "$l" = "$label" ] || gh issue edit "$NUM" --remove-label "$l" >/dev/null 2>&1 || true
@@ -54,6 +64,10 @@ jobs:
           gh issue edit "$NUM" --add-label "$label"
           # a maintainer's `run` label re-checks the request without commenting again
           [ "$ACTION" = labeled ] || gh issue comment "$NUM" --body-file comment.md
+          # the `run` label on a request nothing can run says so, instead of doing nothing
+          if [ "$ACTION" = labeled ] && [ "$LABEL" = run ] && [ "$label" = needs-review ] && [ "$approvable" != true ]; then
+            gh issue comment "$NUM" --body "The \`run\` label starts a request only when this bot says a maintainer can accept it that way; this one needs a maintainer's own work (see the reasons above)."
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: triage
@@ -62,9 +76,12 @@ jobs:
 
   run:
     needs: triage
+    # an `auto` request runs by itself (REQUESTS_AUTORUN) or on the `run` label; a request triage marked approvable (a
+    # Copernicus Marine one) runs only on a maintainer's `run` label, never by itself
     if: >-
-      needs.triage.outputs.label == 'auto' &&
-      ((github.event.action != 'labeled' && vars.REQUESTS_AUTORUN == 'on') || github.event.label.name == 'run')
+      (needs.triage.outputs.label == 'auto' &&
+       ((github.event.action != 'labeled' && vars.REQUESTS_AUTORUN == 'on') || github.event.label.name == 'run')) ||
+      (needs.triage.outputs.approvable == 'true' && github.event.action == 'labeled' && github.event.label.name == 'run')
     runs-on: [self-hosted, macmini]
     concurrency:
       group: requests-run           # one job at a time on the runner, never cancelled mid-run
@@ -98,12 +115,12 @@ jobs:
         env:
           REQUESTS_PER_DAY: ${{ vars.REQUESTS_PER_DAY }}
       - uses: actions/checkout@v4
-        if: steps.cap.outputs.over != '1'
+        if: steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems'
         with:
           repository: oceanmetrics/erddap-places
           path: erddap-places
       - name: compute the place (erddap-places precompute)
-        if: steps.cap.outputs.over != '1'
+        if: steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems'
         run: |
           export PATH="/opt/homebrew/bin:$PATH"
           (cd erddap-places/app && npm ci --no-audit --no-fund)
@@ -111,14 +128,25 @@ jobs:
           # PRECOMPUTE_PUBLISH: erddap-places uploads the parquet, provenance and item of each unit it finishes
           PRECOMPUTE_PUBLISH=s3://oceanmetrics.io-public/gazetteer \
             npx tsx src/precompute.ts --gazetteer "$REQ_COLL" --place "$REQ_PLACE" --dataset "$REQ_DATASET" --variable "$REQ_VARIABLE"
+      - name: compute the place (Copernicus Marine place producer, with the maintainer's own login)
+        if: steps.cap.outputs.over != '1' && env.REQ_FAMILY == 'cmems'
+        run: |
+          export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+          # the Toolbox finds its login in the runner user's ~/.copernicusmarine and the upload uses the host's AWS profile;
+          # --publish uploads the place's folder and the merged index.json under indicators/producers/cmems/
+          uv run --group cmems python -m om_indicators.producers.cmems_place \
+            --place "$REQ_PLACE" --coll "$REQ_COLL" --indicator "$REQ_INDICATOR" --publish
       - name: rebuild and publish the catalog
         if: steps.cap.outputs.over != '1'
         run: |
           export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
-          # the item goes on the requested-items list, which the build reads and the publish keeps
-          uv run python -m om_indicators.requests add-item job.json --out requested_items.json
-          aws s3 cp requested_items.json s3://oceanmetrics.io-public/indicators/requests/items.json \
-            --content-type application/json --cache-control "public, max-age=300" --only-show-errors
+          # an erddap-places item goes on the requested-items list, which the build reads and the publish keeps; a Copernicus
+          # Marine place is in the producer's published index.json, which the cmems-places step of the build reads
+          if [ "$REQ_FAMILY" != cmems ]; then
+            uv run python -m om_indicators.requests add-item job.json --out requested_items.json
+            aws s3 cp requested_items.json s3://oceanmetrics.io-public/indicators/requests/items.json \
+              --content-type application/json --cache-control "public, max-age=300" --only-show-errors
+          fi
           npm ci --no-audit --no-fund
           scripts/build_catalog.sh
           scripts/publish_catalog.sh
@@ -135,4 +163,4 @@ jobs:
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          gh issue comment "$NUM" --body "The automatic run failed; a maintainer will look at it. Run log: $RUN_URL"
+          gh issue comment "$NUM" --body "The run failed; a maintainer will look at it. Run log: $RUN_URL"
