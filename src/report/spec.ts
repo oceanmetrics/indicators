@@ -121,7 +121,10 @@ export interface IndicatorLike {
 }
 export interface PlaceLike {
   id: string
+  /** the place's group: its home gazetteer collection */
   coll: string
+  /** the values collections that hold rows of it (a place can be in two) */
+  valuesColls?: string[]
 }
 
 /** each series' lead (its first member when none is marked), keyed by series */
@@ -155,10 +158,17 @@ export function expandIndicators<T extends IndicatorLike>(sel: ReportSpec['indic
   return indicators.filter(i => inc.has(i) && !exc.has(i))
 }
 
-/** the places one rule selects: `*`, `coll:<slug>`, or a place_id (in every collection that has it) */
+/**
+ * the places one rule selects: `*`, `coll:<slug>`, or a place_id. `coll:<slug>` matches a place whose group (home
+ * gazetteer collection) or any of its values collections is the slug, so a link written when places were grouped by
+ * their values file (`coll:places`) still selects the same places.
+ */
 export function matchPlaces<P extends PlaceLike>(rule: string, places: P[]): P[] {
   if (rule === '*') return places
-  if (rule.startsWith('coll:')) return places.filter(p => p.coll === rule.slice(5))
+  if (rule.startsWith('coll:')) {
+    const slug = rule.slice(5)
+    return places.filter(p => p.coll === slug || (p.valuesColls ?? []).includes(slug))
+  }
   return places.filter(p => p.id === rule)
 }
 
@@ -173,14 +183,13 @@ export function expandPlaces<P extends PlaceLike>(sel: ReportSpec['places'], pla
  * coverage counts for the tree ("7 of 9 places"): for each indicator, how many of the chosen places have a value at
  * any grain. `rows` are coverage rows (place_id, coll, indicator, last_value).
  */
-export function coverageCounts(rows: { place_id: string; coll: string; indicator: string; last_value: number | null }[], places: PlaceLike[]): Map<string, number> {
-  const chosen = new Set(places.map(p => p.coll + '\u0000' + p.id))
+export function coverageCounts(rows: { place_id: string; indicator: string; last_value: number | null }[], places: PlaceLike[]): Map<string, number> {
+  const chosen = new Set(places.map(p => p.id))
   const seen = new Map<string, Set<string>>()
   for (const r of rows) {
-    const k = r.coll + '\u0000' + r.place_id
-    if (r.last_value == null || !chosen.has(k)) continue
+    if (r.last_value == null || !chosen.has(r.place_id)) continue
     if (!seen.has(r.indicator)) seen.set(r.indicator, new Set())
-    seen.get(r.indicator)!.add(k)
+    seen.get(r.indicator)!.add(r.place_id)
   }
   return new Map([...seen].map(([ind, s]) => [ind, s.size]))
 }

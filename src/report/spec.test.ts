@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_SPEC, budget, budgetLine, coverageCounts, exceptionRank, expandIndicators, expandPlaces, matchIndicators,
+  DEFAULT_SPEC, budget, budgetLine, coverageCounts, exceptionRank, expandIndicators, expandPlaces, matchIndicators, matchPlaces,
   seriesLeads, specFromParams, specId, specParams,
 } from './spec.ts'
 import type { ReportSpec } from './spec.ts'
@@ -87,13 +87,27 @@ describe('expanding the rules', () => {
     expect(ids(expandPlaces({ include: ['NMS:CINMS', 'MRGID:8371'], exclude: [], context: false }, PLACES))).toEqual(['NMS:CINMS', 'MRGID:8371'])
     expect(expandPlaces({ include: ['*'], exclude: ['coll:mr_eez'], context: false }, PLACES)).toHaveLength(3)
   })
+  it('coll:<slug> matches a place by its group (home collection) or by a values collection that holds it', () => {
+    // NMS:A is grouped under its gazetteer collection and read from `places`; Pitcairn is grouped under mr_eez but also has rows in `places`
+    const pl = [
+      { id: 'NERRS:WEL', coll: 'noaa_nerrs', valuesColls: ['noaa_nerrs'] },
+      { id: 'MRGID:8439', coll: 'mr_eez', valuesColls: ['mr_eez', 'places'] },
+      { id: 'NMS:A', coll: 'noaa_sanctuaries', valuesColls: ['places'] },
+      { id: 'NMS:B', coll: 'noaa_sanctuaries' },
+    ]
+    expect(ids(matchPlaces('coll:noaa_sanctuaries', pl))).toEqual(['NMS:A', 'NMS:B'])   // by group
+    expect(ids(matchPlaces('coll:places', pl))).toEqual(['MRGID:8439', 'NMS:A'])        // an old link (pi=coll:places): by values collection
+    expect(ids(matchPlaces('coll:mr_eez', pl))).toEqual(['MRGID:8439'])
+    expect(ids(matchPlaces('coll:nope', pl))).toEqual([])
+    expect(ids(matchPlaces('NMS:B', pl))).toEqual(['NMS:B'])
+  })
   it('coverage counts the chosen places with a value, per indicator', () => {
     const rows = [
-      { place_id: 'NMS:CINMS', coll: 'places', indicator: 'erddap:sst:mean', last_value: 15.2 },
-      { place_id: 'NMS:CINMS', coll: 'places', indicator: 'erddap:sst:mean', last_value: 15.1 },   // a second grain
-      { place_id: 'NMS:FKNMS', coll: 'places', indicator: 'erddap:sst:mean', last_value: null },
-      { place_id: 'NMS:FKNMS', coll: 'places', indicator: 'erddap:npp:mean', last_value: 300 },
-      { place_id: 'MRGID:8456', coll: 'mr_eez', indicator: 'erddap:npp:mean', last_value: 1 },     // not chosen
+      { place_id: 'NMS:CINMS', indicator: 'erddap:sst:mean', last_value: 15.2 },
+      { place_id: 'NMS:CINMS', indicator: 'erddap:sst:mean', last_value: 15.1 },   // a second grain
+      { place_id: 'NMS:FKNMS', indicator: 'erddap:sst:mean', last_value: null },
+      { place_id: 'NMS:FKNMS', indicator: 'erddap:npp:mean', last_value: 300 },
+      { place_id: 'MRGID:8456', indicator: 'erddap:npp:mean', last_value: 1 },     // not chosen
     ]
     expect([...coverageCounts(rows, PLACES.slice(0, 2))]).toEqual([['erddap:sst:mean', 1], ['erddap:npp:mean', 1]])
   })

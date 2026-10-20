@@ -36,7 +36,13 @@ export interface ManifestIndicator {
 export interface CoverageRow {
   place_id: string
   place_name: string
+  /** the values collection the row was read from (`places`, `mr_eez`): which values file holds it */
   coll: string
+  /**
+   * the place's home gazetteer collection (`noaa_nerrs`, `mr_eez`): what the viewer groups places by. absent in a
+   * coverage table built before 2026-10-20; readers use `place_coll ?? coll`.
+   */
+  place_coll?: string | null
   indicator: string
   time_grain: Grain
   t0: string | null
@@ -75,16 +81,43 @@ export function encodeSpark(series: Point[], grain: Grain): string {
 }
 const IMPLEMENTED = new Set<string>(['iea-sd', 'names-pct', 'values'])
 
-const empty = (r: ValueRow, placeName = r.place_id): CoverageRow => ({
-  place_id: r.place_id, place_name: placeName, coll: r.coll, indicator: r.indicator, time_grain: r.time_grain,
+// ---- the home collection of a place ----
+
+/** a place's collections in the gazetteer index (one row per place and collection) */
+export interface IndexEntry {
+  place_id: string
+  collection: string
+}
+
+/**
+ * the home collection of every place in the gazetteer index: the first of its collections in `order` (layers.json
+ * order), a collection missing from `order` after those in it (alphabetically). places the index does not list are not
+ * in the map.
+ */
+export function placeHomes(entries: IndexEntry[], order: string[]): Map<string, string> {
+  const rank = new Map(order.map((c, n) => [c, n]))
+  const at = (c: string) => rank.get(c) ?? Number.MAX_SAFE_INTEGER
+  const homes = new Map<string, string>()
+  for (const e of entries) {
+    const have = homes.get(e.place_id)
+    if (have == null || at(e.collection) < at(have) || (at(e.collection) === at(have) && e.collection < have)) homes.set(e.place_id, e.collection)
+  }
+  return homes
+}
+
+/** the home collection of a place; the values collection when the index does not list the place (or there is no index) */
+export const homeColl = (placeId: string, valuesColl: string, homes?: Map<string, string> | null): string => homes?.get(placeId) ?? valuesColl
+
+const empty = (r: ValueRow, placeName = r.place_id, placeColl = r.coll): CoverageRow => ({
+  place_id: r.place_id, place_name: placeName, coll: r.coll, place_coll: placeColl, indicator: r.indicator, time_grain: r.time_grain,
   t0: null, t1: null, n_periods: 0, last_time: null, last_value: null, last_class: null,
   status_method: null, status: null, trend: null, recent_mean: null, recent_from: null, recent_to: null,
   lt_mean: null, lt_sd: null, why: null, sentence: null, spark: '[]',
 })
 
 /** one coverage row for a continuous (place, grain) group */
-export function continuousRow(rows: ValueRow[], ind: ManifestIndicator, placeName: string): CoverageRow {
-  const out = empty(rows[0], placeName)
+export function continuousRow(rows: ValueRow[], ind: ManifestIndicator, placeName: string, placeColl?: string): CoverageRow {
+  const out = empty(rows[0], placeName, placeColl)
   const grain = rows[0].time_grain
   // the `all` grain is one value over the whole record, with no time: no series, no status, no line
   if (grain === 'all') {
@@ -115,8 +148,8 @@ export function continuousRow(rows: ValueRow[], ind: ManifestIndicator, placeNam
 }
 
 /** one coverage row for a categorical (place, grain) group: the last period's largest class */
-export function categoricalRow(rows: ValueRow[], ind: ManifestIndicator, placeName: string): CoverageRow {
-  const out = empty(rows[0], placeName)
+export function categoricalRow(rows: ValueRow[], ind: ManifestIndicator, placeName: string, placeColl?: string): CoverageRow {
+  const out = empty(rows[0], placeName, placeColl)
   const grain = rows[0].time_grain
   const byT = new Map<string, ValueRow[]>()
   for (const r of rows) if (r.time != null && r.value != null) byT.set(r.time, [...(byT.get(r.time) ?? []), r])
@@ -145,7 +178,7 @@ export function shownGrainOrder(statusGrain: Grain): Grain[] {
   return [...new Set<Grain>([statusGrain, 'year', 'month', 'decade', 'day', 'all'])]
 }
 
-export function coverageOf(rows: ValueRow[], ind: ManifestIndicator, names: Map<string, string>): CoverageRow[] {
+export function coverageOf(rows: ValueRow[], ind: ManifestIndicator, names: Map<string, string>, homes?: Map<string, string> | null): CoverageRow[] {
   const groups = new Map<string, ValueRow[]>()
   for (const r of rows) {
     const k = `${r.place_id}\u0000${r.time_grain}`
@@ -154,7 +187,8 @@ export function coverageOf(rows: ValueRow[], ind: ManifestIndicator, names: Map<
   const out: CoverageRow[] = []
   for (const g of groups.values()) {
     const name = names.get(g[0].place_id) ?? g[0].place_id
-    out.push(ind.kind === 'categorical' ? categoricalRow(g, ind, name) : continuousRow(g, ind, name))
+    const home = homeColl(g[0].place_id, g[0].coll, homes)
+    out.push(ind.kind === 'categorical' ? categoricalRow(g, ind, name, home) : continuousRow(g, ind, name, home))
   }
   // a sparkline only on the row a cell shows: the others would be bytes nobody draws (OBIS decades, months beside years)
   const order = shownGrainOrder(ind.status_grain)

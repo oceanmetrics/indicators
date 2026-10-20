@@ -1,8 +1,8 @@
 // the coverage builder: exact rows from small synthetic values, one test per rule.
 import { describe, expect, it } from 'vitest'
-import { coverageOf, SPARK_PERIODS, encodeSpark } from './build.ts'
+import { coverageOf, encodeSpark, homeColl, placeHomes, SPARK_PERIODS } from './build.ts'
 import type { ManifestIndicator, ValueRow } from './build.ts'
-import { coverageParquet } from './cli.ts'
+import { coverageParquet, layerOrder } from './cli.ts'
 import { parquetReadObjects } from 'hyparquet'
 
 const SST: ManifestIndicator = {
@@ -99,6 +99,45 @@ describe('categorical', () => {
       status_method: 'values', status: null, trend: null, why: 'categorical: shown as class shares, with no status',
       sentence: 'Bleaching alert in Alpha Bank: Bleaching Watch over 75% of the area in 2025.', spark: '[]',
     })
+  })
+})
+
+describe('place_coll: the home gazetteer collection', () => {
+  // a synthetic index: Pitcairn is in two collections, a sanctuary in one, and one id the index does not list
+  const index = [
+    { place_id: 'MRGID:8439', collection: 'places' },
+    { place_id: 'MRGID:8439', collection: 'mr_eez' },
+    { place_id: 'NERRS:WEL', collection: 'noaa_nerrs' },
+    { place_id: 'NMS:A', collection: 'places' },
+  ]
+  const order = ['mr_eez', 'noaa_nerrs', 'places']
+
+  it("takes the first of a place's collections in layers.json order", () => {
+    const homes = placeHomes(index, order)
+    expect(Object.fromEntries(homes)).toEqual({ 'MRGID:8439': 'mr_eez', 'NERRS:WEL': 'noaa_nerrs', 'NMS:A': 'places' })
+    // the order decides, not the order of the index rows
+    expect(placeHomes(index, ['places', 'mr_eez']).get('MRGID:8439')).toBe('places')
+  })
+  it('a collection missing from layers.json comes after the listed ones, then alphabetically', () => {
+    const rows = [{ place_id: 'X:1', collection: 'zz_new' }, { place_id: 'X:1', collection: 'aa_new' }, { place_id: 'X:2', collection: 'zz_new' }, { place_id: 'X:2', collection: 'places' }]
+    const homes = placeHomes(rows, ['places'])
+    expect([homes.get('X:1'), homes.get('X:2')]).toEqual(['aa_new', 'places'])
+  })
+  it('a place the index does not list, or no index, falls back to the values collection', () => {
+    const homes = placeHomes(index, order)
+    expect(homeColl('NMS:ZZ', 'places', homes)).toBe('places')
+    expect(homeColl('NMS:A', 'places', null)).toBe('places')
+    expect(homeColl('NMS:A', 'places', undefined)).toBe('places')
+  })
+  it('coverageOf writes it on every row: the home collection, with coll still the values collection', () => {
+    const homes = placeHomes(index, order)
+    const rows = coverageOf([...years(2020, [1, 2], { place_id: 'MRGID:8439', coll: 'places' }), row({ place_id: 'NERRS:WEL', coll: 'noaa_nerrs' })], SST, new Map(), homes)
+    expect(rows.map(r => [r.place_id, r.coll, r.place_coll])).toEqual([['NERRS:WEL', 'noaa_nerrs', 'noaa_nerrs'], ['MRGID:8439', 'places', 'mr_eez']])
+    expect(coverageOf(years(2020, [1]), SST, names)[0].place_coll).toBe('places')
+  })
+  it('layerOrder reads collection, else slug, in file order; anything unreadable is empty', () => {
+    expect(layerOrder({ layers: [{ slug: 'a', collection: 'b' }, { slug: 'c' }, {}] })).toEqual(['b', 'c'])
+    expect(layerOrder(null)).toEqual([])
   })
 })
 

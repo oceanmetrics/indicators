@@ -10,7 +10,8 @@
   "properties": {
     "place_id": { "type": "string" },
     "place_name": { "type": "string", "description": "The place's name in the gazetteer index (its id when the index lacks it), so the Matrix needs no other file." },
-    "coll": { "type": "string" },
+    "coll": { "type": "string", "description": "The values collection the row was read from (`places`, `mr_eez`): which values file holds it." },
+    "place_coll": { "type": ["string", "null"], "description": "The place's home gazetteer collection (`noaa_nerrs`, `mr_eez`): the first of its collections in the gazetteer's layers.json order, else `coll` (a place the index does not list, or a build without the index). The viewer groups places by it. Optional: coverage built before 2026-10-20 has no such column." },
     "indicator": { "type": "string" },
     "time_grain": { "enum": ["all", "decade", "year", "month", "day"] },
     "t0": { "type": ["string", "null"], "description": "First period start (null for grain all)." },
