@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oceanmetrics.io/indicators/schema/v1/indicators.schema.json",
+  "title": "Ocean Metrics indicators manifest (indicators.json)",
+  "description": "One entry per indicator in the value contract: what it is, where its values are, how they were made, how to credit them, and the fields that drive selection and reports (category tags in three vocabularies, series, lead, preferred, kind, min_periods, the default status method). Built by `om-ind manifest` from config/indicators.yml, config/vocab/*.yml, the published STAC of each producer and the values themselves; never hand-edited.",
+  "type": "object",
+  "required": ["version", "contract", "created", "vocabularies", "indicators"],
+  "properties": {
+    "version": {
+      "description": "Manifest version: the UTC build date, YYYY.MM.DD, with .N for a second build that day. A frozen report records it as `as_of`.",
+      "type": "string",
+      "pattern": "^\\d{4}\\.\\d{2}\\.\\d{2}(\\.\\d+)?$"
+    },
+    "contract": { "type": "string", "pattern": "^1\\.\\d+\\.\\d+$" },
+    "created": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+    "vocabularies": {
+      "description": "The category vocabularies an indicator is tagged in, one tag per vocabulary. An instance picks which one its indicator tree shows.",
+      "type": "object",
+      "required": ["onms", "names", "eov"],
+      "additionalProperties": { "$ref": "#/$defs/vocabulary" }
+    },
+    "indicators": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/indicator" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "vocabulary": {
+      "type": "object",
+      "required": ["title", "source", "terms"],
+      "properties": {
+        "title": { "type": "string" },
+        "source": { "type": "string", "description": "Where the vocabulary is defined (URL)." },
+        "note": { "type": "string" },
+        "credit": { "type": "string", "description": "Credit line that must accompany the vocabulary's badges (GOOS for eov)." },
+        "terms": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "label"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+              "label": { "type": "string" },
+              "group": { "type": "string", "description": "A parent term (e.g. an EOV's discipline, an ONMS section's DPSER part)." },
+              "glyph": { "type": "string", "description": "Icon name in the Ocean Metrics sprite (e.g. onms-water-quality, eov-oxygen)." },
+              "badge": { "type": "string", "description": "eov only: path of the unmodified GOOS colour badge, relative to the viewer's assets (e.g. goos-eov/128/oxygen.webp)." },
+              "description": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "grain": { "enum": ["all", "decade", "year", "month", "day"] },
+    "indicator": {
+      "type": "object",
+      "required": ["id", "title", "short", "description", "unit", "kind", "category", "series", "lead", "preferred",
+                   "min_periods", "status_grain", "status_method", "recent", "time_grains", "time_range", "method",
+                   "n_meaning", "producer", "dataset", "license", "citation", "collections"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*:[A-Za-z0-9_.\\-]+(:[A-Za-z0-9_.\\-]+)*$" },
+        "title": { "type": "string", "description": "Full title, e.g. 'Sea surface temperature (CRW, 5 km)'." },
+        "short": { "type": "string", "maxLength": 28, "description": "Column header in the Matrix." },
+        "description": { "type": "string" },
+        "unit": { "type": "string", "description": "Unit as written in the values (UDUNITS-style)." },
+        "unit_label": { "type": "string", "description": "Unit for display (e.g. °C, mg m⁻³)." },
+        "decimals": { "type": "integer", "minimum": 0, "maximum": 6 },
+        "kind": { "enum": ["continuous", "categorical"] },
+        "classes": {
+          "description": "Categorical only: class value -> label, in display order.",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "category": {
+          "description": "One tag per vocabulary; each value is a term id of that vocabulary.",
+          "type": "object",
+          "required": ["onms", "names", "eov"],
+          "additionalProperties": { "type": "string" }
+        },
+        "eov_match": {
+          "description": "`exact` when the indicator measures that EOV; `discipline` when no single EOV fits and the tag is the GOOS discipline (bioeco, biogeo, physics).",
+          "enum": ["exact", "discipline"]
+        },
+        "series": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "Family from one producer and dataset, e.g. sst, obis-diversity." },
+        "series_title": { "type": "string" },
+        "lead": { "type": "boolean", "description": "The one indicator a ticked series contributes by default." },
+        "preferred": { "type": "boolean", "description": "Ticked by default when two datasets measure the same variable." },
+        "variable": { "type": "string", "description": "What is measured, shared across datasets (e.g. sst), so `preferred` can choose among them." },
+        "min_periods": { "type": "integer", "minimum": 1, "description": "Fewest periods at status_grain before a status or trend is given (NaMES uses 10 years)." },
+        "status_grain": { "$ref": "#/$defs/grain" },
+        "status_method": { "enum": ["iea-sd", "names-pct", "anomaly", "stacked", "values"] },
+        "recent": { "type": "integer", "minimum": 2, "description": "Recent window, in periods at status_grain (5 years by default)." },
+        "time_grains": { "type": "array", "items": { "$ref": "#/$defs/grain" }, "minItems": 1, "uniqueItems": true },
+        "time_range": {
+          "type": "array", "minItems": 2, "maxItems": 2,
+          "items": { "type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
+        },
+        "method": {
+          "type": "object",
+          "required": ["kind", "summary"],
+          "properties": {
+            "kind": { "enum": ["precomputed-exact", "precomputed-h3", "on-the-fly"] },
+            "summary": { "type": "string" },
+            "code": { "type": "string", "description": "Link to the code that produced the values." }
+          },
+          "additionalProperties": false
+        },
+        "n_meaning": { "type": "string", "description": "What `n` counts in this indicator's rows." },
+        "producer": {
+          "type": "object",
+          "required": ["name", "url"],
+          "properties": {
+            "name": { "type": "string" },
+            "url": { "type": "string" },
+            "catalog": { "type": "string", "description": "STAC collection of the producer's published output." }
+          },
+          "additionalProperties": false
+        },
+        "dataset": {
+          "type": "object",
+          "required": ["id", "title", "providers", "license"],
+          "properties": {
+            "id": { "type": "string" },
+            "title": { "type": "string" },
+            "stac": { "type": "string" },
+            "via": { "type": "string", "description": "The upstream page for the dataset (ERDDAP info, UN SDG series page, OBIS)." },
+            "providers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "roles": { "type": "array", "items": { "type": "string" } },
+                  "url": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
+            },
+            "license": { "type": "string", "description": "SPDX licence of the upstream dataset." },
+            "citation": { "type": ["string", "null"] },
+            "doi": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        },
+        "license": { "type": "string", "description": "SPDX licence of the values we publish." },
+        "citation": { "type": "string", "description": "How to cite these values, upstream credit included." },
+        "collections": {
+          "description": "Place collections with values, with counts.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["coll", "places", "rows", "path"],
+            "properties": {
+              "coll": { "type": "string" },
+              "places": { "type": "integer", "minimum": 0 },
+              "rows": { "type": "integer", "minimum": 0 },
+              "path": { "type": "string", "description": "values file, relative to the manifest." },
+              "time_range": {
+                "type": "array", "minItems": 2, "maxItems": 2,
+                "items": { "type": ["string", "null"] }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

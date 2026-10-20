@@ -1,0 +1,21 @@
+# build output: published to s3://oceanmetrics.io-public/indicators/, never committed
+catalog/
+cache/
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# node
+node_modules/
+viewer/dist/
+dist/
+.vite/
+# screenshots in scratch
+shots/tmp/
+.DS_Store
+# claude: plans/notes are symlinks into the private notes repo
+.claude/plans
+.claude/plans_todo
+.claude/plans_done
+.claude/notes

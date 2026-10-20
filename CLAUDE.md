@@ -1,0 +1,71 @@
+# CLAUDE.md
+
+Guidance for Claude Code in `oceanmetrics/indicators`: **Ocean Metrics Indicators**, any place × any indicator × time.
+The plan is `~/Github/bbest/notes/om/plans_todo/2026-10-19_indicator-matrix_plan.md` (§1 contract, §2 manifest,
+§6 reports and status methods, §8 branding and icons; its "Decisions" sections are settled). The OBIS track is
+`2026-10-19_eez-obis-exact_plan.md` (obisindicators, its own repo).
+
+**This repo is public from its first commit.** Never commit secrets, private emails, or internal data: nothing from
+`~/data/oceanmetrics/places-internal`, no Marine Regions copies, no PPOW geometry, in code or fixtures. Values tables
+(no geometry) are fine; fixtures are synthetic or from public sources.
+
+## Commands
+
+```sh
+uv sync --group dev && npm ci
+uv run --group dev pytest -q                      # contract, adapters, manifest (must be green to commit)
+uv run --group dev pytest -q tests/test_contract.py -k round_trip
+npm test                                          # vitest: status methods, coverage, icons, viewer (must be green)
+npx vitest run src/status/ieaSd.test.ts           # one file
+npm run check                                     # svelte-check + tsc
+npm run dev                                       # viewer on http://localhost:5181/ (reads catalog/)
+Rscript fixtures/ecoidx/build_iea_sd_fixtures.R ~/Github/noaa-iea/ecoidx   # regenerate the iea-sd cross-check
+```
+
+In a sandbox set `TMPDIR` to a writable directory or vitest cannot start. `OM_OFFLINE=1` skips tests that read the
+published gazetteer over HTTP.
+
+## Architecture
+
+```
+producer outputs (published) ──► om_indicators/adapters/*.py ──► contract.write_values() ──► catalog/values/indicator=<id>/coll=<slug>/data.parquet
+config/indicators.yml + vocab + producer STAC ──► om_indicators/manifest.py ──► catalog/indicators.json
+values + indicators.json ──► src/coverage/build.ts (imports src/status/) ──► catalog/coverage.parquet
+indicators.json + coverage.parquet ──► viewer/ (imports src/status/, src/icons/)
+```
+
+- **One implementation per status method.** `src/status/` (TypeScript, no DOM) is the only place a status, trend,
+  sentence or alt text is computed. The coverage builder (Node) and the viewer import it, as the erddap-places
+  precompute imports the app's modules. Python never computes a status. R appears only in `fixtures/ecoidx/`, to run
+  the real ecoidx `PlotTimeSeries()` and record what it draws; vitest asserts `iea-sd` matches every series.
+- **`iea-sd` is ported from ecoidx `PlotTimeSeries()`, not `plot_ts()`.** `plot_ts()` compares the recent mean
+  itself with 1 SD rather than its departure from the long-term mean (`R/plot.R:167-168`), and its +/− captions are
+  reversed. The recent window is the last `recent` rows of the series (NA rows count), the SD is the sample SD, a
+  change of exactly 1 SD is not a change.
+- **Statuses are statistical, never better/worse.** No ONMS colours, no ▲ ▬ ▼; glyphs `st-above|within|below`,
+  `tr-up|flat|down` differ in shape, and captions say "relative to its own record".
+- **The contract** (`schema/values.schema.json`, `om_indicators/contract.py`): every adapter writes through
+  `contract.write_values()`, which validates rows and provenance and refuses to write on any error. Rules beyond
+  JSON Schema (time aligned to its grain, unique keys, one indicator and coll per file, finite values, class on
+  all rows or none) live in `validate_rows()`, each with a test.
+- **Adapters read published outputs only** and never change a producer repo. The STAC items stay the provenance:
+  each values file lists the exact items/files it read in `om:provenance.sources`.
+- **The manifest takes titles, units, providers, licences and citations from the producer's STAC**, never typed
+  here. `config/indicators.yml` holds only what is ours: category tags (ONMS, NaMES, EOV), series, lead, preferred,
+  kind, min_periods, status method and grain.
+- **Icons: no path is typed by hand.** MDI comes from `@mdi/js` by export name (`brand/icon-map.json`), bespoke
+  glyphs from `brand/glyphs.py` (primitives on the 24-px grid), EOV glyphs from `brand/eov_trace.py` (traced GOOS
+  badges). All feed the generated `src/icons/icon-paths.ts`; the sprite, `icons.css` and contact sheet are built
+  from it. Earlier glyphs stay byte-identical (`brand/icons.lock.json`).
+- **GOOS badges are used unmodified** (`assets/goos-eov/`, resized to WebP only), always with "Credit: Global Ocean
+  Observing System (GOOS)", never in the Ocean Metrics sprite, never with the GOOS logo.
+- **Themes:** `brand/themes/mbon.css` (the kit's tokens as they are) and `oceanmetrics.css` (DESIGN.md mapped onto
+  the kit's semantic tokens: teal brand, one sun action with dark ink). Hex values live only in theme and token
+  files; components use semantic tokens (`@marinebon/ui` rules). Check both themes and 390 px.
+
+## Conventions
+
+2-space indent, snake_case in Python, camelCase in TypeScript, lowercase comments, `----` section headings in long
+files. One test per rule with a small synthetic fixture asserting exact output; a bug fix adds a named regression
+test. pytest and vitest must both be green before every commit. The `log` skill records milestones in
+`~/Github/bbest/notes/om/`.
