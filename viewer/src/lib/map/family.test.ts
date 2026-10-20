@@ -6,16 +6,16 @@ const ind = (id: string, short: string, title: string) => ({ id, short, title })
 const OBIS = [
   ind('obis:records', 'Records (all)', 'OBIS records, all taxa'),
   ind('obis:records:fish', 'Records (fish)', 'OBIS records, fish'),
-  ind('obis:species', 'Species (all)', 'OBIS species richness, all taxa'),
-  ind('obis:species:fish', 'Species (fish)', 'OBIS species richness, fish'),
-  ind('obis:species:hard-corals', 'Species (hard corals)', 'OBIS species richness, hard corals'),
+  ind('obis:species', 'Species richness (all)', 'OBIS species richness, all taxa'),
+  ind('obis:species:fish', 'Species richness (fish)', 'OBIS species richness, fish'),
+  ind('obis:species:hard-corals', 'Species richness (hard corals)', 'OBIS species richness, hard corals'),
 ]
 
 describe('the OBIS family on the Map', () => {
   it('names the metric and the EOV, with the choices that exist', () => {
     expect(familyOf(OBIS[3], OBIS)).toEqual({
       metric: 'species', eov: 'fish',
-      metrics: [{ id: 'records', label: 'Records' }, { id: 'species', label: 'Species' }],
+      metrics: [{ id: 'records', label: 'Records' }, { id: 'species', label: 'Species richness' }],
       eovs: [{ id: 'all', label: 'All taxa' }, { id: 'fish', label: 'Fish' }, { id: 'hard-corals', label: 'Hard corals' }],
     })
   })

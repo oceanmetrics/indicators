@@ -302,6 +302,14 @@ def test_regression_every_configured_short_fits_the_schemas_max_length():
   assert {i: e["short"] for i, e in entries.items() if len(e["short"]) > limit} == {}
 
 
+def test_regression_the_obis_species_shorts_say_species_richness():
+  # the Map's metric chooser takes the short without its "(…)": "Species" was ambiguous (owner review, 2026-10-20)
+  entries, _ = m.load_config()
+  shorts = {i: e["short"] for i, e in entries.items() if i == "obis:species" or i.startswith("obis:species:")}
+  assert len(shorts) == 8
+  assert all(s.startswith("Species richness (") and s.endswith(")") for s in shorts.values())
+
+
 # place sets ----
 POLITICAL = {"id": "political", "title": "Ocean by jurisdiction", "groups": ["mr_eez", "fao_high_seas"],
              "note": "the exclusive economic zones and the high seas"}
