@@ -37,7 +37,8 @@
   const drawn = $derived(spec.layout === 'cards' || spec.layout === 'scorecard')
 
   let editing = $state(false)
-  let split = $state<'place' | 'category' | null>(null)
+  // the sections a split fix chose live in the spec (split=), so a split report is a permalink too
+  const split = $derived(spec.split)
   // printing: the Cards layout lists every category instead of the open tab, so the paper has them all
   let printing = $state(false)
   let head: HTMLElement | undefined = $state()
@@ -49,7 +50,7 @@
   }
   function fix(f: Fix) {
     if (f.kind === 'layout') setSpec({ ...spec, layout: f.layout })
-    else if (f.kind === 'split') split = f.by
+    else if (f.kind === 'split') setSpec({ ...spec, split: f.by })
     else setSpec({ ...spec, indicators: collapseToLeads(spec.indicators, catalog.manifest.indicators) })
   }
 
@@ -156,9 +157,9 @@
 
   {#if editing}
     <Builder {catalog} {idx} {spec} {model} vocab={view.vocab} depth={view.depth} {titles} {split} onspec={setSpec} onview={setView} onfix={fix}
-      onunsplit={() => (split = null)} ondone={() => { editing = false; head?.focus({ preventScroll: true }) }} />
+      onunsplit={() => setSpec({ ...spec, split: null })} ondone={() => { editing = false; head?.focus({ preventScroll: true }) }} />
   {:else if !model.budget.ok || split}
-    <Fixes layout={spec.layout} budget={model.budget} {split} onfix={fix} onunsplit={() => (split = null)} />
+    <Fixes layout={spec.layout} budget={model.budget} {split} onfix={fix} onunsplit={() => setSpec({ ...spec, split: null })} />
   {/if}
 
   {#if !drawn}

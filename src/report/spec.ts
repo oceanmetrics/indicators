@@ -4,7 +4,7 @@
 //   `series:<id>:*` (every member), or an id; each untick goes in `exclude`. a live report picks up what is
 //   published later; `as_of` (a manifest version) marks a frozen one.
 // - in a URL the spec is flat, readable keys (`pi`, `px`, `ii`, `ix`, `ctx`, `layout`, `status`, `recent`, `base`,
-//   `grain`, `from`, `to`, `asof`, `title`); defaults are left out, so the default spec writes nothing.
+//   `grain`, `from`, `to`, `split`, `asof`, `title`); defaults are left out, so the default spec writes nothing.
 import type { Grain, MethodId, Status, Trend } from '../status/index.ts'
 
 export type Layout = 'cards' | 'scorecard' | 'small-multiples' | 'quad' | 'map-sheet' | 'dossier'
@@ -17,6 +17,8 @@ export interface ReportSpec {
   places: { include: string[]; exclude: string[]; context: boolean }
   indicators: { include: string[]; exclude: string[] }
   layout: Layout
+  /** sections, when a fix split an over-budget report: one per place or one per category; null = one report */
+  split: 'place' | 'category' | null
   style: { status: MethodId; recent: number; baseline: [number, number] | null }
   time: { grain: Grain; from: number | null; to: number | null }
   depth: Depth
@@ -28,6 +30,7 @@ export const DEFAULT_SPEC: ReportSpec = {
   places: { include: ['*'], exclude: [], context: false },
   indicators: { include: ['*'], exclude: [] },
   layout: 'cards',
+  split: null,
   style: { status: 'iea-sd', recent: 5, baseline: null },
   time: { grain: 'year', from: null, to: null },
   depth: 'swim',
@@ -54,6 +57,7 @@ export function specFromParams(kv: Map<string, string>, depth: Depth = DEFAULT_S
     places: { include: pi.length ? pi : d.places.include, exclude: list(kv.get('px')), context: kv.get('ctx') === '1' },
     indicators: { include: ii.length ? ii : d.indicators.include, exclude: list(kv.get('ix')) },
     layout: LAYOUT_IDS.includes(layout) ? layout : d.layout,
+    split: kv.get('split') === 'place' || kv.get('split') === 'category' ? (kv.get('split') as 'place' | 'category') : null,
     style: {
       status: METHODS.includes(status) ? status : d.style.status,
       recent: recent != null && recent >= 2 && recent <= 50 ? recent : d.style.recent,
@@ -82,6 +86,7 @@ export function specParams(s: ReportSpec): [string, string][] {
   if (s.time.grain !== d.time.grain) out.push(['grain', s.time.grain])
   if (s.time.from != null) out.push(['from', String(s.time.from)])
   if (s.time.to != null) out.push(['to', String(s.time.to)])
+  if (s.split) out.push(['split', s.split])
   if (s.as_of) out.push(['asof', s.as_of])
   if (s.title) out.push(['title', s.title])
   return out
