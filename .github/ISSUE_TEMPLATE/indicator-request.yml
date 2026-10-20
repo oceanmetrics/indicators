@@ -1,0 +1,54 @@
+name: Request an indicator
+description: Ask for an indicator to be computed for a place. Small requests for a catalogued dataset run by themselves.
+title: "Request: <indicator> for <place>"
+labels: [request]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The Ocean Metrics Indicators viewer pre-fills this form from an empty cell. A bot answers within minutes:
+        - **runs by itself** when the indicator is already in the [manifest](https://storage.oceanmetrics.io/indicators/indicators.json), comes from erddap-places, the place is in a public gazetteer collection, and the job is under about 50 million grid values; this issue then gets the link and is closed;
+        - **needs a maintainer** otherwise (a new dataset or method, a whole collection, a large place), who replies here.
+
+        This issue is public. **Do not put an email address or anything private here**; replies come on this issue.
+  - type: input
+    id: place
+    attributes:
+      label: Place
+      description: A gazetteer place id, as the [places browser](https://oceanmetrics.io/places/) shows it.
+      placeholder: NMS:CINMS
+    validations:
+      required: true
+  - type: input
+    id: collection
+    attributes:
+      label: Collection
+      description: The gazetteer collection the place belongs to (optional; the place id decides).
+      placeholder: noaa_sanctuaries
+  - type: input
+    id: indicator
+    attributes:
+      label: Indicator
+      description: An indicator id from the manifest, or the dataset you have in mind in a few words.
+      placeholder: erddap:dhw_5km:CRW_SST:mean
+    validations:
+      required: true
+  - type: input
+    id: time
+    attributes:
+      label: Time range
+      description: Optional. The automatic run computes the whole record.
+      placeholder: 1990-2025
+  - type: dropdown
+    id: grain
+    attributes:
+      label: Time grain
+      options:
+        - year
+        - month
+      default: 0
+  - type: textarea
+    id: purpose
+    attributes:
+      label: Purpose
+      description: What the values are for (a condition report, a paper, a dashboard). It helps us decide what to add next.
