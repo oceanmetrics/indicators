@@ -57,3 +57,14 @@ def test_short_jobs_run_on_the_quick_runner_never_behind_the_precompute():
   catalog = yaml.safe_load((Path(__file__).resolve().parent.parent / ".github" / "workflows" / "catalog.yml").read_text())
   for runs_on in (RUN["runs-on"], catalog["jobs"]["catalog"]["runs-on"]):
     assert runs_on == ["self-hosted", "macmini-quick"]
+
+
+def test_the_daily_cap_counts_only_runs_that_started_by_themselves():
+  # regression (2026-10-20): issue #2, accepted with the `run` label, was closed `auto-done` and so counted against the
+  # automatic runs' daily cap; a maintainer-started run is `run-done`
+  cap = next(s for s in RUN["steps"] if s.get("id") == "cap")["run"]
+  assert "--label auto-done" in cap and "run-done" not in cap
+  answer = next(s for s in RUN["steps"] if s.get("name") == "answer the issue")["run"]
+  assert 'if [ "$ACTION" = labeled ]; then done=run-done; else done=auto-done; fi' in answer
+  assert '--add-label "$done"' in answer and "--add-label auto-done" not in answer
+  assert RUN["env"]["ACTION"] == "${{ github.event.action }}"

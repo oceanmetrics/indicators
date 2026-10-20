@@ -93,6 +93,7 @@ jobs:
       AWS_DEFAULT_REGION: us-east-1
       NUM: ${{ github.event.issue.number }}
       GH_TOKEN: ${{ github.token }}
+      ACTION: ${{ github.event.action }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -156,9 +157,12 @@ jobs:
         if: steps.cap.outputs.over != '1'
         run: |
           link="https://oceanmetrics.io/indicators/#view=place&place=${REQ_PLACE}&coll=${REQ_COLL}&ind=${REQ_INDICATOR}"
-          gh label create auto-done --color 0e8a16 --force >/dev/null 2>&1 || true
+          # a run that started by itself is `auto-done`, which the daily cap counts; one a maintainer started with the `run`
+          # label (an approved Copernicus Marine request, or an auto one past the cap) is `run-done`, which it does not
+          if [ "$ACTION" = labeled ]; then done=run-done; else done=auto-done; fi
+          gh label create "$done" --color 0e8a16 --force >/dev/null 2>&1 || true
           gh issue comment "$NUM" --body "Done: the values are published. Place view: $link"
-          gh issue edit "$NUM" --add-label auto-done
+          gh issue edit "$NUM" --add-label "$done"
           gh issue close "$NUM" --reason completed
       - name: say so when it failed
         if: failure()
