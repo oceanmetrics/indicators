@@ -113,6 +113,12 @@ drawn from the gazetteer's PMTiles; reference collections (`mr_eez`) are drawn b
 tile, coloured by an SLD and the request's `ENV`, so no Marine Regions geometry is hosted by us. The legend and "The map
 as a table" carry every class in words and glyphs, so nothing depends on colour.
 
+## The paper
+
+`node scripts/paper_matrix.mjs` turns the manifest and coverage into the figure and table of what is computed where
+(`docs/paper/computed_where.{svg,png,csv}`), for "Coding Ocean Indicators: Patterns and People" (PPG-26-197): one row
+per indicator series, one column per place collection, the places with values, the years and whether a status is given.
+
 ## Size budget
 
 `node scripts/size-budget.mjs` after `npm run build`, in gzip: entry JS ≤ 110 kB, all JS except the map chunk ≤ 200 kB,

@@ -1,0 +1,183 @@
+series,indicator,short,lead,producer,names,onms,eov,coll,places,with_values,with_status,t0,t1,status_method
+cmems-physics,cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:bottomT:mean,Bottom temperature,false,noaa-onms/eco-indicators,physical-chemical,water-quality,subsurface-temperature,places,20,13,13,1993,2026,iea-sd
+cmems-physics,cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:mlotst:mean,Mixed layer depth,false,noaa-onms/eco-indicators,physical-chemical,water-quality,physics,places,20,13,13,1993,2026,iea-sd
+cmems-physics,cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:so:mean,Salinity 0.5 m,false,noaa-onms/eco-indicators,physical-chemical,water-quality,sea-surface-salinity,places,20,13,13,1993,2026,iea-sd
+cmems-physics,cmems:cmems_mod_glo_phy_my_0.083deg_P1M-m:thetao:mean,Temperature 0.5 m,true,noaa-onms/eco-indicators,physical-chemical,water-quality,sea-surface-temperature,places,20,13,13,1993,2026,iea-sd
+cmems-ocean-colour,cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:CHL:mean,Chlorophyll-a (ocean colour),true,noaa-onms/eco-indicators,biological,water-quality,ocean-colour,places,20,13,13,1997,2026,iea-sd
+cmems-ocean-colour,cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:DIATO:mean,Diatoms,false,noaa-onms/eco-indicators,biological,living-resources,phytoplankton,places,20,13,12,2002,2026,iea-sd
+cmems-ocean-colour,cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:DINO:mean,Dinoflagellates,false,noaa-onms/eco-indicators,biological,living-resources,phytoplankton,places,20,13,12,2002,2026,iea-sd
+cmems-ocean-colour,cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:GREEN:mean,Green algae,false,noaa-onms/eco-indicators,biological,living-resources,phytoplankton,places,20,13,12,2002,2026,iea-sd
+cmems-ocean-colour,cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:HAPTO:mean,Haptophytes,false,noaa-onms/eco-indicators,biological,living-resources,phytoplankton,places,20,13,12,2002,2026,iea-sd
+cmems-ocean-colour,cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:MICRO:mean,Microphytoplankton,false,noaa-onms/eco-indicators,biological,living-resources,phytoplankton,places,20,13,12,2002,2026,iea-sd
+cmems-ocean-colour,cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:NANO:mean,Nanophytoplankton,false,noaa-onms/eco-indicators,biological,living-resources,phytoplankton,places,20,13,12,2002,2026,iea-sd
+cmems-ocean-colour,cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:PICO:mean,Picophytoplankton,false,noaa-onms/eco-indicators,biological,living-resources,phytoplankton,places,20,13,12,2002,2026,iea-sd
+cmems-ocean-colour,cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:PROCHLO:mean,Prochlorophytes,false,noaa-onms/eco-indicators,biological,living-resources,phytoplankton,places,20,13,12,2002,2026,iea-sd
+cmems-ocean-colour,cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:PROKAR:mean,Prokaryotes,false,noaa-onms/eco-indicators,biological,living-resources,phytoplankton,places,20,13,12,2002,2026,iea-sd
+cmems-ocean-colour,cmems:cmems_obs-oc_glo_bgc-pp_my_l4-multi-4km_P1M:PP:mean,Primary production (OC),false,noaa-onms/eco-indicators,biological,living-resources,phytoplankton,places,20,13,13,1997,2026,iea-sd
+precipitation,erddap:IMERG_monthly_global_precip:precipitation:mean,Precipitation,true,erddap-places,physical-chemical,drivers-pressures,physics,places,20,18,18,1998,2025,iea-sd
+cmems-physics,erddap:cmems_altimetry:mlotst:mean,Mixed layer depth,false,erddap-places,physical-chemical,water-quality,physics,places,20,14,0,2022,2025,iea-sd
+cmems-physics,erddap:cmems_altimetry:tob:mean,Bottom temperature,false,erddap-places,physical-chemical,water-quality,subsurface-temperature,places,20,14,0,2022,2025,iea-sd
+cmems-carbonate,erddap:cmems_biogeochem_carbon:dissic:mean,DIC,false,erddap-places,physical-chemical,water-quality,inorganic-carbon,places,20,14,0,2021,2025,iea-sd
+cmems-carbonate,erddap:cmems_biogeochem_carbon:ph:mean,pH,true,erddap-places,physical-chemical,water-quality,inorganic-carbon,places,20,14,0,2021,2025,iea-sd
+cmems-carbonate,erddap:cmems_biogeochem_co2:spco2:mean,pCO₂,false,erddap-places,physical-chemical,water-quality,inorganic-carbon,places,20,14,0,2021,2025,iea-sd
+cmems-nutrients,erddap:cmems_biogeochem_nutrients:fe:mean,Iron,false,erddap-places,physical-chemical,water-quality,nutrients,places,20,14,0,2021,2025,iea-sd
+cmems-nutrients,erddap:cmems_biogeochem_nutrients:no3:mean,Nitrate,true,erddap-places,physical-chemical,water-quality,nutrients,places,20,14,0,2021,2025,iea-sd
+cmems-nutrients,erddap:cmems_biogeochem_nutrients:po4:mean,Phosphate,false,erddap-places,physical-chemical,water-quality,nutrients,places,20,14,0,2021,2025,iea-sd
+cmems-nutrients,erddap:cmems_biogeochem_nutrients:si:mean,Silicate,false,erddap-places,physical-chemical,water-quality,nutrients,places,20,14,0,2021,2025,iea-sd
+cmems-plankton,erddap:cmems_biogeochem_phyto:chl:mean,Chlorophyll-a,true,erddap-places,biological,water-quality,ocean-colour,places,20,14,0,2021,2025,iea-sd
+cmems-plankton,erddap:cmems_biogeochem_phyto:phyc:mean,Phytoplankton,false,erddap-places,biological,living-resources,phytoplankton,places,20,14,0,2021,2025,iea-sd
+cmems-plankton,erddap:cmems_biogeochem_pp:nppv:mean,Primary production,false,erddap-places,biological,living-resources,phytoplankton,places,20,14,0,2021,2025,iea-sd
+cmems-oxygen,erddap:cmems_biogeochem_pp:o2:mean,Oxygen,true,erddap-places,physical-chemical,water-quality,oxygen,places,20,14,0,2021,2025,iea-sd
+cmems-plankton,erddap:cmems_biogeochem_zoo:zooc:mean,Zooplankton,false,erddap-places,biological,living-resources,zooplankton,places,20,14,0,2024,2025,iea-sd
+cmems-physics,erddap:cmems_salinity:so:mean,Salinity,false,erddap-places,physical-chemical,water-quality,sea-surface-salinity,places,20,14,0,2022,2025,iea-sd
+heat-stress,erddap:dhw_5km:CRW_BAA:share,Bleaching alert,true,erddap-places,physical-chemical,drivers-pressures,sea-surface-temperature,places,20,17,0,1985,2026,values
+sst,erddap:dhw_5km:CRW_SST:mean,SST,true,erddap-places,physical-chemical,water-quality,sea-surface-temperature,places,20,17,16,1985,2026,iea-sd
+npp,erddap:moda_npp_mo_glob:npp:mean,NPP,true,erddap-places,biological,living-resources,phytoplankton,places,20,14,14,2002,2023,iea-sd
+seascapes,erddap:noaa_aoml_seascapes_8day:CLASS:share,Seascapes,true,erddap-places,biological,habitat,ocean-colour,places,20,5,0,2002,2026,values
+obis-all,obis:bp,Berger-Parker (all),false,obisindicators,biological,living-resources,bioeco,mr_eez,281,281,0,1626,2025,values
+obis-all,obis:bp,Berger-Parker (all),false,obisindicators,biological,living-resources,bioeco,mr_high_seas,1,1,0,1753,2025,values
+obis-fish,obis:bp:fish,Berger-Parker (fish),false,obisindicators,biological,living-resources,fish,mr_eez,281,276,0,1743,2025,values
+obis-fish,obis:bp:fish,Berger-Parker (fish),false,obisindicators,biological,living-resources,fish,mr_high_seas,1,1,0,1753,2025,values
+obis-hard-corals,obis:bp:hard-corals,Berger-Parker (corals),false,obisindicators,biological,living-resources,hard-coral,mr_eez,281,224,0,1758,2025,values
+obis-hard-corals,obis:bp:hard-corals,Berger-Parker (corals),false,obisindicators,biological,living-resources,hard-coral,mr_high_seas,1,1,0,1758,2025,values
+obis-mangroves,obis:bp:mangroves,Berger-Parker (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_eez,281,109,0,1794,2025,values
+obis-mangroves,obis:bp:mangroves,Berger-Parker (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_high_seas,1,1,0,2010,2019,values
+obis-marine-mammals,obis:bp:marine-mammals,Berger-Parker (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_eez,281,260,0,1758,2025,values
+obis-marine-mammals,obis:bp:marine-mammals,Berger-Parker (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_high_seas,1,1,0,1849,2025,values
+obis-sea-turtles,obis:bp:sea-turtles,Berger-Parker (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_eez,281,229,0,1757,2025,values
+obis-sea-turtles,obis:bp:sea-turtles,Berger-Parker (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_high_seas,1,1,0,1960,2025,values
+obis-seabirds,obis:bp:seabirds,Berger-Parker (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_eez,281,256,0,1626,2025,values
+obis-seabirds,obis:bp:seabirds,Berger-Parker (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_high_seas,1,1,0,1841,2025,values
+obis-seagrasses,obis:bp:seagrasses,Berger-Parker (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_eez,281,145,0,1839,2025,values
+obis-seagrasses,obis:bp:seagrasses,Berger-Parker (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_high_seas,1,1,0,1970,2019,values
+obis-all,obis:density,Record density (all),false,obisindicators,biological,living-resources,bioeco,mr_eez,281,281,0,1626,2025,values
+obis-all,obis:density,Record density (all),false,obisindicators,biological,living-resources,bioeco,mr_high_seas,1,1,0,1753,2025,values
+obis-fish,obis:density:fish,Record density (fish),false,obisindicators,biological,living-resources,fish,mr_eez,281,276,0,1743,2025,values
+obis-fish,obis:density:fish,Record density (fish),false,obisindicators,biological,living-resources,fish,mr_high_seas,1,1,0,1753,2025,values
+obis-hard-corals,obis:density:hard-corals,Record density (corals),false,obisindicators,biological,living-resources,hard-coral,mr_eez,281,224,0,1758,2025,values
+obis-hard-corals,obis:density:hard-corals,Record density (corals),false,obisindicators,biological,living-resources,hard-coral,mr_high_seas,1,1,0,1758,2025,values
+obis-mangroves,obis:density:mangroves,Record density (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_eez,281,109,0,1794,2025,values
+obis-mangroves,obis:density:mangroves,Record density (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_high_seas,1,1,0,2010,2019,values
+obis-marine-mammals,obis:density:marine-mammals,Record density (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_eez,281,260,0,1758,2025,values
+obis-marine-mammals,obis:density:marine-mammals,Record density (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_high_seas,1,1,0,1849,2025,values
+obis-sea-turtles,obis:density:sea-turtles,Record density (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_eez,281,229,0,1757,2025,values
+obis-sea-turtles,obis:density:sea-turtles,Record density (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_high_seas,1,1,0,1960,2025,values
+obis-seabirds,obis:density:seabirds,Record density (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_eez,281,256,0,1626,2025,values
+obis-seabirds,obis:density:seabirds,Record density (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_high_seas,1,1,0,1841,2025,values
+obis-seagrasses,obis:density:seagrasses,Record density (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_eez,281,145,0,1839,2025,values
+obis-seagrasses,obis:density:seagrasses,Record density (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_high_seas,1,1,0,1970,2019,values
+obis-all,obis:es50,ES(50) (all),false,obisindicators,biological,living-resources,bioeco,mr_eez,281,269,0,1753,2025,values
+obis-all,obis:es50,ES(50) (all),false,obisindicators,biological,living-resources,bioeco,mr_high_seas,1,1,0,1837,2025,values
+obis-fish,obis:es50:fish,ES(50) (fish),false,obisindicators,biological,living-resources,fish,mr_eez,281,254,0,1758,2025,values
+obis-fish,obis:es50:fish,ES(50) (fish),false,obisindicators,biological,living-resources,fish,mr_high_seas,1,1,0,1913,2025,values
+obis-hard-corals,obis:es50:hard-corals,ES(50) (corals),false,obisindicators,biological,living-resources,hard-coral,mr_eez,281,152,0,1758,2025,values
+obis-hard-corals,obis:es50:hard-corals,ES(50) (corals),false,obisindicators,biological,living-resources,hard-coral,mr_high_seas,1,1,0,1960,2022,values
+obis-mangroves,obis:es50:mangroves,ES(50) (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_eez,281,21,0,1960,2025,values
+obis-mangroves,obis:es50:mangroves,ES(50) (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_high_seas,1,0,0,,,values
+obis-marine-mammals,obis:es50:marine-mammals,ES(50) (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_eez,281,175,0,1758,2025,values
+obis-marine-mammals,obis:es50:marine-mammals,ES(50) (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_high_seas,1,1,0,1849,2025,values
+obis-sea-turtles,obis:es50:sea-turtles,ES(50) (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_eez,281,125,0,1960,2025,values
+obis-sea-turtles,obis:es50:sea-turtles,ES(50) (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_high_seas,1,1,0,1990,2020,values
+obis-seabirds,obis:es50:seabirds,ES(50) (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_eez,281,199,0,1758,2025,values
+obis-seabirds,obis:es50:seabirds,ES(50) (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_high_seas,1,1,0,1910,2025,values
+obis-seagrasses,obis:es50:seagrasses,ES(50) (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_eez,281,64,0,1970,2025,values
+obis-seagrasses,obis:es50:seagrasses,ES(50) (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_high_seas,1,0,0,,,values
+obis-all,obis:hill1,Hill N1 (all),false,obisindicators,biological,living-resources,bioeco,mr_eez,281,281,0,1626,2025,values
+obis-all,obis:hill1,Hill N1 (all),false,obisindicators,biological,living-resources,bioeco,mr_high_seas,1,1,0,1753,2025,values
+obis-fish,obis:hill1:fish,Hill N1 (fish),false,obisindicators,biological,living-resources,fish,mr_eez,281,276,0,1743,2025,values
+obis-fish,obis:hill1:fish,Hill N1 (fish),false,obisindicators,biological,living-resources,fish,mr_high_seas,1,1,0,1753,2025,values
+obis-hard-corals,obis:hill1:hard-corals,Hill N1 (corals),false,obisindicators,biological,living-resources,hard-coral,mr_eez,281,224,0,1758,2025,values
+obis-hard-corals,obis:hill1:hard-corals,Hill N1 (corals),false,obisindicators,biological,living-resources,hard-coral,mr_high_seas,1,1,0,1758,2025,values
+obis-mangroves,obis:hill1:mangroves,Hill N1 (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_eez,281,109,0,1794,2025,values
+obis-mangroves,obis:hill1:mangroves,Hill N1 (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_high_seas,1,1,0,2010,2019,values
+obis-marine-mammals,obis:hill1:marine-mammals,Hill N1 (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_eez,281,260,0,1758,2025,values
+obis-marine-mammals,obis:hill1:marine-mammals,Hill N1 (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_high_seas,1,1,0,1849,2025,values
+obis-sea-turtles,obis:hill1:sea-turtles,Hill N1 (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_eez,281,229,0,1757,2025,values
+obis-sea-turtles,obis:hill1:sea-turtles,Hill N1 (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_high_seas,1,1,0,1960,2025,values
+obis-seabirds,obis:hill1:seabirds,Hill N1 (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_eez,281,256,0,1626,2025,values
+obis-seabirds,obis:hill1:seabirds,Hill N1 (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_high_seas,1,1,0,1841,2025,values
+obis-seagrasses,obis:hill1:seagrasses,Hill N1 (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_eez,281,145,0,1839,2025,values
+obis-seagrasses,obis:hill1:seagrasses,Hill N1 (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_high_seas,1,1,0,1970,2019,values
+obis-all,obis:hill2,Hill N2 (all),false,obisindicators,biological,living-resources,bioeco,mr_eez,281,281,0,1626,2025,values
+obis-all,obis:hill2,Hill N2 (all),false,obisindicators,biological,living-resources,bioeco,mr_high_seas,1,1,0,1753,2025,values
+obis-fish,obis:hill2:fish,Hill N2 (fish),false,obisindicators,biological,living-resources,fish,mr_eez,281,276,0,1743,2025,values
+obis-fish,obis:hill2:fish,Hill N2 (fish),false,obisindicators,biological,living-resources,fish,mr_high_seas,1,1,0,1753,2025,values
+obis-hard-corals,obis:hill2:hard-corals,Hill N2 (corals),false,obisindicators,biological,living-resources,hard-coral,mr_eez,281,224,0,1758,2025,values
+obis-hard-corals,obis:hill2:hard-corals,Hill N2 (corals),false,obisindicators,biological,living-resources,hard-coral,mr_high_seas,1,1,0,1758,2025,values
+obis-mangroves,obis:hill2:mangroves,Hill N2 (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_eez,281,109,0,1794,2025,values
+obis-mangroves,obis:hill2:mangroves,Hill N2 (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_high_seas,1,1,0,2010,2019,values
+obis-marine-mammals,obis:hill2:marine-mammals,Hill N2 (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_eez,281,260,0,1758,2025,values
+obis-marine-mammals,obis:hill2:marine-mammals,Hill N2 (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_high_seas,1,1,0,1849,2025,values
+obis-sea-turtles,obis:hill2:sea-turtles,Hill N2 (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_eez,281,229,0,1757,2025,values
+obis-sea-turtles,obis:hill2:sea-turtles,Hill N2 (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_high_seas,1,1,0,1960,2025,values
+obis-seabirds,obis:hill2:seabirds,Hill N2 (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_eez,281,256,0,1626,2025,values
+obis-seabirds,obis:hill2:seabirds,Hill N2 (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_high_seas,1,1,0,1841,2025,values
+obis-seagrasses,obis:hill2:seagrasses,Hill N2 (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_eez,281,145,0,1839,2025,values
+obis-seagrasses,obis:hill2:seagrasses,Hill N2 (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_high_seas,1,1,0,1970,2019,values
+obis-all,obis:records,Records (all),false,obisindicators,biological,living-resources,bioeco,mr_eez,281,281,0,1626,2025,values
+obis-all,obis:records,Records (all),false,obisindicators,biological,living-resources,bioeco,mr_high_seas,1,1,0,1753,2025,values
+obis-fish,obis:records:fish,Records (fish),false,obisindicators,biological,living-resources,fish,mr_eez,281,276,0,1743,2025,values
+obis-fish,obis:records:fish,Records (fish),false,obisindicators,biological,living-resources,fish,mr_high_seas,1,1,0,1753,2025,values
+obis-hard-corals,obis:records:hard-corals,Records (corals),false,obisindicators,biological,living-resources,hard-coral,mr_eez,281,224,0,1758,2025,values
+obis-hard-corals,obis:records:hard-corals,Records (corals),false,obisindicators,biological,living-resources,hard-coral,mr_high_seas,1,1,0,1758,2025,values
+obis-mangroves,obis:records:mangroves,Records (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_eez,281,109,0,1794,2025,values
+obis-mangroves,obis:records:mangroves,Records (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_high_seas,1,1,0,2010,2019,values
+obis-marine-mammals,obis:records:marine-mammals,Records (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_eez,281,260,0,1758,2025,values
+obis-marine-mammals,obis:records:marine-mammals,Records (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_high_seas,1,1,0,1849,2025,values
+obis-sea-turtles,obis:records:sea-turtles,Records (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_eez,281,229,0,1757,2025,values
+obis-sea-turtles,obis:records:sea-turtles,Records (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_high_seas,1,1,0,1960,2025,values
+obis-seabirds,obis:records:seabirds,Records (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_eez,281,256,0,1626,2025,values
+obis-seabirds,obis:records:seabirds,Records (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_high_seas,1,1,0,1841,2025,values
+obis-seagrasses,obis:records:seagrasses,Records (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_eez,281,145,0,1839,2025,values
+obis-seagrasses,obis:records:seagrasses,Records (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_high_seas,1,1,0,1970,2019,values
+obis-all,obis:shannon,Shannon H' (all),false,obisindicators,biological,living-resources,bioeco,mr_eez,281,281,0,1626,2025,values
+obis-all,obis:shannon,Shannon H' (all),false,obisindicators,biological,living-resources,bioeco,mr_high_seas,1,1,0,1753,2025,values
+obis-fish,obis:shannon:fish,Shannon H' (fish),false,obisindicators,biological,living-resources,fish,mr_eez,281,276,0,1743,2025,values
+obis-fish,obis:shannon:fish,Shannon H' (fish),false,obisindicators,biological,living-resources,fish,mr_high_seas,1,1,0,1753,2025,values
+obis-hard-corals,obis:shannon:hard-corals,Shannon H' (corals),false,obisindicators,biological,living-resources,hard-coral,mr_eez,281,224,0,1758,2025,values
+obis-hard-corals,obis:shannon:hard-corals,Shannon H' (corals),false,obisindicators,biological,living-resources,hard-coral,mr_high_seas,1,1,0,1758,2025,values
+obis-mangroves,obis:shannon:mangroves,Shannon H' (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_eez,281,109,0,1794,2025,values
+obis-mangroves,obis:shannon:mangroves,Shannon H' (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_high_seas,1,1,0,2010,2019,values
+obis-marine-mammals,obis:shannon:marine-mammals,Shannon H' (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_eez,281,260,0,1758,2025,values
+obis-marine-mammals,obis:shannon:marine-mammals,Shannon H' (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_high_seas,1,1,0,1849,2025,values
+obis-sea-turtles,obis:shannon:sea-turtles,Shannon H' (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_eez,281,229,0,1757,2025,values
+obis-sea-turtles,obis:shannon:sea-turtles,Shannon H' (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_high_seas,1,1,0,1960,2025,values
+obis-seabirds,obis:shannon:seabirds,Shannon H' (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_eez,281,256,0,1626,2025,values
+obis-seabirds,obis:shannon:seabirds,Shannon H' (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_high_seas,1,1,0,1841,2025,values
+obis-seagrasses,obis:shannon:seagrasses,Shannon H' (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_eez,281,145,0,1839,2025,values
+obis-seagrasses,obis:shannon:seagrasses,Shannon H' (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_high_seas,1,1,0,1970,2019,values
+obis-all,obis:simpson,Simpson (all),false,obisindicators,biological,living-resources,bioeco,mr_eez,281,281,0,1626,2025,values
+obis-all,obis:simpson,Simpson (all),false,obisindicators,biological,living-resources,bioeco,mr_high_seas,1,1,0,1753,2025,values
+obis-fish,obis:simpson:fish,Simpson (fish),false,obisindicators,biological,living-resources,fish,mr_eez,281,276,0,1743,2025,values
+obis-fish,obis:simpson:fish,Simpson (fish),false,obisindicators,biological,living-resources,fish,mr_high_seas,1,1,0,1753,2025,values
+obis-hard-corals,obis:simpson:hard-corals,Simpson (corals),false,obisindicators,biological,living-resources,hard-coral,mr_eez,281,224,0,1758,2025,values
+obis-hard-corals,obis:simpson:hard-corals,Simpson (corals),false,obisindicators,biological,living-resources,hard-coral,mr_high_seas,1,1,0,1758,2025,values
+obis-mangroves,obis:simpson:mangroves,Simpson (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_eez,281,109,0,1794,2025,values
+obis-mangroves,obis:simpson:mangroves,Simpson (mangroves),false,obisindicators,biological,living-resources,mangroves,mr_high_seas,1,1,0,2010,2019,values
+obis-marine-mammals,obis:simpson:marine-mammals,Simpson (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_eez,281,260,0,1758,2025,values
+obis-marine-mammals,obis:simpson:marine-mammals,Simpson (mammals),false,obisindicators,biological,living-resources,marine-mammals,mr_high_seas,1,1,0,1849,2025,values
+obis-sea-turtles,obis:simpson:sea-turtles,Simpson (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_eez,281,229,0,1757,2025,values
+obis-sea-turtles,obis:simpson:sea-turtles,Simpson (turtles),false,obisindicators,biological,living-resources,sea-turtles,mr_high_seas,1,1,0,1960,2025,values
+obis-seabirds,obis:simpson:seabirds,Simpson (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_eez,281,256,0,1626,2025,values
+obis-seabirds,obis:simpson:seabirds,Simpson (seabirds),false,obisindicators,biological,living-resources,seabirds,mr_high_seas,1,1,0,1841,2025,values
+obis-seagrasses,obis:simpson:seagrasses,Simpson (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_eez,281,145,0,1839,2025,values
+obis-seagrasses,obis:simpson:seagrasses,Simpson (seagrass),false,obisindicators,biological,living-resources,seagrass,mr_high_seas,1,1,0,1970,2019,values
+obis-all,obis:species,Species (all),true,obisindicators,biological,living-resources,bioeco,mr_eez,281,281,0,1626,2025,values
+obis-all,obis:species,Species (all),true,obisindicators,biological,living-resources,bioeco,mr_high_seas,1,1,0,1753,2025,values
+obis-fish,obis:species:fish,Species (fish),true,obisindicators,biological,living-resources,fish,mr_eez,281,276,0,1743,2025,values
+obis-fish,obis:species:fish,Species (fish),true,obisindicators,biological,living-resources,fish,mr_high_seas,1,1,0,1753,2025,values
+obis-hard-corals,obis:species:hard-corals,Species (corals),true,obisindicators,biological,living-resources,hard-coral,mr_eez,281,224,0,1758,2025,values
+obis-hard-corals,obis:species:hard-corals,Species (corals),true,obisindicators,biological,living-resources,hard-coral,mr_high_seas,1,1,0,1758,2025,values
+obis-mangroves,obis:species:mangroves,Species (mangroves),true,obisindicators,biological,living-resources,mangroves,mr_eez,281,109,0,1794,2025,values
+obis-mangroves,obis:species:mangroves,Species (mangroves),true,obisindicators,biological,living-resources,mangroves,mr_high_seas,1,1,0,2010,2019,values
+obis-marine-mammals,obis:species:marine-mammals,Species (mammals),true,obisindicators,biological,living-resources,marine-mammals,mr_eez,281,260,0,1758,2025,values
+obis-marine-mammals,obis:species:marine-mammals,Species (mammals),true,obisindicators,biological,living-resources,marine-mammals,mr_high_seas,1,1,0,1849,2025,values
+obis-sea-turtles,obis:species:sea-turtles,Species (turtles),true,obisindicators,biological,living-resources,sea-turtles,mr_eez,281,229,0,1757,2025,values
+obis-sea-turtles,obis:species:sea-turtles,Species (turtles),true,obisindicators,biological,living-resources,sea-turtles,mr_high_seas,1,1,0,1960,2025,values
+obis-seabirds,obis:species:seabirds,Species (seabirds),true,obisindicators,biological,living-resources,seabirds,mr_eez,281,256,0,1626,2025,values
+obis-seabirds,obis:species:seabirds,Species (seabirds),true,obisindicators,biological,living-resources,seabirds,mr_high_seas,1,1,0,1841,2025,values
+obis-seagrasses,obis:species:seagrasses,Species (seagrass),true,obisindicators,biological,living-resources,seagrass,mr_eez,281,145,0,1839,2025,values
+obis-seagrasses,obis:species:seagrasses,Species (seagrass),true,obisindicators,biological,living-resources,seagrass,mr_high_seas,1,1,0,1970,2019,values
+sdg-14,sdg:EN_MAR_CHLDEV,SDG 14.1.1,false,places/proto/eez_indicators,biological,water-quality,ocean-colour,mr_eez,281,226,0,2008,2022,values
+sdg-14,sdg:ER_MRN_MPA,SDG 14.5.1,true,places/proto/eez_indicators,human-dimensions,response,bioeco,mr_eez,281,217,0,2025,2025,values
+sdg-14,sdg:ER_REG_UNFCIM,SDG 14.6.1,false,places/proto/eez_indicators,human-dimensions,response,fish,mr_eez,281,204,0,2018,2026,values

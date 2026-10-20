@@ -99,7 +99,7 @@ out.push(`<text x="${PAD}" y="${y + 38}" font-size="11.5" fill="${T['text-body']
 colls.forEach((c, k) => {
   const x = PAD + W_LABEL + k * W_CELL
   out.push(`<text x="${x + 8}" y="${y + H_HEAD - 10}" font-size="12" font-weight="600" fill="${T['text-strong']}">${esc(COLL_TITLES[c] ?? c)}</text>`)
-  out.push(`<text x="${x + 8}" y="${y + H_HEAD + 4}" font-size="10.5" fill="${T['text-body']}">${placesIn.get(c).size} places</text>`)
+  out.push(`<text x="${x + 8}" y="${y + H_HEAD + 4}" font-size="10.5" fill="${T['text-body']}">${placesIn.get(c).size} place${placesIn.get(c).size === 1 ? "" : "s"}</text>`)
 })
 y += H_HEAD + 12
 for (const g of series) {

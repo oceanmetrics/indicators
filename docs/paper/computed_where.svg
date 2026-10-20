@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="902" height="922" viewBox="0 0 902 922" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="16" y="34" font-size="15" font-weight="600" fill="#082129">What is computed where</text>
+<text x="16" y="54" font-size="11.5" fill="#3c5b64">Indicator series (lead, members) by place collection: places with values, years, and • where a status is given. Manifest 2026.10.20.</text>
+<text x="324" y="70" font-size="12" font-weight="600" fill="#082129">Exclusive Economic Zones</text>
+<text x="324" y="84" font-size="10.5" fill="#3c5b64">281 places</text>
+<text x="514" y="70" font-size="12" font-weight="600" fill="#082129">Sanctuaries and other places</text>
+<text x="514" y="84" font-size="10.5" fill="#3c5b64">20 places</text>
+<text x="704" y="70" font-size="12" font-weight="600" fill="#082129">High seas</text>
+<text x="704" y="84" font-size="10.5" fill="#3c5b64">1 place</text>
+<text x="16" y="112" font-size="11" font-weight="600" letter-spacing="0.08em" fill="#0c7288">PHYSICAL-CHEMICAL</text>
+<text x="16" y="137" font-size="12" fill="#082129">Temperature 0.5 m <tspan fill="#3c5b64">+6</tspan></text>
+<text x="16" y="150" font-size="9.5" fill="#3c5b64">noaa-onms/eco-indicators</text>
+<rect x="320" y="125" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="510" y="125" width="182" height="28" rx="4" fill="#184f95"/>
+<text x="518" y="143" font-size="11" fill="#ffffff">13/20 · 1993–2026 •</text>
+<rect x="700" y="125" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<text x="16" y="171" font-size="12" fill="#082129">Precipitation</text>
+<text x="16" y="184" font-size="9.5" fill="#3c5b64">erddap-places</text>
+<rect x="320" y="159" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="510" y="159" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="518" y="177" font-size="11" fill="#ffffff">18/20 · 1998–2025 •</text>
+<rect x="700" y="159" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<text x="16" y="205" font-size="12" fill="#082129">pH <tspan fill="#3c5b64">+2</tspan></text>
+<text x="16" y="218" font-size="9.5" fill="#3c5b64">erddap-places</text>
+<rect x="320" y="193" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="510" y="193" width="182" height="28" rx="4" fill="#184f95"/>
+<text x="518" y="211" font-size="11" fill="#ffffff">14/20 · 2021–2025</text>
+<rect x="700" y="193" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<text x="16" y="239" font-size="12" fill="#082129">Nitrate <tspan fill="#3c5b64">+3</tspan></text>
+<text x="16" y="252" font-size="9.5" fill="#3c5b64">erddap-places</text>
+<rect x="320" y="227" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="510" y="227" width="182" height="28" rx="4" fill="#184f95"/>
+<text x="518" y="245" font-size="11" fill="#ffffff">14/20 · 2021–2025</text>
+<rect x="700" y="227" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<text x="16" y="273" font-size="12" fill="#082129">Oxygen</text>
+<text x="16" y="286" font-size="9.5" fill="#3c5b64">erddap-places</text>
+<rect x="320" y="261" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="510" y="261" width="182" height="28" rx="4" fill="#184f95"/>
+<text x="518" y="279" font-size="11" fill="#ffffff">14/20 · 2021–2025</text>
+<rect x="700" y="261" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<text x="16" y="307" font-size="12" fill="#082129">Bleaching alert</text>
+<text x="16" y="320" font-size="9.5" fill="#3c5b64">erddap-places</text>
+<rect x="320" y="295" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="510" y="295" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="518" y="313" font-size="11" fill="#ffffff">17/20 · 1985–2026</text>
+<rect x="700" y="295" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<text x="16" y="341" font-size="12" fill="#082129">SST</text>
+<text x="16" y="354" font-size="9.5" fill="#3c5b64">erddap-places</text>
+<rect x="320" y="329" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="510" y="329" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="518" y="347" font-size="11" fill="#ffffff">17/20 · 1985–2026 •</text>
+<rect x="700" y="329" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<text x="16" y="380" font-size="11" font-weight="600" letter-spacing="0.08em" fill="#0c7288">BIOLOGICAL</text>
+<text x="16" y="405" font-size="12" fill="#082129">Chlorophyll-a (ocean colour) <tspan fill="#3c5b64">+10</tspan></text>
+<text x="16" y="418" font-size="9.5" fill="#3c5b64">noaa-onms/eco-indicators</text>
+<rect x="320" y="393" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="510" y="393" width="182" height="28" rx="4" fill="#184f95"/>
+<text x="518" y="411" font-size="11" fill="#ffffff">13/20 · 1997–2026 •</text>
+<rect x="700" y="393" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<text x="16" y="439" font-size="12" fill="#082129">Chlorophyll-a <tspan fill="#3c5b64">+3</tspan></text>
+<text x="16" y="452" font-size="9.5" fill="#3c5b64">erddap-places</text>
+<rect x="320" y="427" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="510" y="427" width="182" height="28" rx="4" fill="#184f95"/>
+<text x="518" y="445" font-size="11" fill="#ffffff">14/20 · 2021–2025</text>
+<rect x="700" y="427" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<text x="16" y="473" font-size="12" fill="#082129">NPP</text>
+<text x="16" y="486" font-size="9.5" fill="#3c5b64">erddap-places</text>
+<rect x="320" y="461" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="510" y="461" width="182" height="28" rx="4" fill="#184f95"/>
+<text x="518" y="479" font-size="11" fill="#ffffff">14/20 · 2002–2023 •</text>
+<rect x="700" y="461" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<text x="16" y="507" font-size="12" fill="#082129">Seascapes</text>
+<text x="16" y="520" font-size="9.5" fill="#3c5b64">erddap-places</text>
+<rect x="320" y="495" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="510" y="495" width="182" height="28" rx="4" fill="#3987e5"/>
+<text x="518" y="513" font-size="11" fill="#082129">5/20 · 2002–2026</text>
+<rect x="700" y="495" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<text x="16" y="541" font-size="12" fill="#082129">Species (all) <tspan fill="#3c5b64">+8</tspan></text>
+<text x="16" y="554" font-size="9.5" fill="#3c5b64">obisindicators</text>
+<rect x="320" y="529" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="328" y="547" font-size="11" fill="#ffffff">281/281 · 1626–2025</text>
+<rect x="510" y="529" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="700" y="529" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="708" y="547" font-size="11" fill="#ffffff">1/1 · 1753–2025</text>
+<text x="16" y="575" font-size="12" fill="#082129">Species (fish) <tspan fill="#3c5b64">+8</tspan></text>
+<text x="16" y="588" font-size="9.5" fill="#3c5b64">obisindicators</text>
+<rect x="320" y="563" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="328" y="581" font-size="11" fill="#ffffff">276/281 · 1743–2025</text>
+<rect x="510" y="563" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="700" y="563" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="708" y="581" font-size="11" fill="#ffffff">1/1 · 1753–2025</text>
+<text x="16" y="609" font-size="12" fill="#082129">Species (corals) <tspan fill="#3c5b64">+8</tspan></text>
+<text x="16" y="622" font-size="9.5" fill="#3c5b64">obisindicators</text>
+<rect x="320" y="597" width="182" height="28" rx="4" fill="#184f95"/>
+<text x="328" y="615" font-size="11" fill="#ffffff">224/281 · 1758–2025</text>
+<rect x="510" y="597" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="700" y="597" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="708" y="615" font-size="11" fill="#ffffff">1/1 · 1758–2025</text>
+<text x="16" y="643" font-size="12" fill="#082129">Species (mangroves) <tspan fill="#3c5b64">+8</tspan></text>
+<text x="16" y="656" font-size="9.5" fill="#3c5b64">obisindicators</text>
+<rect x="320" y="631" width="182" height="28" rx="4" fill="#3987e5"/>
+<text x="328" y="649" font-size="11" fill="#082129">109/281 · 1794–2025</text>
+<rect x="510" y="631" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="700" y="631" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="708" y="649" font-size="11" fill="#ffffff">1/1 · 2010–2019</text>
+<text x="16" y="677" font-size="12" fill="#082129">Species (mammals) <tspan fill="#3c5b64">+8</tspan></text>
+<text x="16" y="690" font-size="9.5" fill="#3c5b64">obisindicators</text>
+<rect x="320" y="665" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="328" y="683" font-size="11" fill="#ffffff">260/281 · 1758–2025</text>
+<rect x="510" y="665" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="700" y="665" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="708" y="683" font-size="11" fill="#ffffff">1/1 · 1849–2025</text>
+<text x="16" y="711" font-size="12" fill="#082129">Species (turtles) <tspan fill="#3c5b64">+8</tspan></text>
+<text x="16" y="724" font-size="9.5" fill="#3c5b64">obisindicators</text>
+<rect x="320" y="699" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="328" y="717" font-size="11" fill="#ffffff">229/281 · 1757–2025</text>
+<rect x="510" y="699" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="700" y="699" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="708" y="717" font-size="11" fill="#ffffff">1/1 · 1960–2025</text>
+<text x="16" y="745" font-size="12" fill="#082129">Species (seabirds) <tspan fill="#3c5b64">+8</tspan></text>
+<text x="16" y="758" font-size="9.5" fill="#3c5b64">obisindicators</text>
+<rect x="320" y="733" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="328" y="751" font-size="11" fill="#ffffff">256/281 · 1626–2025</text>
+<rect x="510" y="733" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="700" y="733" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="708" y="751" font-size="11" fill="#ffffff">1/1 · 1841–2025</text>
+<text x="16" y="779" font-size="12" fill="#082129">Species (seagrass) <tspan fill="#3c5b64">+8</tspan></text>
+<text x="16" y="792" font-size="9.5" fill="#3c5b64">obisindicators</text>
+<rect x="320" y="767" width="182" height="28" rx="4" fill="#256abf"/>
+<text x="328" y="785" font-size="11" fill="#082129">145/281 · 1839–2025</text>
+<rect x="510" y="767" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="700" y="767" width="182" height="28" rx="4" fill="#0d366b"/>
+<text x="708" y="785" font-size="11" fill="#ffffff">1/1 · 1970–2019</text>
+<text x="16" y="818" font-size="11" font-weight="600" letter-spacing="0.08em" fill="#0c7288">HUMAN DIMENSIONS</text>
+<text x="16" y="843" font-size="12" fill="#082129">SDG 14.5.1 <tspan fill="#3c5b64">+2</tspan></text>
+<text x="16" y="856" font-size="9.5" fill="#3c5b64">places/proto/eez_indicators</text>
+<rect x="320" y="831" width="182" height="28" rx="4" fill="#184f95"/>
+<text x="328" y="849" font-size="11" fill="#ffffff">217/281 · 2008–2026</text>
+<rect x="510" y="831" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<rect x="700" y="831" width="182" height="28" rx="4" fill="none" stroke="#c2e0e7" stroke-dasharray="3 3"/>
+<text x="16" y="884" font-size="10" fill="#3c5b64">Fill: share of the collection's places with values (fifths). Dashed: not computed.</text>
+<text x="16" y="898" font-size="10" fill="#3c5b64">Source: the oceanmetrics/indicators catalog; values CC BY 4.0, with the upstream credit in the manifest.</text>
+</svg>
