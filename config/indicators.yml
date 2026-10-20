@@ -622,7 +622,7 @@ indicators:
     eov_match: discipline
   - id: "obis:species"
     title: "OBIS species richness, all taxa"
-    short: "Species (all)"
+    short: "Species richness (all)"
     description: "Species richness: distinct species names among the OBIS records inside the place; all taxa."
     series: obis-all
     series_title: "OBIS (all taxa)"
@@ -715,7 +715,7 @@ indicators:
     eov_match: exact
   - id: "obis:species:fish"
     title: "OBIS species richness, fish"
-    short: "Species (fish)"
+    short: "Species richness (fish)"
     description: "Species richness: distinct species names among the OBIS records inside the place; fish only (the EOV's IOOS Marine Life Data Network taxa)."
     series: obis-fish
     series_title: "OBIS (fish)"
@@ -808,7 +808,7 @@ indicators:
     eov_match: exact
   - id: "obis:species:hard-corals"
     title: "OBIS species richness, hard corals"
-    short: "Species (corals)"
+    short: "Species richness (corals)"
     description: "Species richness: distinct species names among the OBIS records inside the place; hard corals only (the EOV's IOOS Marine Life Data Network taxa)."
     series: obis-hard-corals
     series_title: "OBIS (hard corals)"
@@ -901,7 +901,7 @@ indicators:
     eov_match: exact
   - id: "obis:species:mangroves"
     title: "OBIS species richness, mangroves"
-    short: "Species (mangroves)"
+    short: "Species richness (mangroves)"
     description: "Species richness: distinct species names among the OBIS records inside the place; mangroves only (the EOV's IOOS Marine Life Data Network taxa)."
     series: obis-mangroves
     series_title: "OBIS (mangroves)"
@@ -994,7 +994,7 @@ indicators:
     eov_match: exact
   - id: "obis:species:marine-mammals"
     title: "OBIS species richness, marine mammals"
-    short: "Species (mammals)"
+    short: "Species richness (mammals)"
     description: "Species richness: distinct species names among the OBIS records inside the place; marine mammals only (the EOV's IOOS Marine Life Data Network taxa)."
     series: obis-marine-mammals
     series_title: "OBIS (marine mammals)"
@@ -1087,7 +1087,7 @@ indicators:
     eov_match: exact
   - id: "obis:species:sea-turtles"
     title: "OBIS species richness, sea turtles"
-    short: "Species (turtles)"
+    short: "Species richness (turtles)"
     description: "Species richness: distinct species names among the OBIS records inside the place; sea turtles only (the EOV's IOOS Marine Life Data Network taxa)."
     series: obis-sea-turtles
     series_title: "OBIS (sea turtles)"
@@ -1180,7 +1180,7 @@ indicators:
     eov_match: exact
   - id: "obis:species:seabirds"
     title: "OBIS species richness, seabirds"
-    short: "Species (seabirds)"
+    short: "Species richness (seabirds)"
     description: "Species richness: distinct species names among the OBIS records inside the place; seabirds only (the EOV's IOOS Marine Life Data Network taxa)."
     series: obis-seabirds
     series_title: "OBIS (seabirds)"
@@ -1273,7 +1273,7 @@ indicators:
     eov_match: exact
   - id: "obis:species:seagrasses"
     title: "OBIS species richness, seagrasses"
-    short: "Species (seagrass)"
+    short: "Species richness (seagrass)"
     description: "Species richness: distinct species names among the OBIS records inside the place; seagrasses only (the EOV's IOOS Marine Life Data Network taxa)."
     series: obis-seagrasses
     series_title: "OBIS (seagrasses)"

@@ -11,7 +11,7 @@
 // - Map: ind (the indicator), coll (the place group: a gazetteer collection; an old link's values collection still resolves),
 //   place (the place selected), color (value | departure | status | trend | record | class |
 //   share), t (the period shown: "2024", "2024-07"; none = the latest), cls (the class of `share`), grain (year |
-//   decade | month: the grain read; the indicator's status grain when absent), method.
+//   decade | month: the grain read; the indicator's status grain when absent), proj (globe; absent = the flat map), method.
 // - Report: the report spec's own flat keys (src/report/spec.ts: pi, px, ctx, ii, ix, layout, status, recent, base,
 //   grain, from, to, asof, title).
 // vocab and depth are shared. defaults are left out. `?brand=` and `?theme=` are query switches, never hash keys. an
@@ -55,6 +55,8 @@ export interface ViewState {
   cls: string | null
   /** the Map's grain (the indicator's status grain when null) */
   grain: Grain | null
+  /** the Map's projection: the globe, or null for the flat map (the default) */
+  proj: 'globe' | null
   /** the Report view's spec (the default spec in every other view) */
   spec: ReportSpec
 }
@@ -62,7 +64,7 @@ export interface ViewState {
 export const DEFAULT_STATE: ViewState = {
   view: 'matrix', colls: [], q: '', vocab: 'onms', leads: true, depth: 'swim', cell: null,
   place: null, coll: null, method: null, ind: null,
-  axes: 'indicators', showEmpty: false, hidePlaces: [], hideInds: [], addInds: [], color: null, t: null, cls: null, grain: null, spec: DEFAULT_SPEC,
+  axes: 'indicators', showEmpty: false, hidePlaces: [], hideInds: [], addInds: [], color: null, t: null, cls: null, grain: null, proj: null, spec: DEFAULT_SPEC,
 }
 
 // keep the readable characters of ids (NMS:FKNMS, erddap:dhw_5km:CRW_SST:mean, a|b) out of percent-encoding
@@ -108,6 +110,7 @@ export function parseHash(hash: string): ViewState {
     t: /^\d{4}(-\d{2}(-\d{2})?)?$/.test(t) ? t : null,
     cls: kv.get('cls') || null,
     grain: MAP_GRAINS.includes(kv.get('grain') as Grain) ? (kv.get('grain') as Grain) : null,
+    proj: kv.get('proj') === 'globe' ? 'globe' : null,
     spec: kv.get('view') === 'report' ? specFromParams(kv, depth === 'skim' || depth === 'dive' ? depth : 'swim') : DEFAULT_SPEC,
   }
 }
@@ -145,6 +148,7 @@ export function serializeHash(s: ViewState): string {
     if (s.t) parts.push('t=' + s.t)
     if (s.cls) parts.push('cls=' + enc(s.cls))
     if (s.grain) parts.push('grain=' + s.grain)
+    if (s.proj) parts.push('proj=' + s.proj)
     shared()
     if (s.method) parts.push('method=' + s.method)
     return parts.join('&')

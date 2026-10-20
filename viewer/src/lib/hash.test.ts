@@ -223,3 +223,18 @@ describe('a place set in a link (set:<id>)', () => {
     expect(serializeHash(parseHash('#' + matrix))).toBe(matrix)
   })
 })
+
+describe('the Map projection (proj)', () => {
+  it('proj=globe is a Map key written after grain; the flat map leaves it out; anything else parses to flat', () => {
+    const s: ViewState = { ...DEFAULT_STATE, view: 'map', ind: 'obis:species', coll: 'mr_eez', grain: 'decade', proj: 'globe' }
+    expect(serializeHash(s)).toBe('view=map&ind=obis:species&coll=mr_eez&grain=decade&proj=globe')
+    expect(parseHash('#view=map&ind=obis:species&coll=mr_eez&grain=decade&proj=globe')).toEqual(s)
+    expect(serializeHash({ ...s, proj: null })).toBe('view=map&ind=obis:species&coll=mr_eez&grain=decade')
+    expect(parseHash('#view=map&proj=flat').proj).toBeNull()
+    expect(parseHash('#view=map&proj=orthographic').proj).toBeNull()
+  })
+  it('is never written by the Matrix or the Place view', () => {
+    expect(serializeHash({ ...DEFAULT_STATE, proj: 'globe' })).toBe('')
+    expect(serializeHash({ ...DEFAULT_STATE, view: 'place', place: 'NMS:CINMS', proj: 'globe' })).toBe('view=place&place=NMS:CINMS')
+  })
+})

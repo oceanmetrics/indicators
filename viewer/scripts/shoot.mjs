@@ -67,6 +67,20 @@ const choosePickerRow = key => async page => {
 }
 const NERRS_PRECIP = 'view=map&ind=erddap:IMERG_monthly_global_precip:precipitation:mean&coll=noaa_nerrs&place=NERRS:WEL'
 const NERRS_MEMBER = 'view=map&ind=erddap:IMERG_monthly_global_precip:precipitation:mean&coll=noaa_nerrs&place=NERRS:ACE'
+// full screen: a real click on the map frame's button (the Fullscreen API needs a user gesture); 'expanded' removes the API first
+const fullscreen = mode => async page => {
+  if (mode === 'expanded') await page.evaluate(() => { for (const k of ['fullscreenEnabled', 'webkitFullscreenEnabled']) Object.defineProperty(document, k, { value: false }) })
+  await page.click('.fc .full')
+  await page.waitForSelector('.layout.full', { timeout: 5000 })
+  await new Promise(r => setTimeout(r, 1500))
+  const got = await page.evaluate(() => ({ native: !!document.fullscreenElement, expanded: !!document.querySelector('.layout.expanded'), label: document.querySelector('.fc .full')?.textContent?.trim() }))
+  console.log('  full screen:', JSON.stringify(got))
+}
+// the kit's Menu in the header (Help): open its panel
+const openMenu = async page => {
+  await page.evaluate(() => document.querySelector('header .mbon-menu button')?.click())
+  await page.waitForSelector('.mbon-menu .panel', { timeout: 5000 })
+}
 const EEZ_OBIS = 'view=map&ind=obis:species&coll=mr_eez'
 // the political ocean: the EEZs (Marine Regions' WMS) over the high seas by FAO area (the FAO major areas' PMTiles), one scale
 const NERRS_ALL = 'view=map&ind=erddap:IMERG_monthly_global_precip:precipitation:mean&coll=noaa_nerrs'
@@ -199,6 +213,27 @@ const SHOTS = [
   ['embed_map_political_mbon_light', 'mbon', 'light', { width: 900, height: 1100, deviceScaleFactor: 1 }, POLITICAL],
   // the Matrix of the set: its groups, places as rows
   ['matrix_political_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, 'colls=set:political&axes=p'],
+  // the globe (proj=globe): the political set (a WMS layer over a derived vector layer), a vector group with its hollow circles, the embed
+  ['map_globe_political_oceanmetrics_light', 'oceanmetrics', 'light', MAP, POLITICAL + '&proj=globe'],
+  ['map_globe_political_mbon_dark', 'mbon', 'dark', MAP, POLITICAL + '&proj=globe'],
+  ['map_globe_political_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, POLITICAL + '&proj=globe'],
+  ['map_globe_nerrs_oceanmetrics_light', 'oceanmetrics', 'light', MAP, NERRS_ALL + '&proj=globe'],
+  ['map_globe_sst_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, SST + '&color=status&proj=globe'],
+  ['embed_map_globe_mbon_light', 'mbon', 'light', { width: 900, height: 1100, deviceScaleFactor: 1 }, POLITICAL + '&proj=globe'],
+  // full screen: the map with its legend, by the browser's Fullscreen API (a real click grants it) and by the expanded fallback (the API removed, as on an iPhone)
+  ['map_full_political_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, POLITICAL, fullscreen('native')],
+  ['map_full_political_mbon_dark', 'mbon', 'dark', DESKTOP, POLITICAL, fullscreen('native')],
+  ['map_full_globe_oceanmetrics_dark', 'oceanmetrics', 'dark', DESKTOP, POLITICAL + '&proj=globe', fullscreen('native')],
+  ['map_full_expanded_oceanmetrics_light_390', 'oceanmetrics', 'light', PHONE, POLITICAL, fullscreen('expanded')],
+  ['map_full_expanded_mbon_dark_390', 'mbon', 'dark', PHONE, POLITICAL, fullscreen('expanded')],
+  // the pickers in dark mode: the panel stands off the page (both brands, desktop and 390 px)
+  ['matrix_mbon_dark_places_picker', 'mbon', 'dark', DESKTOP, REMOVED, openPicker('Places')],
+  ['matrix_mbon_dark_places_picker_390', 'mbon', 'dark', PHONE, REMOVED, openPicker('Places')],
+  ['matrix_mbon_light_indicators_picker', 'mbon', 'light', DESKTOP, REMOVED, openPicker('Indicators')],
+  ['matrix_oceanmetrics_dark_indicators_picker_390', 'oceanmetrics', 'dark', PHONE, REMOVED, openPicker('Indicators')],
+  ['map_mbon_dark_groups_picker', 'mbon', 'dark', MAP, POLITICAL, openPicker('Place group')],
+  ['help_menu_oceanmetrics_dark', 'oceanmetrics', 'dark', DESKTOP, '', openMenu],
+  ['help_menu_mbon_dark', 'mbon', 'dark', DESKTOP, '', openMenu],
 ]
 
 async function alive(url) { try { return (await fetch(url)).ok } catch { return false } }
@@ -231,12 +266,14 @@ try {
     if (hash.includes('view=map')) await page.waitForSelector('.map[data-state=done]', { timeout: 60000 })
     if (hash.includes('view=place')) await page.waitForFunction(() => document.querySelector('article.card') && !document.querySelector('article.card[aria-busy="true"]'), { timeout: 30000 })
     await page.evaluate(() => document.fonts.ready)
+    // the globe asks for more tiles after the map first says it is idle: give it a few seconds
+    if (hash.includes('proj=globe')) await new Promise(r => setTimeout(r, 6000))
     await new Promise(r => setTimeout(r, 400))
     if (act) { await act(page); await new Promise(r => setTimeout(r, 200)) }
     // the legend is shot on its own
     const legend = name.startsWith('legend_') ? await page.$('#legend') : null
     if (legend) await legend.screenshot({ path: resolve(OUT, name + '.png') })
-    else await page.screenshot({ path: resolve(OUT, name + '.png'), fullPage: !hash.includes('cell=') && !hash.includes('view=place') && !hash.includes('view=report') && !embed })
+    else await page.screenshot({ path: resolve(OUT, name + '.png'), fullPage: !name.includes('_full') && !hash.includes('cell=') && !hash.includes('view=place') && !hash.includes('view=report') && !embed })
     // a page-level sideways scroll is a layout bug at any width
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     console.log(name, overflow > 0 ? `PAGE OVERFLOW ${overflow}px` : 'ok', errors.length ? errors : '')

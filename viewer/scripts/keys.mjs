@@ -235,6 +235,42 @@ if (t) {
   check(await hashChanged(was, 'place=NMS:CINMS'), `place picker: Enter on a result opens that place (${await page.evaluate(() => location.hash)})`)
 }
 
+// Map frame: Tab to Globe, Enter writes proj=globe, Tab back to Flat drops it; Tab to Full screen, Enter goes full screen
+// (the label says Exit full screen, the wrapper holds the legend), Enter again leaves and focus stays on the button
+await fresh('#view=map&ind=obis:species&coll=set:political&grain=decade')
+await page.waitForSelector('.map[data-state=done]', { timeout: 60000 })
+const label = () => page.evaluate(() => document.querySelector('.fc .full')?.textContent?.trim())
+const globe = await tabUntil(f => f.tag === 'BUTTON' && /Globe/.test(f.label ?? ''), 300)
+check(!!globe, 'map frame: Tab reaches the Globe button')
+if (globe) {
+  await page.keyboard.press('Enter')
+  check(await hashChanged('', 'proj=globe'), `map frame: Enter on Globe writes proj=globe (${await page.evaluate(() => location.hash)})`)
+  await page.keyboard.down('Shift'); await page.keyboard.press('Tab'); await page.keyboard.up('Shift')
+  await page.keyboard.press('Enter')
+  check(await page.waitForFunction(() => !location.hash.includes('proj='), { timeout: 5000 }).then(() => true, () => false), 'map frame: Enter on Flat drops proj')
+  const full = await tabUntil(f => f.tag === 'BUTTON' && /\bfull\b/.test(f.cls), 6)
+  check(!!full && (await label()) === 'Full screen', 'map frame: Tab reaches the button, which says Full screen')
+  await page.keyboard.press('Enter')
+  check(await page.waitForSelector('.layout.full', { timeout: 5000 }).then(() => true, () => false), 'map frame: Enter goes full screen')
+  check((await label()) === 'Exit full screen', 'map frame: the button now says Exit full screen')
+  check(await page.evaluate(() => { const l = document.querySelector('.layout.full'); return !!l?.querySelector('#map-legend-h') && !!l.querySelector('.map') }), 'map frame: the full-screen wrapper holds the map and its legend')
+  await page.keyboard.press('Enter')
+  check(await page.waitForSelector('.layout.full', { hidden: true, timeout: 5000 }).then(() => true, () => false), 'map frame: Enter on the button leaves full screen')
+  check(/\bfull\b/.test((await focused())?.cls ?? ''), 'map frame: focus stays on the button')
+}
+// the expanded fallback (no Fullscreen API, as on an iPhone): Enter expands, Esc leaves, focus on the button
+await fresh('#view=map&ind=obis:species&coll=set:political&grain=decade')
+await page.waitForSelector('.map[data-state=done]', { timeout: 60000 })
+await page.evaluate(() => { for (const k of ['fullscreenEnabled', 'webkitFullscreenEnabled']) Object.defineProperty(document, k, { value: false }) })
+const exp = await tabUntil(f => f.tag === 'BUTTON' && /\bfull\b/.test(f.cls), 300)
+if (exp) {
+  await page.keyboard.press('Enter')
+  check(await page.waitForSelector('.layout.expanded', { timeout: 5000 }).then(() => true, () => false), 'expanded fallback: Enter expands the wrapper to the viewport')
+  await page.keyboard.press('Escape')
+  check(await page.waitForSelector('.layout.full', { hidden: true, timeout: 5000 }).then(() => true, () => false), 'expanded fallback: Esc leaves')
+  check(/\bfull\b/.test((await focused())?.cls ?? ''), 'expanded fallback: focus is on the button')
+} else check(false, 'expanded fallback: Tab reaches the button')
+
 await browser.close()
 console.log(fails.length ? `${fails.length} keyboard check(s) failed` : 'keyboard checks passed')
 process.exit(fails.length ? 1 : 0)

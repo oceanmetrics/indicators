@@ -154,9 +154,9 @@
     bottom: 0;
     width: min(36rem, 100%);
     z-index: calc(var(--z-overlay) + 1);
-    background: var(--pane-bg);
-    border-left: 1px solid var(--pane-border);
-    box-shadow: var(--shadow-lg);
+    background: var(--overlay-bg);
+    border-left: 1px solid var(--overlay-border);
+    box-shadow: var(--overlay-shadow);
     overflow-y: auto;
     padding: var(--space-4) var(--space-5) var(--space-6);
     display: grid;

@@ -15,6 +15,11 @@
   --pipe-place-ink:    #01375f;
   --pipe-method-ink:   #15788f;
   --pipe-delivery-ink: #c4471d;        /* coral-500 deepened to 4.6:1 on white */
+
+  --overlay-bg:     var(--popover-bg);
+  --overlay-border: var(--border-strong);
+  --overlay-shadow: var(--shadow-lg);
+  --map-sea:        #d0cfd4;           /* under the basemap: the Arctic cap its tiles do not cover, seen on the globe */
 }
 
 [data-theme="dark"] {
@@ -23,4 +28,12 @@
   --pipe-place-ink:    #79a3e8;        /* the kit's cobalt-300 */
   --pipe-method-ink:   #74c8d6;        /* the kit's teal-300 */
   --pipe-delivery-ink: #f7a98c;        /* the kit's coral-300 */
+
+  --overlay-bg:     #0f3552;
+  --overlay-border: #4a7c99;
+  --overlay-shadow: 0 0 0 1px #a0cde61a, 0 18px 48px #000a;
+  --map-sea:        #232227;
 }
+
+/* the kit Menu panel stands off the page like the pickers and the drawer (the kit styles it with its own popover tokens) */
+.mbon-menu .panel.panel { background: var(--overlay-bg); border-color: var(--overlay-border); box-shadow: var(--overlay-shadow); }

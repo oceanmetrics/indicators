@@ -38,6 +38,8 @@
   import { findSet, isSetRef } from '../sets.ts'
   import { familyId, familyOf, FAMILY_DEFAULT, FAMILY_LABEL, isFamily } from './family.ts'
   import MapCanvas from './MapCanvas.svelte'
+  import MapFrameControls from './MapFrameControls.svelte'
+  import type { FullMode } from './frame.ts'
   import MapLegend from './MapLegend.svelte'
   import MapTable from './MapTable.svelte'
 
@@ -232,6 +234,9 @@
     ind && model && coll ? `${ind.title} · ${titles(coll)} · by ${MODE_LABELS[model.color].toLowerCase()}${model.period ? ` · ${periodLabel(model.period, model.grain)}` : ''}` : '',
   )
   const methodChoices: MethodId[] = ['iea-sd', 'names-pct']
+  // full screen: the wrapper of the map, its credit line and the side column (legend, selected place) goes full screen as one
+  let fsEl = $state<HTMLElement>()
+  let full = $state<FullMode>('off')
 </script>
 
 {#if !ind || !model || !coll}
@@ -306,12 +311,13 @@
     <span>{heading}{model.pending ? ' · loading the record…' : ''}</span>
   </p>
 
-  <div class="layout">
+  <div class="layout" class:full={full !== 'off'} class:expanded={full === 'expanded'} bind:this={fsEl}>
     <div class="mapcol">
       <div class="frame">
         {#if parts.length}
-          <MapCanvas {parts} {bbox} {colors} line={lineColor} none={noneColor} nofill={nofillColor} faint={faintColor} focus={focusColor} {dark} selected={selectedId} {marker}
+          <MapCanvas {parts} {bbox} {colors} line={lineColor} none={noneColor} nofill={nofillColor} faint={faintColor} focus={focusColor} {dark} selected={selectedId} proj={view.proj} {marker}
             {onpick} onstate={s => (drawn = s)} label={`Map of ${ind.short} by place`} />
+          <MapFrameControls target={fsEl} proj={view.proj} onproj={p => onpatch({ proj: p })} bind:mode={full} />
         {:else if layerError}
           <div class="msg"><Notice kind="error">{layerError}</Notice></div>
         {:else}
@@ -392,7 +398,22 @@
   .links { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: 0; }
   .links a { display: inline-flex; align-items: center; gap: var(--space-2); font: var(--fw-semibold) var(--text-sm) / 1.2 var(--font-sans); }
 
+  /* full screen (the browser's, or expanded to the viewport where it has none): the map fills the screen with its credit line
+     under it, and the side column (legend, selected place) floats over the map on a raised surface, readable in both themes */
+  .layout.full { position: relative; height: 100dvh; box-sizing: border-box; gap: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; background: var(--bg-page); }
+  .layout.expanded { position: fixed; inset: 0; z-index: calc(var(--z-overlay) + 2); height: auto; }
+  .full .mapcol { grid-template-rows: minmax(0, 1fr) auto; gap: 0; height: 100%; min-height: 0; }
+  .full .frame { height: 100%; min-height: 0; }
+  .full .credits { padding: var(--space-1) var(--space-3); max-height: 4.5rem; overflow: auto; font-size: 0.75rem; background: var(--bg-surface); }
+  .full .side {
+    position: absolute; z-index: 3; top: 3.25rem; left: var(--space-2); width: min(19rem, calc(100% - 2 * var(--space-2))); max-height: calc(100% - 6rem); overflow: auto;
+    padding: var(--space-3); background: var(--overlay-bg); border: 1px solid var(--overlay-border); border-radius: var(--radius-md); box-shadow: var(--overlay-shadow);
+  }
+
   @media (max-width: 900px) {
+    /* on a phone the column goes under the map, so it covers none of it */
+    .layout.full { grid-template-rows: minmax(0, 1fr) auto; }
+    .full .side { position: static; width: auto; max-height: 36dvh; border-width: 1px 0 0; border-radius: 0; box-shadow: none; }
     /* the last tick's label ("the 2020s (latest)") is centred on the end of the track: leave it room */
     .group.slide { padding-inline-end: var(--space-6, 2rem); }
     .layout { grid-template-columns: minmax(0, 1fr); }
