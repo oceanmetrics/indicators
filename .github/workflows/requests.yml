@@ -5,13 +5,15 @@
 #
 # the issue is untrusted input: its body reaches the triage only as a file written from an environment variable, never
 # through ${{ }} in a script; the run job re-checks the job (check-job) and passes each value as an environment
-# variable. the run job is off until the repository variable REQUESTS_AUTORUN is `on`, and at most
-# REQUESTS_PER_DAY (default 10) jobs run in 24 h. requesters are answered on the issue only: no email (yet).
+# variable. an `auto` job runs by itself while the repository variable REQUESTS_AUTORUN is `on` (at most
+# REQUESTS_PER_DAY, default 10, in 24 h); otherwise, or past the cap, a maintainer starts it by adding the `run` label
+# (only people with triage access can add labels, and labels this workflow's own token adds start no run). requesters
+# are answered on the issue only: no email (yet).
 name: requests
 
 on:
   issues:
-    types: [opened, edited, reopened]
+    types: [opened, edited, reopened, labeled]
 
 permissions:
   contents: read
@@ -19,7 +21,9 @@ permissions:
 
 jobs:
   triage:
-    if: github.event.issue.state == 'open' && contains(github.event.issue.labels.*.name, 'request')
+    if: >-
+      github.event.issue.state == 'open' && contains(github.event.issue.labels.*.name, 'request') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'run')
     runs-on: ubuntu-latest
     concurrency:
       group: request-triage-${{ github.event.issue.number }}
@@ -35,9 +39,12 @@ jobs:
           BODY: ${{ github.event.issue.body }}
           NUM: ${{ github.event.issue.number }}
           GH_TOKEN: ${{ github.token }}
+          AUTORUN: ${{ vars.REQUESTS_AUTORUN }}
+          ACTION: ${{ github.event.action }}
         run: |
           printf '%s' "$BODY" > body.md
-          uv run python -m om_indicators.requests triage --body body.md --out triage.json --comment comment.md
+          uv run python -m om_indicators.requests triage --body body.md --out triage.json --comment comment.md \
+            --autorun "${AUTORUN:-off}"
           label=$(jq -r .label triage.json)
           echo "label=$label" >> "$GITHUB_OUTPUT"
           for l in auto already needs-review; do
@@ -45,7 +52,8 @@ jobs:
             [ "$l" = "$label" ] || gh issue edit "$NUM" --remove-label "$l" >/dev/null 2>&1 || true
           done
           gh issue edit "$NUM" --add-label "$label"
-          gh issue comment "$NUM" --body-file comment.md
+          # a maintainer's `run` label re-checks the request without commenting again
+          [ "$ACTION" = labeled ] || gh issue comment "$NUM" --body-file comment.md
       - uses: actions/upload-artifact@v4
         with:
           name: triage
@@ -54,7 +62,9 @@ jobs:
 
   run:
     needs: triage
-    if: needs.triage.outputs.label == 'auto' && vars.REQUESTS_AUTORUN == 'on'
+    if: >-
+      needs.triage.outputs.label == 'auto' &&
+      ((github.event.action != 'labeled' && vars.REQUESTS_AUTORUN == 'on') || github.event.label.name == 'run')
     runs-on: [self-hosted, macmini]
     concurrency:
       group: requests-run           # one job at a time on the runner, never cancelled mid-run
@@ -74,14 +84,15 @@ jobs:
           export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
           jq '.job' triage.json > job.json
           uv run python -m om_indicators.requests check-job job.json >> "$GITHUB_ENV"
-      - name: daily cap
+      - name: daily cap (automatic runs only; a maintainer's `run` label is not capped)
         id: cap
+        if: github.event.action != 'labeled'
         run: |
           since=$(date -u -v-1d +%Y-%m-%dT%H:%M:%SZ)
           n=$(gh issue list --label auto-done --state closed --search "closed:>$since" --json number --jq length)
           echo "done in 24 h: $n of ${REQUESTS_PER_DAY:-10}"
           if [ "$n" -ge "${REQUESTS_PER_DAY:-10}" ]; then
-            gh issue comment "$NUM" --body "Today's automatic runs are used up; this one will run when a maintainer starts it."
+            gh issue comment "$NUM" --body "Today's automatic runs are used up; a maintainer starts this one by adding the \`run\` label."
             echo "over=1" >> "$GITHUB_OUTPUT"
           fi
         env:

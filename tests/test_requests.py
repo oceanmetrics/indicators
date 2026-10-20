@@ -142,6 +142,13 @@ def test_comment_states_the_outcome_and_the_reasons():
   assert "Place view: https://oceanmetrics.io/indicators/#view=place&place=NMS:CINMS&coll=places&ind=erddap:dhw_5km:CRW_SST:mean" in c
 
 
+def test_with_autorun_off_a_small_request_waits_for_the_run_label():
+  c = comment(run(parse_issue_form(BODY)), {}, autorun=False)
+  assert c.startswith("This request is small and uses a catalogued dataset, so it is ready to run on the Ocean Metrics "
+                      "runner. A maintainer starts it by adding the `run` label;")
+  assert "will run by itself on" not in c
+
+
 def test_item_href_is_the_erddap_places_item_id():
   job = {"dataset": "dhw_5km", "variable": "CRW_SST", "indicator": "erddap:dhw_5km:CRW_SST:mean", "coll": "noaa_nerrs", "place": "NERRS:WEL"}
   assert item_href(job) == "items/dhw_5km_CRW_SST_NERRS-WEL.json"

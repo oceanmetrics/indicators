@@ -141,11 +141,33 @@ as a table" carry every class in words and glyphs, so nothing depends on colour.
   title="OBIS species richness by EEZ (Ocean Metrics Indicators)" width="100%" height="900" style="border:0"></iframe>
 ```
 
+## Requests
+
+Anyone with a GitHub account can ask for an indicator the catalog does not hold yet for a place:
+
+1. **In the viewer:** a cell that reads "not computed yet" is a dataset erddap-places can compute for that place.
+   Opening it offers "Compute it now in erddap-places" (in the browser, nothing saved) and "Ask to add it to the
+   catalog", which opens the issue form `.github/ISSUE_TEMPLATE/indicator-request.yml` filled in with the place, its
+   collection and the indicator. The requester adds a purpose and submits.
+2. **Triage, within a minute** (`requests.yml`, `om_indicators/requests.py`): a bot labels the issue and comments why.
+   - `auto`: the indicator is in the manifest, comes from erddap-places, the place is in a public gazetteer collection
+     and the job is under 50 million grid values;
+   - `already`: the values exist;
+   - `needs-review`: anything else, for a maintainer.
+3. **The run, on the Mac mini:** an `auto` request runs by itself while the repository variable `REQUESTS_AUTORUN` is
+   `on`, at most `REQUESTS_PER_DAY` (default 10) a day. Otherwise, or past the cap, a maintainer starts it by adding the
+   `run` label (only people with triage access can add labels). erddap-places computes the place and publishes it, the
+   catalog is rebuilt and published, and the bot comments the Place view link and closes the issue. Issue #1 (Wells
+   NERR, precipitation) is the worked example.
+
+Requesters are answered on the issue only; no email is sent.
+
 ## The paper
 
 `node scripts/paper_matrix.mjs` turns the manifest and coverage into the figure and table of what is computed where
-(`docs/paper/computed_where.{svg,png,csv}`), for "Coding Ocean Indicators: Patterns and People" (PPG-26-197): one row
-per indicator series, one column per place collection, the places with values, the years and whether a status is given.
+(`docs/paper/computed_where.{svg,png,csv}`): one row per indicator series, one column per place collection, the places
+with values, the years and whether a status is given. It was first made for "Coding Ocean Indicators: Patterns and
+People" (PPG-26-197).
 
 ## Size budget
 

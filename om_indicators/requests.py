@@ -172,11 +172,16 @@ def add_item(items: list[str], href: str) -> list[str]:
   return sorted(set(items) | {href})
 
 
-def comment(t: Triage, form: dict[str, str]) -> str:
-  """the bot's comment: what will happen, in words, and why"""
+def comment(t: Triage, form: dict[str, str], autorun: bool = True) -> str:
+  """the bot's comment: what will happen, in words, and why. with autorun off (REQUESTS_AUTORUN not `on`) a small
+  request waits for a maintainer's `run` label instead of running by itself."""
+  auto = ("This request is small and uses a catalogued dataset, so it will run by itself on the Ocean Metrics runner. "
+          "This issue gets a comment with the link when the values are published.") if autorun else (
+          "This request is small and uses a catalogued dataset, so it is ready to run on the Ocean Metrics runner. "
+          "A maintainer starts it by adding the `run` label; this issue then gets a comment with the link when the "
+          "values are published.")
   head = {
-    "auto": "This request is small and uses a catalogued dataset, so it will run by itself on the Ocean Metrics runner. "
-            "This issue gets a comment with the link when the values are published.",
+    "auto": auto,
     "already": "These values exist already.",
     "needs-review": "This request needs a maintainer, who will reply here.",
   }[t.label]
@@ -220,6 +225,7 @@ def main(argv: list[str] | None = None) -> int:
   t.add_argument("--out", type=Path, required=True, help="triage JSON")
   t.add_argument("--comment", type=Path, required=True, help="comment markdown")
   t.add_argument("--catalog", default=CATALOG)
+  t.add_argument("--autorun", default="on", help="the repo variable REQUESTS_AUTORUN: `on` runs small requests by themselves")
   c = sub.add_parser("check-job", help="re-check a job JSON; prints KEY=value lines for $GITHUB_ENV")
   c.add_argument("job", type=Path)
   ai = sub.add_parser("add-item", help="add a job's stats item to the requested-items list (read from --list, a path or URL)")
@@ -237,7 +243,7 @@ def main(argv: list[str] | None = None) -> int:
     form = parse_issue_form(a.body.read_text())
     tri = classify(form, *_load_network(a.catalog), today=dt.date.today())
     a.out.write_text(json.dumps(asdict(tri), indent=2))
-    a.comment.write_text(comment(tri, form))
+    a.comment.write_text(comment(tri, form, autorun=a.autorun == "on"))
     print(tri.label)
     return 0
   job = check_job(json.loads(a.job.read_text()))
