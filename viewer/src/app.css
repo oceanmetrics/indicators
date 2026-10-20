@@ -1,0 +1,5 @@
+/* the viewer's page frame. semantic tokens only (no hex): the kit's tokens.css and the instance theme file supply every
+   colour, so [data-theme] and ?brand= switch the whole page. */
+html, body { height: 100%; }
+body { min-height: 100dvh; overflow-x: hidden; }
+#app { min-height: 100dvh; display: flex; flex-direction: column; }

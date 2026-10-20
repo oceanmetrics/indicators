@@ -1,0 +1,53 @@
+// the real catalog, when it has been built (catalog/ is git-ignored): every coverage indicator is in the manifest and
+// every cell of the default matrix resolves to a state. skipped on a fresh clone.
+import { existsSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { parquetReadObjects } from 'hyparquet'
+import { describe, expect, it } from 'vitest'
+import { normalizeRow } from './data.ts'
+import type { Manifest } from './data.ts'
+import { cellAria, cellModel, groupColumns, groupRows, indexCoverage, matrixStats, pickRow } from './matrix.ts'
+import { VOCAB_IDS } from './data.ts'
+
+const DIR = resolve(__dirname, '../../../catalog')
+const have = existsSync(resolve(DIR, 'indicators.json')) && existsSync(resolve(DIR, 'coverage.parquet'))
+
+describe.skipIf(!have)('the real catalog', async () => {
+  const manifest = JSON.parse(readFileSync(resolve(DIR, 'indicators.json'), 'utf8')) as Manifest
+  const buf = readFileSync(resolve(DIR, 'coverage.parquet'))
+  const rows = (await parquetReadObjects({ file: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer })).map(normalizeRow)
+  const idx = indexCoverage(rows, manifest.indicators)
+  const ids = new Set(manifest.indicators.map(i => i.id))
+
+  it('every coverage indicator is in the manifest', () => {
+    expect([...new Set(rows.map(r => r.indicator))].filter(i => !ids.has(i))).toEqual([])
+  })
+  it('every collection with coverage is listed by some indicator', () => {
+    const listed = new Set(manifest.indicators.flatMap(i => i.collections.map(c => c.coll)))
+    expect(idx.colls.filter(c => !listed.has(c))).toEqual([])
+  })
+  it('every category tag of every indicator is a term of its vocabulary', () => {
+    for (const ind of manifest.indicators) for (const v of VOCAB_IDS) {
+      const tag = ind.category[v]
+      if (tag) expect(manifest.vocabularies[v].terms.map(t => t.id), `${ind.id} ${v}`).toContain(tag)
+    }
+  })
+  it('every cell resolves to a state with an accessible name, in every vocabulary, leads or all', () => {
+    for (const vocab of VOCAB_IDS) for (const leads of [true, false]) {
+      const cols = groupColumns(manifest.indicators, manifest.vocabularies, vocab, leads)
+      const inds = cols.flatMap(c => c.indicators)
+      expect(inds.length).toBe(manifest.indicators.filter(i => !leads || i.lead).length)
+      for (const g of groupRows(idx, [], '')) for (const p of g.places) for (const ind of inds) {
+        const m = cellModel(ind, p, pickRow(idx, p.id, ind))
+        expect(['value', 'class', 'nodata', 'live', 'na']).toContain(m.kind)
+        expect(cellAria(ind, p, m).length).toBeGreaterThan(10)
+      }
+    }
+  })
+  it('the default matrix has the places and the cells with a status the coverage promises', () => {
+    const s = matrixStats(groupRows(idx, [], ''), groupColumns(manifest.indicators, manifest.vocabularies, 'onms', true), idx)
+    expect(s.places).toBe(new Set(rows.map(r => r.place_id)).size)
+    expect(s.withStatus).toBeGreaterThan(0)
+    expect(s.withValue).toBeGreaterThanOrEqual(s.withStatus)
+  })
+})
