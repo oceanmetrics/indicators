@@ -1,5 +1,5 @@
 // screenshots of the Matrix and the Place view with the real catalog: docs/shots/matrix_<brand>_<theme>[_390].png,
-// the drawer, and place_<place>_<brand>_<theme>[_390].png.
+// the flipped matrix (matrix_*_flipped*), the Add or restore menu (matrix_*_addmenu), the drawer, and place_<place>_<brand>_<theme>[_390].png.
 // headless Chrome through puppeteer-core, against the dev server (started here when nothing answers on the port).
 //   node viewer/scripts/shoot.mjs [--url http://localhost:5181/] [--only matrix_mbon_dark] [--out docs/shots/live]
 import { spawn } from 'node:child_process'
@@ -24,6 +24,9 @@ const PLACE_PHONE = { width: 390, height: 2000, deviceScaleFactor: 2, isMobile: 
 const FKNMS = 'view=place&place=NMS:FKNMS'
 const FKNMS_SST = 'cell=NMS:FKNMS|erddap:dhw_5km:CRW_SST:mean'
 
+const REMOVED = 'xp=NMS:NMSAS,NMS:FKNMS&xi=erddap:IMERG_monthly_global_precip:precipitation:mean'
+const openMenu = async page => { await page.click('details.add > summary') }
+
 const SHOTS = [
   ['matrix_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, ''],
   ['matrix_oceanmetrics_dark', 'oceanmetrics', 'dark', DESKTOP, ''],
@@ -42,6 +45,12 @@ const SHOTS = [
   ['place_FKNMS_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PLACE_PHONE, FKNMS],
   ['place_eez_oceanmetrics_light', 'oceanmetrics', 'light', PLACE, 'view=place&place=MRGID:8371'],
   ['place_FKNMS_oceanmetrics_light_eov', 'oceanmetrics', 'light', PLACE, FKNMS + '&vocab=eov'],
+  // the flipped matrix: indicators in rows, places in columns
+  ['matrix_oceanmetrics_light_flipped', 'oceanmetrics', 'light', DESKTOP, 'axes=t'],
+  ['matrix_oceanmetrics_dark_flipped', 'oceanmetrics', 'dark', DESKTOP, 'axes=t'],
+  ['matrix_oceanmetrics_light_flipped_390', 'oceanmetrics', 'light', PHONE, 'axes=t'],
+  // the Add or restore menu open, with a place and an indicator removed
+  ['matrix_oceanmetrics_light_addmenu', 'oceanmetrics', 'light', DESKTOP, REMOVED, openMenu],
 ]
 
 async function alive(url) { try { return (await fetch(url)).ok } catch { return false } }
@@ -55,7 +64,7 @@ if (!(await alive(URL_BASE))) {
 mkdirSync(OUT, { recursive: true })
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox'] })
 try {
-  for (const [name, brand, theme, vp, hash] of SHOTS) {
+  for (const [name, brand, theme, vp, hash, act] of SHOTS) {
     if (ONLY && !name.includes(ONLY)) continue
     const page = await browser.newPage()
     await page.setViewport(vp)
@@ -68,6 +77,7 @@ try {
     if (hash.includes('view=place')) await page.waitForFunction(() => document.querySelector('article.card') && !document.querySelector('article.card[aria-busy="true"]'), { timeout: 30000 })
     await page.evaluate(() => document.fonts.ready)
     await new Promise(r => setTimeout(r, 400))
+    if (act) { await act(page); await new Promise(r => setTimeout(r, 200)) }
     await page.screenshot({ path: resolve(OUT, name + '.png'), fullPage: !hash.includes('cell=') && !hash.includes('view=place') })
     // a page-level sideways scroll is a layout bug at any width
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)

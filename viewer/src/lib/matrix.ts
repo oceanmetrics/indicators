@@ -157,14 +157,20 @@ const OTHER: Term = { id: 'other', label: 'Other' }
 /**
  * columns grouped by a vocabulary, in the vocabulary's term order; groups with no indicator are dropped, and an
  * indicator whose tag is not a term of the vocabulary goes to a last group "Other". `leadsOnly` keeps one column per
- * series (its lead). within a group, a series' indicators stay together (the lead first) in manifest order.
+ * series (its lead), plus any id in `opts.add`; ids in `opts.hide` are always dropped. within a group, a series'
+ * indicators stay together (the lead first) in manifest order.
  */
-export function groupColumns(indicators: Indicator[], vocabs: Record<VocabId, Vocab>, vocab: VocabId, leadsOnly: boolean): ColumnGroup[] {
+export function groupColumns(
+  indicators: Indicator[], vocabs: Record<VocabId, Vocab>, vocab: VocabId, leadsOnly: boolean,
+  opts: { add?: string[]; hide?: string[] } = {},
+): ColumnGroup[] {
+  const add = new Set(opts.add ?? [])
+  const hide = new Set(opts.hide ?? [])
   const terms = vocabs[vocab]?.terms ?? []
   const known = new Set(terms.map(t => t.id))
   const seriesRank = new Map<string, number>()
   indicators.forEach(i => { if (!seriesRank.has(i.series)) seriesRank.set(i.series, seriesRank.size) })
-  const pool = indicators.map((ind, n) => ({ ind, n })).filter(x => !leadsOnly || x.ind.lead)
+  const pool = indicators.map((ind, n) => ({ ind, n })).filter(x => !hide.has(x.ind.id) && (!leadsOnly || x.ind.lead || add.has(x.ind.id)))
   const order = (a: { ind: Indicator; n: number }, b: { ind: Indicator; n: number }) =>
     (seriesRank.get(a.ind.series) as number) - (seriesRank.get(b.ind.series) as number) || Number(b.ind.lead) - Number(a.ind.lead) || a.n - b.n
   const groups: ColumnGroup[] = []
@@ -183,19 +189,48 @@ export interface RowGroup {
   places: Place[]
 }
 
-/** rows grouped by collection (empty `colls` = every collection), filtered by a case-insensitive search of name or id */
-export function groupRows(idx: CoverageIndex, colls: string[], q: string): RowGroup[] {
+/**
+ * rows grouped by collection (empty `colls` = every collection), filtered by a case-insensitive search of name or id;
+ * places in `hide` are dropped
+ */
+export function groupRows(idx: CoverageIndex, colls: string[], q: string, hide: string[] = []): RowGroup[] {
   const needle = q.trim().toLowerCase()
   const wanted = colls.length ? new Set(colls) : null
+  const hidden = new Set(hide)
   const out: RowGroup[] = []
   for (const coll of idx.colls) {
     if (wanted && !wanted.has(coll)) continue
     const places = idx.places
-      .filter(p => p.coll === coll && (!needle || p.name.toLowerCase().includes(needle) || p.id.toLowerCase().includes(needle)))
+      .filter(p => p.coll === coll && !hidden.has(p.id) && (!needle || p.name.toLowerCase().includes(needle) || p.id.toLowerCase().includes(needle)))
       .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
     if (places.length) out.push({ coll, places })
   }
   return out
+}
+
+export interface SeriesGroup {
+  series: string
+  title: string
+  indicators: Indicator[]
+}
+
+/** the indicators not on display, grouped by series (manifest order, titled `series_title ?? series`), the lead first */
+export function addableIndicators(indicators: Indicator[], shown: Set<string>): SeriesGroup[] {
+  const groups = new Map<string, SeriesGroup>()
+  for (const ind of indicators) {
+    if (shown.has(ind.id)) continue
+    if (!groups.has(ind.series)) groups.set(ind.series, { series: ind.series, title: ind.series_title ?? ind.series, indicators: [] })
+    groups.get(ind.series)!.indicators.push(ind)
+  }
+  // a stable sort keeps manifest order among the non-leads
+  for (const g of groups.values()) g.indicators.sort((a, b) => Number(b.lead) - Number(a.lead))
+  return [...groups.values()]
+}
+
+/** the places removed from the display, in name order, for the restore list; ids that are not places are skipped */
+export function hiddenPlaces(idx: CoverageIndex, hide: string[]): Place[] {
+  const wanted = new Set(hide)
+  return idx.places.filter(p => wanted.has(p.id)).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
 }
 
 export interface MatrixStats {

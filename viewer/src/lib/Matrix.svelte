@@ -1,11 +1,13 @@
 <script lang="ts">
-  // the Matrix: rows are places grouped by collection, columns are indicators grouped by the chosen vocabulary.
-  // it scrolls inside its own box, with the place column and the headers sticky.
+  // the Matrix: places grouped by collection against indicators grouped by the chosen vocabulary. `axes` says which
+  // runs down the rows: places (the default) or indicators. it scrolls inside its own box, with the first column and
+  // the header rows sticky in both orientations. every place and indicator header has a remove button (`onhide`).
+  import { tick } from 'svelte'
   import { Icon } from '../../../src/icons/index.ts'
-  import type { Catalog, VocabId } from './data.ts'
+  import type { Catalog, Indicator, VocabId } from './data.ts'
   import { cellModel, pickRow } from './matrix.ts'
-  import type { ColumnGroup, CoverageIndex, RowGroup } from './matrix.ts'
-  import type { Depth } from './hash.ts'
+  import type { ColumnGroup, CoverageIndex, Place, RowGroup } from './matrix.ts'
+  import type { Axes, Depth } from './hash.ts'
   import { badgeUrl } from './delivery.ts'
   import { asIcon } from './icons.ts'
   import Cell from './Cell.svelte'
@@ -17,72 +19,130 @@
     rows: RowGroup[]
     vocab: VocabId
     depth: Depth
+    axes?: Axes
     titles: (coll: string) => string
     open: { place: string; indicator: string } | null
     onopen: (placeId: string, indicator: string) => void
+    /** remove a place or an indicator from the display */
+    onhide: (kind: 'place' | 'indicator', id: string) => void
     /** the href of a place's view */
     placeHref: (placeId: string, coll: string) => string
   }
-  let { catalog, idx, cols, rows, vocab, depth, titles, open, onopen, placeHref }: Props = $props()
+  let { catalog, idx, cols, rows, vocab, depth, axes = 'places', titles, open, onopen, onhide, placeHref }: Props = $props()
 
   const flat = $derived(cols.flatMap(g => g.indicators))
+  const flatPlaces = $derived(rows.flatMap(g => g.places))
+  const flipped = $derived(axes === 'indicators')
+  // the cells are the same in both orientations; only the loop order differs
+  const width = $derived((flipped ? flatPlaces.length : flat.length) + 1)
   const base = import.meta.env.BASE_URL
   let missingBadge = $state<Record<string, boolean>>({})
+  let box = $state<HTMLDivElement>()
+
+  const model = (ind: Indicator, p: Place) => cellModel(ind, p, pickRow(idx, p.id, ind))
+  const isOpen = (ind: Indicator, p: Place) => open?.place === p.id && open?.indicator === ind.id
+  const emptyWhy = $derived(flatPlaces.length === 0 ? 'No place matches. Clear the search or pick other collections.' : 'No indicator is shown. Add one from the menu.')
+
+  // removing a header drops the button the keyboard is on: put focus on the next remove button of the same kind
+  async function hide(kind: 'place' | 'indicator', id: string) {
+    const all = () => [...(box?.querySelectorAll<HTMLButtonElement>(`button.x[data-kind="${kind}"]`) ?? [])]
+    const at = all().findIndex(b => b.dataset.id === id)
+    onhide(kind, id)
+    await tick()
+    const left = all()
+    ;(left[Math.min(at, left.length - 1)] ?? box)?.focus({ preventScroll: true })
+  }
 </script>
 
-<div class="box" role="region" aria-label="Places by indicators" tabindex="-1">
-  <table class="matrix">
+{#snippet remove(kind: 'place' | 'indicator', id: string, name: string)}
+  <button type="button" class="x" data-kind={kind} data-id={id} aria-label="Remove {name} from the matrix" onclick={() => hide(kind, id)}>
+    <Icon name="ui-close" size={14} />
+  </button>
+{/snippet}
+
+{#snippet placeHead(p: Place)}
+  <a class="pn" href={placeHref(p.id, p.coll)} data-place={p.id} title="Open the place view of {p.name}">{p.name}</a>
+  <span class="pid">{p.id}</span>
+  {@render remove('place', p.id, p.name)}
+{/snippet}
+
+{#snippet indHead(ind: Indicator, glyph: ReturnType<typeof asIcon>)}
+  <span class="t">{#if glyph}<Icon name={glyph} size={16} />{/if}<span>{ind.short}</span></span>
+  <span class="u">{ind.unit_label || 'unitless'} · by {ind.status_grain}</span>
+  {@render remove('indicator', ind.id, ind.short)}
+{/snippet}
+
+{#snippet termHead(g: ColumnGroup)}
+  {@const gi = asIcon(g.term.glyph)}
+  <span class="gh">
+    {#if vocab === 'eov' && !missingBadge[g.term.id]}
+      <img class="badge" src={badgeUrl(base, g.term.id)} alt="{g.term.label} (GOOS EOV badge)" width="28" height="28"
+        onerror={() => (missingBadge[g.term.id] = true)} />
+    {/if}
+    {#if gi}<Icon name={gi} size={18} />{/if}
+    <span class="mbon-label">{g.term.label}</span>
+  </span>
+{/snippet}
+
+<div class="box" role="region" aria-label={flipped ? 'Indicators by places' : 'Places by indicators'} tabindex="-1" bind:this={box}>
+  <table class="matrix" class:flipped>
     <thead>
       <tr class="groups">
-        <th class="place corner" scope="col" rowspan="2"><span class="mbon-label">Place</span></th>
-        {#each cols as g (g.term.id)}
-          {@const gi = asIcon(g.term.glyph)}
-          <th scope="colgroup" colspan={g.indicators.length} class="group">
-            <span class="gh">
-              {#if vocab === 'eov' && !missingBadge[g.term.id]}
-                <img class="badge" src={badgeUrl(base, g.term.id)} alt="{g.term.label} (GOOS EOV badge)" width="28" height="28"
-                  onerror={() => (missingBadge[g.term.id] = true)} />
-              {/if}
-              {#if gi}<Icon name={gi} size={18} />{/if}
-              <span class="mbon-label">{g.term.label}</span>
-            </span>
-          </th>
-        {/each}
-      </tr>
-      <tr class="inds">
-        {#each cols as g (g.term.id)}
-          {#each g.indicators as ind (ind.id)}
-            {@const ci = asIcon(g.term.glyph)}
-            <th scope="col" class="ind" title={ind.title}>
-              <span class="t">{#if ci}<Icon name={ci} size={16} />{/if}<span>{ind.short}</span></span>
-              <span class="u">{ind.unit_label || 'unitless'} · by {ind.status_grain}</span>
-            </th>
+        <th class="rowh corner" scope="col" rowspan="2"><span class="mbon-label">{flipped ? 'Indicator' : 'Place'}</span></th>
+        {#if flipped}
+          {#each rows as g (g.coll)}
+            <th scope="colgroup" colspan={g.places.length} class="group"><span class="gh"><span class="mbon-label">{titles(g.coll)} · {g.places.length}</span></span></th>
           {/each}
-        {/each}
+        {:else}
+          {#each cols as g (g.term.id)}
+            <th scope="colgroup" colspan={g.indicators.length} class="group">{@render termHead(g)}</th>
+          {/each}
+        {/if}
+      </tr>
+      <tr class="heads">
+        {#if flipped}
+          {#each flatPlaces as p (p.id)}
+            <th scope="col" class="colh">{@render placeHead(p)}</th>
+          {/each}
+        {:else}
+          {#each cols as g (g.term.id)}
+            {#each g.indicators as ind (ind.id)}
+              <th scope="col" class="colh ind" title={ind.title}>{@render indHead(ind, asIcon(g.term.glyph))}</th>
+            {/each}
+          {/each}
+        {/if}
       </tr>
     </thead>
     <tbody>
-      {#each rows as g (g.coll)}
-        <tr class="coll">
-          <th colspan={flat.length + 1} scope="colgroup"><span class="collname mbon-label">{titles(g.coll)} · {g.places.length}</span></th>
-        </tr>
-        {#each g.places as p (p.id)}
-          <tr>
-            <th class="place" scope="row">
-              <a class="pn" href={placeHref(p.id, p.coll)} data-place={p.id} title="Open the place view of {p.name}">{p.name}</a>
-              <span class="pid">{p.id}</span>
-            </th>
-            {#each flat as ind (ind.id)}
-              <td>
-                <Cell {ind} place={p} model={cellModel(ind, p, pickRow(idx, p.id, ind))} {depth}
-                  open={open?.place === p.id && open?.indicator === ind.id} {onopen} />
-              </td>
-            {/each}
-          </tr>
+      {#if flipped}
+        {#each cols as g (g.term.id)}
+          <tr class="band"><th colspan={width} scope="colgroup">{@render termHead(g)}</th></tr>
+          {#each g.indicators as ind (ind.id)}
+            <tr>
+              <th class="rowh ind" scope="row" title={ind.title}>{@render indHead(ind, asIcon(g.term.glyph))}</th>
+              {#each flatPlaces as p (p.id)}
+                <td><Cell {ind} place={p} model={model(ind, p)} {depth} open={isOpen(ind, p)} {onopen} /></td>
+              {/each}
+            </tr>
+          {/each}
         {/each}
-      {/each}
-      {#if rows.length === 0}
-        <tr><td class="empty" colspan={flat.length + 1}>No place matches. Clear the search or pick other collections.</td></tr>
+      {:else}
+        {#each rows as g (g.coll)}
+          <tr class="band">
+            <th colspan={width} scope="colgroup"><span class="collname mbon-label">{titles(g.coll)} · {g.places.length}</span></th>
+          </tr>
+          {#each g.places as p (p.id)}
+            <tr>
+              <th class="rowh" scope="row">{@render placeHead(p)}</th>
+              {#each flat as ind (ind.id)}
+                <td><Cell {ind} place={p} model={model(ind, p)} {depth} open={isOpen(ind, p)} {onopen} /></td>
+              {/each}
+            </tr>
+          {/each}
+        {/each}
+      {/if}
+      {#if flat.length === 0 || flatPlaces.length === 0}
+        <tr><td class="empty" colspan={width}>{emptyWhy}</td></tr>
       {/if}
     </tbody>
   </table>
@@ -112,28 +172,62 @@
   td { min-width: 9.5rem; width: 9.5rem; vertical-align: top; }
   td.empty { padding: var(--space-5); color: var(--text-body); }
 
+  /* header rows: the group row, then the heads row below it */
   thead th { position: sticky; background: var(--bg-surface); z-index: 3; }
   thead tr.groups th { top: 0; height: var(--grp-h); border-bottom: 1px solid var(--border); vertical-align: middle; }
-  thead tr.inds th { top: var(--grp-h); padding: var(--space-2) var(--space-3); vertical-align: bottom; border-bottom: 1px solid var(--border-strong); }
+  thead tr.heads th { top: var(--grp-h); vertical-align: bottom; border-bottom: 1px solid var(--border-strong); }
   th.group { padding: 0 var(--space-3); }
   .gh { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--label-color); position: sticky; left: calc(var(--place-w) + var(--space-3)); }
   .badge { width: 28px; height: 28px; border-radius: 50%; flex: none; }
-  .ind .t { display: flex; align-items: flex-start; gap: var(--space-1); font: var(--fw-semibold) var(--text-sm) / 1.2 var(--font-sans); color: var(--text-strong); }
-  .ind .t :global(svg) { margin-top: 1px; color: var(--label-color); }
-  .ind .u { display: block; margin-top: 2px; font: var(--fw-regular) 0.6875rem / 1.3 var(--font-mono); color: var(--text-body); }
 
-  th.place { position: sticky; left: 0; z-index: 2; background: var(--bg-surface); min-width: var(--place-w); max-width: var(--place-w); width: var(--place-w); padding: var(--space-2) var(--space-3); border-right: 1px solid var(--border); }
-  thead th.place { z-index: 4; top: 0; vertical-align: bottom; }
+  /* a column head or a row head holds a place or an indicator; the right padding keeps room for its remove button */
+  th.colh, th.rowh { position: sticky; padding: var(--space-2) 2rem var(--space-2) var(--space-3); }
+  th.rowh { left: 0; z-index: 2; background: var(--bg-surface); min-width: var(--place-w); max-width: var(--place-w); width: var(--place-w); border-right: 1px solid var(--border); }
+  thead th.rowh { z-index: 4; top: 0; vertical-align: bottom; }
+  .ind .t { display: flex; align-items: flex-start; gap: var(--space-1); font: var(--fw-semibold) var(--text-sm) / 1.2 var(--font-sans); color: var(--text-strong); }
+  .ind .t :global(svg) { margin-top: 1px; color: var(--label-color); flex: none; }
+  .ind .u { display: block; margin-top: 2px; font: var(--fw-regular) 0.6875rem / 1.3 var(--font-mono); color: var(--text-body); }
   .pn { display: block; font: var(--fw-medium) var(--text-sm) / 1.25 var(--font-sans); color: var(--text-strong); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
   .pn:hover { color: var(--link); text-decoration-color: currentColor; }
-  .pid { display: block; margin-top: 2px; font: var(--fw-regular) 0.6875rem / 1.3 var(--font-mono); color: var(--text-body); }
-  tr.coll th { position: sticky; left: 0; background: var(--bg-tint); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); }
-  .collname { position: sticky; left: var(--space-3); display: inline-block; }
+  .pid { display: block; margin-top: 2px; font: var(--fw-regular) 0.6875rem / 1.3 var(--font-mono); color: var(--text-body); overflow-wrap: anywhere; }
+  tr.band th { position: sticky; left: 0; background: var(--bg-tint); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); }
+  tr.band .gh, .collname { position: sticky; left: var(--space-3); }
+  .collname { display: inline-block; }
+
+  /* the remove button sits in the top right corner of its header, out of the flow so it never shifts the layout; shown
+     on hover or focus, always on touch screens */
+  .x {
+    position: absolute;
+    top: var(--space-1);
+    right: var(--space-1);
+    display: inline-grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text-body);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+  th:hover > .x, th:focus-within > .x, .x:focus-visible { opacity: 1; }
+  .x:hover { background: var(--bg-tint); color: var(--text-strong); }
+  @media (hover: none) {
+    .x { opacity: 1; width: 2rem; height: 2rem; top: 0; right: 0; }
+    th.colh, th.rowh { padding-right: 2.25rem; }
+  }
+  @media (prefers-reduced-motion: reduce) { .x { transition: none; } }
 
   @media (max-width: 640px) {
     .box { --place-w: 8.75rem; max-height: 68dvh; }
     td { min-width: 8.75rem; width: 8.75rem; }
     .pid { display: none; }
+    table.flipped .pid { display: block; }
     .gh { left: calc(var(--place-w) + var(--space-2)); }
+    th.colh, th.rowh { padding-left: var(--space-2); }
+    tr.band .gh, .collname { left: var(--space-2); }
   }
 </style>

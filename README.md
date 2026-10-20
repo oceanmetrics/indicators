@@ -56,7 +56,7 @@ WHERE time_grain = 'year' ORDER BY place_id, time;
 | `fixtures/ecoidx/` | R | runs ecoidx `PlotTimeSeries()` on the CCIEA example data: the cross-check for `iea-sd` |
 | `brand/` | Python, Node | icon pipeline (MDI by export name + generated glyphs + traced GOOS EOV glyphs), themes, favicons |
 | `assets/goos-eov/` | PNG, WebP | the GOOS EOV badges, unmodified (see its `SOURCE.md`) |
-| `viewer/` | Svelte 5 + Vite | the Matrix view on `indicators.json` + `coverage.parquet`, with `@marinebon/ui` |
+| `viewer/` | Svelte 5 + Vite | the Matrix view on `indicators.json` + `coverage.parquet`, with `@marinebon/ui`; flip it with `#axes=t`, remove places or indicators with the x on a header (`xp=`, `xi=`), add more indicators from the Add or restore menu (`ai=`) |
 | `catalog/` | (git-ignored) | build output, published to `s3://oceanmetrics.io-public/indicators/` |
 
 ## Commands

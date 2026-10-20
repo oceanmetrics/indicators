@@ -1,5 +1,6 @@
 // keyboard check of the viewer, keys only: Tab reaches a Matrix cell, Enter opens its drawer, Esc closes it and focus
 // returns to the cell; Tab reaches a place link, Enter opens the Place view, and its controls are reachable by Tab.
+// a second pass on the flipped matrix (#axes=t): the same cell round trip, and Tab + Enter on a remove button.
 //   node viewer/scripts/keys.mjs [--url https://oceanmetrics.io/indicators/]
 import puppeteer from 'puppeteer-core'
 
@@ -13,9 +14,9 @@ const fails = []
 const check = (ok, what) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${what}`); if (!ok) fails.push(what) }
 const focused = () => page.evaluate(() => {
   const e = document.activeElement
-  return e ? { tag: e.tagName, cls: e.className?.toString() ?? '', label: e.getAttribute('aria-label') ?? e.textContent?.trim().slice(0, 60), href: e.getAttribute('href') } : null
+  return e ? { tag: e.tagName, cls: e.className?.toString() ?? '', label: e.getAttribute('aria-label') ?? e.textContent?.trim().slice(0, 60), href: e.getAttribute('href'), kind: e.dataset?.kind } : null
 })
-const tabUntil = async (pred, max = 200) => {
+const tabUntil = async (pred, max = 600) => {
   for (let i = 0; i < max; i++) {
     await page.keyboard.press('Tab')
     const f = await focused()
@@ -50,8 +51,42 @@ if (link) {
   await page.keyboard.press('Enter')
   const ok = await page.waitForFunction(() => location.hash.includes('view=place') && document.querySelector('.lens[data-state=done]'), { timeout: 20000 }).then(() => true, () => false)
   check(ok, 'Enter opens the Place view')
+  await page.waitForFunction(() => !document.querySelector('table.matrix'), { timeout: 10000 }).catch(() => {})
   const ctl = await tabUntil(f => f.tag === 'BUTTON', 40)
   check(!!ctl, `Tab reaches a Place view control${ctl ? ` ("${ctl.f.label}")` : ''}`)
+}
+
+// the flipped matrix: indicators in rows, places in columns
+await page.goto('about:blank')   // a fresh load: a hash-only change would keep the page, and the focus, as it was
+await page.goto(`${URL_BASE}?theme=light#axes=t`, { waitUntil: 'networkidle0' })
+await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
+const flipped = await page.evaluate(() => !!document.querySelector('table.matrix.flipped'))
+check(flipped, 'the hash axes=t flips the matrix (indicators in rows)')
+const cell2 = await tabUntil(f => f.tag === 'BUTTON' && /\bcell\b/.test(f.cls))
+check(!!cell2, `flipped: Tab reaches a Matrix cell${cell2 ? ` (${cell2.presses} presses: "${cell2.f.label}")` : ''}`)
+if (cell2) {
+  await page.keyboard.press('Enter')
+  check(await page.waitForSelector('[role=dialog]', { timeout: 5000 }).then(() => true, () => false), 'flipped: Enter opens the drawer')
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('[role=dialog]', { hidden: true, timeout: 5000 })
+  check((await focused())?.label === cell2.f.label, 'flipped: focus returns to the same cell')
+}
+// Tab to the first remove button of a kind, press Enter: the hash gets xp= (place) or xi= (indicator), focus stays on a button
+for (const [kind, key] of [['place', 'xp='], ['indicator', 'xi=']]) {
+  await page.goto('about:blank')   // a fresh load: a hash-only change would keep the page, and the focus, as it was
+  await page.goto(`${URL_BASE}?theme=light#axes=t`, { waitUntil: 'networkidle0' })
+  await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
+  await page.evaluate(() => (document.activeElement instanceof HTMLElement) && document.activeElement.blur())
+  const rm = await tabUntil(f => f.tag === 'BUTTON' && f.kind === kind && /^Remove .* from the matrix$/.test(f.label ?? ''))
+  check(!!rm, `flipped: Tab reaches a ${kind} remove button${rm ? ` ("${rm.f.label}")` : ''}`)
+  if (rm) {
+    await page.keyboard.press('Enter')
+    await page.waitForFunction(k => location.hash.includes(k), { timeout: 5000 }, key).catch(() => {})
+    const hash = await page.evaluate(() => location.hash)
+    check(hash.includes(key), `Enter removes it: the hash has ${key} (${hash})`)
+    const f = await focused()
+    check(!!f && f.tag === 'BUTTON' && f.kind === kind, 'focus moves to the next remove button, not lost to the page')
+  }
 }
 
 await browser.close()

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { CoverageRow } from '../../../src/coverage/build.ts'
 import type { Indicator, Vocab, VocabId } from './data.ts'
 import {
-  cellAria, cellModel, classText, groupColumns, groupRows, indexCoverage, matrixStats, orderColls, pickRow, valueText,
+  addableIndicators, cellAria, cellModel, classText, groupColumns, groupRows, hiddenPlaces, indexCoverage, matrixStats, orderColls, pickRow, valueText,
 } from './matrix.ts'
 
 // small synthetic manifest and coverage: one rule per test, exact outputs
@@ -136,6 +136,70 @@ describe('groupColumns', () => {
   it('an indicator whose tag is not a term goes to a last group, Other', () => {
     const g = groupColumns(inds, vocabs(), 'onms', true)
     expect(g[g.length - 1].term.id).toBe('other')
+  })
+})
+
+describe('groupColumns with add and hide', () => {
+  const inds = [
+    ind({ id: 'a', series: 's1', lead: false }),
+    ind({ id: 'b', series: 's1', lead: true }),
+    ind({ id: 'c', series: 's2', lead: true, category: { onms: 'drivers' } }),
+    ind({ id: 'd', series: 's2', lead: false, category: { onms: 'drivers' } }),
+  ]
+  const ids = (g: ReturnType<typeof groupColumns>) => g.map(x => [x.term.id, x.indicators.map(i => i.id)])
+  it('leads-only plus add keeps the added non-lead beside its lead', () => {
+    expect(ids(groupColumns(inds, vocabs(), 'onms', true, { add: ['a'] }))).toEqual([['drivers', ['c']], ['water-quality', ['b', 'a']]])
+  })
+  it('add is ignored when every indicator is shown anyway', () => {
+    expect(ids(groupColumns(inds, vocabs(), 'onms', false, { add: ['a'] }))).toEqual(ids(groupColumns(inds, vocabs(), 'onms', false)))
+  })
+  it('hide drops an indicator, a lead included, with or without leads-only', () => {
+    expect(ids(groupColumns(inds, vocabs(), 'onms', true, { hide: ['b'] }))).toEqual([['drivers', ['c']]])
+    expect(ids(groupColumns(inds, vocabs(), 'onms', false, { hide: ['a', 'c'] }))).toEqual([['drivers', ['d']], ['water-quality', ['b']]])
+  })
+  it('hide wins over add; a group left empty is dropped', () => {
+    expect(ids(groupColumns(inds, vocabs(), 'onms', true, { add: ['a'], hide: ['a', 'c'] }))).toEqual([['water-quality', ['b']]])
+  })
+  it('no options behaves as before', () => {
+    expect(ids(groupColumns(inds, vocabs(), 'onms', true, {}))).toEqual([['drivers', ['c']], ['water-quality', ['b']]])
+  })
+})
+
+describe('addableIndicators', () => {
+  const inds = [
+    ind({ id: 'a', series: 's1', series_title: 'Series one', lead: false }),
+    ind({ id: 'b', series: 's1', series_title: 'Series one', lead: true }),
+    ind({ id: 'c', series: 's2', lead: true }),
+    ind({ id: 'd', series: 's1', series_title: 'Series one', lead: false }),
+  ]
+  it('lists what is not shown, grouped by series, the lead first, titled series_title else series', () => {
+    expect(addableIndicators(inds, new Set(['c'])).map(g => [g.series, g.title, g.indicators.map(i => i.id)])).toEqual([['s1', 'Series one', ['b', 'a', 'd']]])
+    expect(addableIndicators(inds, new Set(['a', 'b', 'd'])).map(g => [g.series, g.title, g.indicators.map(i => i.id)])).toEqual([['s2', 's2', ['c']]])
+  })
+  it('is empty when everything is shown', () => {
+    expect(addableIndicators(inds, new Set(inds.map(i => i.id)))).toEqual([])
+  })
+})
+
+describe('groupRows with hide', () => {
+  const idx = indexCoverage([
+    row({ place_id: 'NMS:B', place_name: 'Bravo' }), row({ place_id: 'NMS:A', place_name: 'Alpha' }),
+    row({ place_id: 'MRGID:9', place_name: 'Zed EEZ', coll: 'mr_eez' }),
+  ])
+  it('drops hidden places and a collection left empty', () => {
+    expect(groupRows(idx, [], '', ['NMS:A']).map(g => [g.coll, g.places.map(p => p.id)])).toEqual([['mr_eez', ['MRGID:9']], ['places', ['NMS:B']]])
+    expect(groupRows(idx, [], '', ['MRGID:9']).map(g => g.coll)).toEqual(['places'])
+  })
+})
+
+describe('hiddenPlaces', () => {
+  const idx = indexCoverage([
+    row({ place_id: 'NMS:B', place_name: 'Bravo' }), row({ place_id: 'NMS:A', place_name: 'Alpha' }),
+    row({ place_id: 'MRGID:9', place_name: 'Zed EEZ', coll: 'mr_eez' }),
+  ])
+  it('returns the removed places in name order and skips unknown ids', () => {
+    expect(hiddenPlaces(idx, ['MRGID:9', 'NMS:B', 'NMS:A', 'NMS:NOPE']).map(p => p.name)).toEqual(['Alpha', 'Bravo', 'Zed EEZ'])
+    expect(hiddenPlaces(idx, [])).toEqual([])
   })
 })
 

@@ -6,7 +6,7 @@
   import type { Catalog, Indicator } from './lib/data.ts'
   import { DEFAULT_STATE, mapHref, matrixHref, parseHash, placeHref, serializeHash } from './lib/hash.ts'
   import type { ViewState } from './lib/hash.ts'
-  import { cellModel, groupColumns, groupRows, indexCoverage, matrixStats, pickRow } from './lib/matrix.ts'
+  import { cellModel, groupColumns, groupRows, hiddenPlaces, indexCoverage, matrixStats, pickRow } from './lib/matrix.ts'
   import { producerCredits } from './lib/delivery.ts'
   import { APP_NAME, TAGLINE, pageTitle } from './lib/brand/brand.ts'
   import type { Brand } from './lib/brand/brand.ts'
@@ -53,8 +53,12 @@
 
   // ---- derived tables ----
   const idx = $derived(catalog ? indexCoverage(catalog.coverage, catalog.manifest.indicators) : null)
-  const cols = $derived(catalog ? groupColumns(catalog.manifest.indicators, catalog.manifest.vocabularies, view.vocab, view.leads) : [])
-  const rows = $derived(idx ? groupRows(idx, view.colls, view.q) : [])
+  const cols = $derived(catalog
+    ? groupColumns(catalog.manifest.indicators, catalog.manifest.vocabularies, view.vocab, view.leads, { add: view.addInds, hide: view.hideInds })
+    : [])
+  const rows = $derived(idx ? groupRows(idx, view.colls, view.q, view.hidePlaces) : [])
+  const shown = $derived(new Set(cols.flatMap(g => g.indicators.map(i => i.id))))
+  const removedPlaces = $derived(idx ? hiddenPlaces(idx, view.hidePlaces) : [])
   const stats = $derived(idx ? matrixStats(rows, cols, idx) : null)
   const collChips = $derived(
     idx ? idx.colls.map(c => ({ id: c, title: title(c), places: idx.places.filter(p => p.coll === c).length })) : [],
@@ -101,6 +105,14 @@
   })
   const backHref = $derived(matrixHref(cameFrom, { vocab: view.vocab, depth: view.depth, coll: catalog && view.place ? placeCoverage(catalog.coverage, view.place, view.coll).place?.coll ?? null : null }))
   const linkToPlace = (placeId: string, coll: string) => placeHref(view, placeId, coll)
+
+  // ---- removing from the display ----
+  // an indicator added beyond the leads is taken back out of the additions; any other goes on the removed list
+  function hide(kind: 'place' | 'indicator', id: string) {
+    if (kind === 'place') patch({ hidePlaces: [...new Set([...view.hidePlaces, id])] })
+    else if (view.addInds.includes(id)) patch({ addInds: view.addInds.filter(x => x !== id) })
+    else patch({ hideInds: [...new Set([...view.hideInds, id])] })
+  }
 
   // ---- the drawer ----
   const open = (place: string, indicator: string) => patch({ cell: { place, indicator } })
@@ -167,7 +179,7 @@
         <p class="status" role="status">Loading the map…</p>
       {/if}
     {:else if catalog && idx}
-      <Toolbar view={view} colls={collChips} onchange={patch} />
+      <Toolbar view={view} colls={collChips} onchange={patch} indicators={catalog.manifest.indicators} {shown} {removedPlaces} />
       <p class="summary" role="status" aria-live="polite">
         <Icon name="view-matrix" size={18} />
         <span>
@@ -175,7 +187,8 @@
           {stats?.withValue} of {stats?.cells} cells have a value · {stats?.withStatus} have a status
         </span>
       </p>
-      <Matrix {catalog} {idx} {cols} {rows} vocab={view.vocab} depth={view.depth} titles={title} open={view.cell} onopen={open} placeHref={linkToPlace} />
+      <Matrix {catalog} {idx} {cols} {rows} vocab={view.vocab} depth={view.depth} axes={view.axes} titles={title} open={view.cell} onopen={open}
+        onhide={hide} placeHref={linkToPlace} />
       <MatrixLegend vocab={view.vocab} />
     {/if}
   </div>
