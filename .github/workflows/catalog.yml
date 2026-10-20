@@ -41,8 +41,17 @@ jobs:
         run: |
           uv run --group dev pytest -q
           npx vitest run src
-      - name: build the catalog (erddap-places rebuilt, SDG pulled from the published catalog)
+      - name: build the catalog (erddap-places, eco-indicators and obis rebuilt, SDG pulled from the published catalog)
         run: scripts/build_catalog.sh catalog
+      # the SanctuaryWatch pilot figures (plan §7): the bundle for CINMS, its PNGs drawn by the deployed embed route,
+      # published under indicators/sanctuarywatch/ so each figure.png keeps a stable URL. a failure here never blocks
+      # the catalog
+      - name: SanctuaryWatch figures (CINMS)
+        continue-on-error: true
+        run: |
+          export PATH=/opt/homebrew/bin:$PATH
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+            node --experimental-strip-types scripts/sanctuarywatch_bundle.ts --place NMS:CINMS --catalog catalog --png
       - name: publish
         if: github.event_name == 'schedule' || inputs.publish
         run: scripts/publish_catalog.sh catalog
