@@ -81,8 +81,8 @@
           "additionalProperties": { "type": "string" }
         },
         "eov_match": {
-          "description": "`exact` when the indicator measures that EOV; `discipline` when no single EOV fits and the tag is the GOOS discipline (bioeco, biogeo, physics).",
-          "enum": ["exact", "discipline"]
+          "description": "`exact` when the indicator measures that EOV; `related` when it does not measure it but is about it (e.g. SDG 14.6.1, instruments against IUU fishing: fish); `discipline` when no single EOV fits and the tag is a GOOS discipline (physics, biogeochemistry, bioeco).",
+          "enum": ["exact", "related", "discipline"]
         },
         "series": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "Family from one producer and dataset, e.g. sst, obis-diversity." },
         "series_title": { "type": "string" },
@@ -102,7 +102,7 @@
           "type": "object",
           "required": ["kind", "summary"],
           "properties": {
-            "kind": { "enum": ["precomputed-exact", "precomputed-h3", "on-the-fly"] },
+            "kind": { "enum": ["precomputed-exact", "precomputed-h3", "precomputed-external", "on-the-fly"], "description": "precomputed-external: computed by another body (e.g. the UN SDG database) and joined to places here." },
             "summary": { "type": "string" },
             "code": { "type": "string", "description": "Link to the code that produced the values." }
           },

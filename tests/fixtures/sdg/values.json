@@ -1,0 +1,22 @@
+{
+  "series": {
+    "ER_MRN_MPA": {"indicator": "14.5.1", "short": "Marine KBAs protected", "units": "%", "domain": [0, 100],
+                   "group": "UN SDG 14 (by country)", "description": "Average proportion of Marine KBAs covered by protected areas (%)",
+                   "source": "synthetic fixture", "link": "https://unstats.un.org/sdgs/dataportal/database?series=ER_MRN_MPA"},
+    "ER_REG_UNFCIM": {"indicator": "14.6.1", "short": "IUU instruments implemented", "units": "score 1-5", "domain": [1, 5],
+                      "group": "UN SDG 14 (by country)", "description": "Progress in implementing instruments against IUU fishing",
+                      "source": "synthetic fixture", "link": "https://unstats.un.org/sdgs/dataportal/database?series=ER_REG_UNFCIM"}
+  },
+  "eez": {
+    "1001": {"name": "Alpha Exclusive Economic Zone", "pol_type": "200NM",
+             "ER_MRN_MPA": {"value": 96.5, "year": 2025, "m49": 56, "basis": "territory"},
+             "ER_REG_UNFCIM": {"value": 5.0, "year": 2026, "m49": 56, "basis": "territory"}},
+    "1002": {"name": "Beta Exclusive Economic Zone", "pol_type": "200NM",
+             "ER_MRN_MPA": {"value": 10.0, "year": 2024, "m49": 250, "basis": "sovereign"},
+             "ER_REG_UNFCIM": {"value": 3.0, "year": 2025, "m49": 250, "basis": "sovereign"}},
+    "1003": {"name": "Gamma Joint regime area", "pol_type": "Joint regime", "ER_MRN_MPA": null, "ER_REG_UNFCIM": null},
+    "1004": {"name": "Delta Exclusive Economic Zone", "pol_type": "200NM", "ER_MRN_MPA": null,
+             "ER_REG_UNFCIM": {"value": 1, "year": 2023, "m49": 840, "basis": "territory"}}
+  },
+  "eez_attribution": "synthetic fixture"
+}

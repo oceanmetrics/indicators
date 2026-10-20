@@ -1,0 +1,278 @@
+# what is ours about each indicator: category tags (one per vocabulary in config/vocab/), series, lead, preferred,
+# kind, the status method and its grain, and display hints. titles of datasets, units, providers, licences and
+# citations come from the producers' STAC and outputs (om_indicators/manifest.py), never from here.
+#
+# rules the manifest builder checks: every indicator with values has an entry here; every tag is a term of its
+# vocabulary; each series has exactly one lead; each `variable` has exactly one preferred indicator; kind
+# categorical <=> the values carry a class.
+#
+# ONMS mapping (plan §6, Ben 2026-10-20): drivers and pressures = heat stress (CRW) and precipitation (IMERG);
+# water quality = SST, pH and the carbonate system, O2, chl, salinity, nutrients, bottom temperature, mixed layer;
+# habitat = Seascapes; living resources = NPP, phytoplankton, zooplankton (OBIS later); response = SDG 14.5.1, 14.6.1.
+# EOV mapping (plan §8): SST and heat stress -> sea surface temperature; O2 -> oxygen; pH, DIC, pCO2 -> inorganic
+# carbon; chl -> ocean colour; NPP and phytoplankton carbon -> phytoplankton.
+
+defaults:
+  kind: continuous
+  status_method: iea-sd
+  status_grain: year
+  min_periods: 10
+  recent: 5
+  lead: false
+  preferred: true
+
+indicators:
+  # ---- erddap-places: NOAA Coral Reef Watch (daily, 1985-) ----
+  - id: "erddap:dhw_5km:CRW_SST:mean"
+    title: Sea surface temperature (CRW, 5 km)
+    short: SST
+    variable: sst
+    series: sst
+    series_title: Sea surface temperature
+    lead: true
+    unit_label: "°C"
+    decimals: 2
+    category: {onms: water-quality, names: physical-chemical, eov: sea-surface-temperature}
+    eov_match: exact
+  - id: "erddap:dhw_5km:CRW_BAA:share"
+    title: Coral bleaching alert area (CRW)
+    short: Bleaching alert
+    description: >-
+      Share of the place's area in each NOAA Coral Reef Watch bleaching alert level (0 no stress, 1 watch, 2 warning,
+      3 alert level 1, 4 alert level 2), averaged over the period: the heat-stress driver of bleaching.
+    variable: bleaching-alert
+    series: heat-stress
+    series_title: Coral heat stress
+    lead: true
+    kind: categorical
+    status_method: values
+    unit_label: share
+    decimals: 2
+    category: {onms: drivers-pressures, names: physical-chemical, eov: sea-surface-temperature}
+    eov_match: related
+
+  # ---- erddap-places: NOAA AOML Seascapes (8-day) ----
+  - id: "erddap:noaa_aoml_seascapes_8day:CLASS:share"
+    title: Seascape classes (AOML, 8-day)
+    short: Seascapes
+    description: >-
+      Share of the place's area in each of the 33 dynamic seascape classes (NOAA AOML), averaged over the period:
+      pelagic habitat as classified from satellite sea surface temperature, salinity and ocean colour.
+    variable: seascapes
+    series: seascapes
+    series_title: Seascapes
+    lead: true
+    kind: categorical
+    status_method: values
+    unit_label: share
+    decimals: 2
+    category: {onms: habitat, names: biological, eov: ocean-colour}
+    eov_match: related
+
+  # ---- erddap-places: CMEMS Global Ocean Physics (monthly, USF IMaRS ERDDAP) ----
+  - id: "erddap:cmems_altimetry:tob:mean"
+    title: Sea bottom temperature (CMEMS)
+    short: Bottom temperature
+    variable: bottom-temperature
+    series: cmems-physics
+    series_title: Ocean physics (CMEMS)
+    lead: true
+    unit_label: "°C"
+    decimals: 2
+    category: {onms: water-quality, names: physical-chemical, eov: subsurface-temperature}
+    eov_match: exact
+  - id: "erddap:cmems_altimetry:mlotst:mean"
+    title: Mixed layer depth (CMEMS)
+    short: Mixed layer depth
+    variable: mixed-layer-depth
+    series: cmems-physics
+    unit_label: m
+    decimals: 1
+    category: {onms: water-quality, names: physical-chemical, eov: physics}
+    eov_match: discipline
+  - id: "erddap:cmems_salinity:so:mean"
+    title: Sea surface salinity (CMEMS, 0.5 m)
+    short: Salinity
+    variable: salinity
+    series: cmems-physics
+    unit_label: PSU
+    decimals: 2
+    category: {onms: water-quality, names: physical-chemical, eov: sea-surface-salinity}
+    eov_match: exact
+
+  # ---- erddap-places: CMEMS Global Biogeochemistry (monthly, surface 0.5 m) ----
+  - id: "erddap:cmems_biogeochem_carbon:ph:mean"
+    title: pH (CMEMS, 0.5 m)
+    short: pH
+    variable: ph
+    series: cmems-carbonate
+    series_title: Carbonate system (CMEMS)
+    lead: true
+    unit_label: ""
+    decimals: 3
+    category: {onms: water-quality, names: physical-chemical, eov: inorganic-carbon}
+    eov_match: exact
+  - id: "erddap:cmems_biogeochem_carbon:dissic:mean"
+    title: Dissolved inorganic carbon (CMEMS, 0.5 m)
+    short: DIC
+    variable: dic
+    series: cmems-carbonate
+    unit_label: "mol m⁻³"
+    decimals: 3
+    category: {onms: water-quality, names: physical-chemical, eov: inorganic-carbon}
+    eov_match: exact
+  - id: "erddap:cmems_biogeochem_co2:spco2:mean"
+    title: Surface pCO₂ (CMEMS)
+    short: pCO₂
+    variable: pco2
+    series: cmems-carbonate
+    unit_label: Pa
+    decimals: 1
+    category: {onms: water-quality, names: physical-chemical, eov: inorganic-carbon}
+    eov_match: exact
+  - id: "erddap:cmems_biogeochem_pp:o2:mean"
+    title: Dissolved oxygen (CMEMS, 0.5 m)
+    short: Oxygen
+    variable: oxygen
+    series: cmems-oxygen
+    series_title: Oxygen (CMEMS)
+    lead: true
+    unit_label: "mmol m⁻³"
+    decimals: 1
+    category: {onms: water-quality, names: physical-chemical, eov: oxygen}
+    eov_match: exact
+  - id: "erddap:cmems_biogeochem_nutrients:no3:mean"
+    title: Nitrate (CMEMS, 0.5 m)
+    short: Nitrate
+    variable: nitrate
+    series: cmems-nutrients
+    series_title: Nutrients (CMEMS)
+    lead: true
+    unit_label: "mmol m⁻³"
+    decimals: 2
+    category: {onms: water-quality, names: physical-chemical, eov: nutrients}
+    eov_match: exact
+  - id: "erddap:cmems_biogeochem_nutrients:po4:mean"
+    title: Phosphate (CMEMS, 0.5 m)
+    short: Phosphate
+    variable: phosphate
+    series: cmems-nutrients
+    unit_label: "mmol m⁻³"
+    decimals: 3
+    category: {onms: water-quality, names: physical-chemical, eov: nutrients}
+    eov_match: exact
+  - id: "erddap:cmems_biogeochem_nutrients:si:mean"
+    title: Silicate (CMEMS, 0.5 m)
+    short: Silicate
+    variable: silicate
+    series: cmems-nutrients
+    unit_label: "mmol m⁻³"
+    decimals: 2
+    category: {onms: water-quality, names: physical-chemical, eov: nutrients}
+    eov_match: exact
+  - id: "erddap:cmems_biogeochem_nutrients:fe:mean"
+    title: Dissolved iron (CMEMS, 0.5 m)
+    short: Iron
+    variable: iron
+    series: cmems-nutrients
+    unit_label: "mmol m⁻³"
+    decimals: 5
+    category: {onms: water-quality, names: physical-chemical, eov: nutrients}
+    eov_match: exact
+  - id: "erddap:cmems_biogeochem_phyto:chl:mean"
+    title: Chlorophyll-a (CMEMS, 0.5 m)
+    short: Chlorophyll-a
+    variable: chl
+    series: cmems-plankton
+    series_title: Plankton and production (CMEMS)
+    lead: true
+    unit_label: "mg m⁻³"
+    decimals: 2
+    category: {onms: water-quality, names: biological, eov: ocean-colour}
+    eov_match: exact
+  - id: "erddap:cmems_biogeochem_phyto:phyc:mean"
+    title: Phytoplankton carbon (CMEMS, 0.5 m)
+    short: Phytoplankton
+    variable: phytoplankton
+    series: cmems-plankton
+    unit_label: "mmol m⁻³"
+    decimals: 2
+    category: {onms: living-resources, names: biological, eov: phytoplankton}
+    eov_match: exact
+  - id: "erddap:cmems_biogeochem_zoo:zooc:mean"
+    title: Zooplankton carbon (CMEMS, 0.5 m)
+    short: Zooplankton
+    variable: zooplankton
+    series: cmems-plankton
+    unit_label: "mmol m⁻³"
+    decimals: 2
+    category: {onms: living-resources, names: biological, eov: zooplankton}
+    eov_match: exact
+  - id: "erddap:cmems_biogeochem_pp:nppv:mean"
+    title: Primary production (CMEMS, 0.5 m)
+    short: Primary production
+    variable: npp
+    preferred: false
+    series: cmems-plankton
+    unit_label: "mg m⁻³ d⁻¹"
+    decimals: 1
+    category: {onms: living-resources, names: biological, eov: phytoplankton}
+    eov_match: exact
+
+  # ---- erddap-places: satellite records (monthly) ----
+  - id: "erddap:moda_npp_mo_glob:npp:mean"
+    title: Net primary productivity (VGPM, MODIS-Aqua)
+    short: NPP
+    variable: npp
+    series: npp
+    series_title: Net primary productivity
+    lead: true
+    unit_label: "mg C m⁻² d⁻¹"
+    decimals: 0
+    category: {onms: living-resources, names: biological, eov: phytoplankton}
+    eov_match: exact
+  - id: "erddap:IMERG_monthly_global_precip:precipitation:mean"
+    title: Precipitation (NASA IMERG)
+    short: Precipitation
+    variable: precipitation
+    series: precipitation
+    series_title: Precipitation
+    lead: true
+    unit_label: mm
+    decimals: 1
+    category: {onms: drivers-pressures, names: physical-chemical, eov: physics}
+    eov_match: discipline
+
+  # ---- UN SDG 14, by country, joined to EEZs (places proto/eez_indicators) ----
+  - id: "sdg:ER_MRN_MPA"
+    title: Marine KBAs covered by protected areas (SDG 14.5.1)
+    short: SDG 14.5.1
+    variable: sdg-14-5-1
+    series: sdg-14
+    series_title: UN SDG 14 (by country)
+    lead: true
+    status_method: values
+    unit_label: "%"
+    decimals: 1
+    category: {onms: response, names: human-dimensions, eov: bioeco}
+    eov_match: discipline
+  - id: "sdg:EN_MAR_CHLDEV"
+    title: Chlorophyll-a deviation (SDG 14.1.1)
+    short: SDG 14.1.1
+    variable: sdg-14-1-1
+    series: sdg-14
+    status_method: values
+    unit_label: "%"
+    decimals: 1
+    category: {onms: water-quality, names: biological, eov: ocean-colour}
+    eov_match: related
+  - id: "sdg:ER_REG_UNFCIM"
+    title: Instruments against IUU fishing (SDG 14.6.1)
+    short: SDG 14.6.1
+    variable: sdg-14-6-1
+    series: sdg-14
+    status_method: values
+    unit_label: "score 1–5"
+    decimals: 0
+    category: {onms: response, names: human-dimensions, eov: fish}
+    eov_match: related

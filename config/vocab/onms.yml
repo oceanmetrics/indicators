@@ -1,0 +1,16 @@
+# the ONMS condition-report sections: the Sanctuaries default (plan §6, Ben 2026-10-20). Condition reports follow
+# DPSER: drivers and pressures; the state of sanctuary resources; ecosystem services; response.
+title: ONMS condition-report sections
+source: https://sanctuaries.noaa.gov/science/condition/faq.html
+note: >-
+  A tag places an indicator in a condition-report section. It is not a condition rating: ONMS ratings are expert
+  judgments of better or worse, while the statuses here are statistical, relative to the place's own record, and
+  never use the ONMS colours or symbols.
+terms:
+  - {id: drivers-pressures, label: Drivers and pressures, group: drivers-pressures, glyph: onms-drivers-pressures}
+  - {id: water-quality, label: Water quality, group: state, glyph: onms-water-quality}
+  - {id: habitat, label: Habitat, group: state, glyph: onms-habitat}
+  - {id: living-resources, label: Living resources, group: state, glyph: onms-living-resources}
+  - {id: maritime-heritage, label: Maritime heritage, group: state, glyph: onms-maritime-heritage}
+  - {id: ecosystem-services, label: Ecosystem services, group: ecosystem-services, glyph: onms-ecosystem-services}
+  - {id: response, label: Response, group: response, glyph: onms-response}

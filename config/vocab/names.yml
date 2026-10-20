@@ -1,0 +1,10 @@
+# the NaMES themes, as the live NOAA National Marine Ecosystem Status site groups its indicators (checked
+# 2026-10-20): Physical-Chemical (its "Climate" indicator sits here, beside SST, marine heatwaves, sea level, ice,
+# upwelling and ocean acidification), Biological (chlorophyll-a, zooplankton, coral reefs, forage fish, seabirds,
+# marine mammals ...) and Human Dimensions. The plan named a fourth, climatological; the site has none.
+title: NaMES themes
+source: https://ecowatch.noaa.gov/regions
+terms:
+  - {id: physical-chemical, label: Physical-chemical}
+  - {id: biological, label: Biological}
+  - {id: human-dimensions, label: Human dimensions}

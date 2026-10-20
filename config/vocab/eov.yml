@@ -1,0 +1,47 @@
+# the GOOS Essential Ocean Variables: the `eov` vocabulary (plan §8). 36 EOVs in four disciplines plus the three
+# discipline terms, which tag an indicator no single EOV fits (eov_match: discipline). The colour badges are the GOOS
+# originals, unmodified (assets/goos-eov/, SOURCE.md); the folder has 35 (no turbulent diapycnal fluxes). The
+# glyphs eov-<id> are adapted from them (traced, monochrome, rescaled) under the CC BY of Martín Míguez et al. 2026.
+title: GOOS Essential Ocean Variables
+source: https://goosocean.org/what-we-do/framework/essential-ocean-variables/
+credit: "Credit: Global Ocean Observing System (GOOS)"
+terms:
+  - {id: physics, label: Physics, group: discipline}
+  - {id: biogeochemistry, label: Biogeochemistry, group: discipline}
+  - {id: bioeco, label: Biology and ecosystems, group: discipline}
+  - {id: sea-state, label: Sea state, group: physics}
+  - {id: ocean-surface-stress, label: Ocean surface stress, group: physics}
+  - {id: sea-ice, label: Sea ice, group: physics}
+  - {id: sea-surface-height, label: Sea surface height, group: physics}
+  - {id: sea-surface-temperature, label: Sea surface temperature, group: physics}
+  - {id: subsurface-temperature, label: Subsurface temperature, group: physics}
+  - {id: surface-currents, label: Surface currents, group: physics}
+  - {id: subsurface-currents, label: Subsurface currents, group: physics}
+  - {id: sea-surface-salinity, label: Sea surface salinity, group: physics}
+  - {id: subsurface-salinity, label: Subsurface salinity, group: physics}
+  - {id: ocean-surface-heat-flux, label: Ocean surface heat flux, group: physics}
+  - {id: ocean-bottom-pressure, label: Ocean bottom pressure, group: physics}
+  - {id: turbulent-diapycnal-fluxes, label: Turbulent diapycnal fluxes, group: physics}
+  - {id: oxygen, label: Oxygen, group: biogeochemistry}
+  - {id: nutrients, label: Nutrients, group: biogeochemistry}
+  - {id: inorganic-carbon, label: Inorganic carbon, group: biogeochemistry}
+  - {id: transient-tracers, label: Transient tracers, group: biogeochemistry}
+  - {id: particulate-matter, label: Particulate matter, group: biogeochemistry}
+  - {id: nitrous-oxide, label: Nitrous oxide, group: biogeochemistry}
+  - {id: stable-carbon-isotopes, label: Stable carbon isotopes, group: biogeochemistry}
+  - {id: dissolved-organic-carbon, label: Dissolved organic carbon, group: biogeochemistry}
+  - {id: phytoplankton, label: Phytoplankton biomass and diversity, group: bioeco}
+  - {id: zooplankton, label: Zooplankton biomass and diversity, group: bioeco}
+  - {id: fish, label: Fish abundance and distribution, group: bioeco}
+  - {id: sea-turtles, label: Sea turtles abundance and distribution, group: bioeco}
+  - {id: seabirds, label: Seabirds abundance and distribution, group: bioeco}
+  - {id: marine-mammals, label: Marine mammals abundance and distribution, group: bioeco}
+  - {id: hard-coral, label: Hard coral cover and composition, group: bioeco}
+  - {id: seagrass, label: Seagrass cover and composition, group: bioeco}
+  - {id: macroalgae, label: Macroalgal canopy cover and composition, group: bioeco}
+  - {id: mangroves, label: Mangrove cover and composition, group: bioeco}
+  - {id: microbes, label: Microbe biomass and diversity, group: bioeco}
+  - {id: invertebrates, label: Invertebrate abundance and distribution, group: bioeco}
+  - {id: ocean-colour, label: Ocean colour, group: cross-disciplinary}
+  - {id: ocean-sound, label: Ocean sound, group: cross-disciplinary}
+  - {id: marine-debris, label: Marine debris, group: cross-disciplinary}
