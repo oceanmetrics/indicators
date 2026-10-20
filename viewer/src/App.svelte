@@ -4,7 +4,8 @@
   import { Icon } from '../../src/icons/index.ts'
   import { loadCatalog, loadLayerTitles, resolveDataBase, collTitle } from './lib/data.ts'
   import type { Catalog, Indicator } from './lib/data.ts'
-  import { DEFAULT_STATE, mapHref, matrixHref, parseHash, placeHref, serializeHash } from './lib/hash.ts'
+  import { DEFAULT_STATE, mapHref, matrixHref, parseHash, placeHref, reportHref, serializeHash } from './lib/hash.ts'
+  import { DEFAULT_SPEC } from '../../src/report/spec.ts'
   import type { ViewState } from './lib/hash.ts'
   import { cellModel, groupColumns, groupRows, hiddenPlaces, indexCoverage, matrixStats, pickRow } from './lib/matrix.ts'
   import { producerCredits } from './lib/delivery.ts'
@@ -33,16 +34,21 @@
   let PlaceView = $state.raw<typeof import('./lib/PlaceView.svelte').default | null>(null)
   // the Map view is its own chunk too (MapLibre)
   let MapView = $state.raw<typeof import('./lib/map/MapView.svelte').default | null>(null)
+  // and the Report view (builder and layouts)
+  let ReportView = $state.raw<typeof import('./lib/report/ReportView.svelte').default | null>(null)
   // the Matrix state the reader left to open a place, so "Back to the matrix" can restore it; null on a cold permalink
   let cameFrom = $state.raw<ViewState | null>(null)
   // the last Matrix and Map states, so the view switch returns to each as it was left
   let lastMatrix = $state.raw<ViewState | null>(null)
   let lastMap = $state.raw<ViewState | null>(null)
+  let lastReport = $state.raw<ViewState | null>(null)
   $effect(() => {
     if (view.view === 'matrix') lastMatrix = view
     else if (view.view === 'map') lastMap = view
+    else if (view.view === 'report') lastReport = view
   })
   const navMatrix = $derived('#' + serializeHash(lastMatrix ?? { ...DEFAULT_STATE, vocab: view.vocab, depth: view.depth }))
+  const navReport = $derived(lastReport ? '#' + serializeHash(lastReport) : reportHref(view, DEFAULT_SPEC))
   const navMap = $derived(lastMap ? '#' + serializeHash(lastMap) : mapHref(view, view.view === 'place' ? null : view.cell?.indicator ?? null))
   // when the Place view was entered (0 on a cold page), and how long its lead cards took
   let placeT0 = $state(0)
@@ -98,10 +104,11 @@
 
   // ---- the page title: "<view> · Ocean Metrics Indicators" (or "· MBON") ----
   const placeName = $derived(catalog && view.view === 'place' ? placeCoverage(catalog.coverage, view.place ?? '', view.coll).place?.name ?? view.place : null)
-  $effect(() => { document.title = pageTitle(brand, view.view === 'place' ? (placeName ?? 'Place') : view.view === 'map' ? 'Map' : 'Matrix') })
+  $effect(() => { document.title = pageTitle(brand, view.view === 'place' ? (placeName ?? 'Place') : view.view === 'map' ? 'Map' : view.view === 'report' ? (view.spec.title ?? 'Report') : 'Matrix') })
   $effect(() => {
     if (view.view === 'place' && !PlaceView) import('./lib/PlaceView.svelte').then(m => { PlaceView = m.default })
     if (view.view === 'map' && !MapView) import('./lib/map/MapView.svelte').then(m => { MapView = m.default })
+    if (view.view === 'report' && !ReportView) import('./lib/report/ReportView.svelte').then(m => { ReportView = m.default })
   })
   const backHref = $derived(matrixHref(cameFrom, { vocab: view.vocab, depth: view.depth, coll: catalog && view.place ? placeCoverage(catalog.coverage, view.place, view.coll).place?.coll ?? null : null }))
   const linkToPlace = (placeId: string, coll: string) => placeHref(view, placeId, coll)
@@ -160,8 +167,8 @@
 
 <main class="lens" data-state={phase} data-brand={brand}>
   <div class="wrap">
-    <h1 class="mbon-sr-only">{APP_NAME}: {view.view === 'place' ? `${placeName} (place view)` : view.view === 'map' ? 'map of one indicator' : 'places by indicators'}</h1>
-    {#if catalog}<ViewNav current={view.view} matrixHref={navMatrix} mapHref={navMap} {placeName} />{/if}
+    <h1 class="mbon-sr-only">{APP_NAME}: {view.view === 'place' ? `${placeName} (place view)` : view.view === 'map' ? 'map of one indicator' : view.view === 'report' ? 'report' : 'places by indicators'}</h1>
+    {#if catalog}<ViewNav current={view.view} matrixHref={navMatrix} mapHref={navMap} reportHref={navReport} {placeName} />{/if}
     {#if phase === 'loading'}
       <p class="status" role="status">Loading the manifest and the coverage table…</p>
     {:else if phase === 'error'}
@@ -177,6 +184,12 @@
         <MapView {catalog} {view} titles={title} onpatch={patch} />
       {:else}
         <p class="status" role="status">Loading the map…</p>
+      {/if}
+    {:else if catalog && view.view === 'report'}
+      {#if ReportView}
+        <ReportView {catalog} {view} titles={title} onpatch={patch} />
+      {:else}
+        <p class="status" role="status">Loading the report…</p>
       {/if}
     {:else if catalog && idx}
       <Toolbar view={view} colls={collChips} onchange={patch} indicators={catalog.manifest.indicators} {shown} {removedPlaces} />

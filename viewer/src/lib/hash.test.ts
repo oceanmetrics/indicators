@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_STATE, mapHref, matrixHref, parseHash, placeHref, serializeHash } from './hash.ts'
+import { DEFAULT_STATE, mapHref, matrixHref, parseHash, placeHref, reportHref, serializeHash } from './hash.ts'
+import { DEFAULT_SPEC } from '../../../src/report/spec.ts'
 import type { ViewState } from './hash.ts'
 
 describe('the hash is the view state', () => {
@@ -118,5 +119,22 @@ describe('the Map view hash', () => {
   it('mapHref carries the vocabulary, the detail level and the method', () => {
     expect(mapHref({ vocab: 'eov', depth: 'swim', method: null }, 'erddap:dhw_5km:CRW_SST:mean', 'places', 'status'))
       .toBe('#view=map&ind=erddap:dhw_5km:CRW_SST:mean&coll=places&color=status&vocab=eov')
+  })
+})
+
+describe('the Report view hash', () => {
+  const spec = { ...DEFAULT_SPEC, places: { include: ['coll:places'], exclude: ['NMS:TBNMS'], context: false }, indicators: { include: ['cat:water-quality', 'series:sst'], exclude: [] }, layout: 'scorecard' as const, title: 'Sanctuaries, water & heat' }
+  it('writes view=report, the spec keys, then the shared keys; depth lives in the shared key', () => {
+    const s: ViewState = { ...DEFAULT_STATE, view: 'report', spec: { ...spec, depth: 'dive' }, depth: 'dive' }
+    expect(serializeHash(s)).toBe('view=report&pi=coll:places&px=NMS:TBNMS&ii=cat:water-quality,series:sst&layout=scorecard&title=Sanctuaries%2C%20water%20%26%20heat&depth=dive')
+    expect(parseHash('#' + serializeHash(s))).toEqual(s)
+  })
+  it('a bare view=report is the default spec; the spec is the default outside the Report view', () => {
+    expect(parseHash('#view=report')).toEqual({ ...DEFAULT_STATE, view: 'report' })
+    expect(parseHash('#view=map&layout=scorecard').spec).toEqual(DEFAULT_SPEC)
+    expect(serializeHash({ ...DEFAULT_STATE, spec })).toBe('')
+  })
+  it('reportHref carries the vocabulary and the depth', () => {
+    expect(reportHref({ vocab: 'eov', depth: 'skim' }, spec)).toBe('#view=report&pi=coll:places&px=NMS:TBNMS&ii=cat:water-quality,series:sst&layout=scorecard&title=Sanctuaries%2C%20water%20%26%20heat&vocab=eov&depth=skim')
   })
 })

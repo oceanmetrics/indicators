@@ -1,5 +1,5 @@
 <script lang="ts">
-  // the view switch: Matrix and Map as links (each keeps the last state it was left in, so switching back restores
+  // the view switch: Matrix, Map and Report as links (each keeps the last state it was left in, so switching back restores
   // it), plus the place being read when the Place view is open. links, not buttons: every view is a permalink.
   import { Icon } from '../../../src/icons/index.ts'
   import type { ViewKind } from './hash.ts'
@@ -8,14 +8,16 @@
     current: ViewKind
     matrixHref: string
     mapHref: string
+    reportHref: string
     placeName?: string | null
   }
-  let { current, matrixHref, mapHref, placeName = null }: Props = $props()
+  let { current, matrixHref, mapHref, reportHref, placeName = null }: Props = $props()
 </script>
 
 <nav class="views" aria-label="Views">
   <a href={matrixHref} aria-current={current === 'matrix' ? 'page' : undefined}><Icon name="view-matrix" size={18} />Matrix</a>
   <a href={mapHref} aria-current={current === 'map' ? 'page' : undefined}><Icon name="view-map" size={18} />Map</a>
+  <a href={reportHref} aria-current={current === 'report' ? 'page' : undefined}><Icon name="view-report" size={18} />Report</a>
   {#if current === 'place' && placeName}
     <span class="here" aria-current="page"><Icon name="view-place" size={18} /><span class="pn">{placeName}</span></span>
   {/if}

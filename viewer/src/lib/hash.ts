@@ -7,14 +7,18 @@
 //   (iea-sd | names-pct | values: overrides every continuous card's status method), ind (an indicator to scroll to).
 // - Map: ind (the indicator), coll (the collection), color (value | departure | status | trend | record | class |
 //   share), t (the period shown: "2024", "2024-07"; none = the latest), cls (the class of `share`), method.
+// - Report: the report spec's own flat keys (src/report/spec.ts: pi, px, ctx, ii, ix, layout, status, recent, base,
+//   grain, from, to, asof, title).
 // vocab and depth are shared. defaults are left out. `?brand=` and `?theme=` are query switches, never hash keys. an
 // old Matrix or Place permalink has none of the new keys and parses to the same state as before.
 import type { VocabId } from './data.ts'
 import type { MethodId } from '../../../src/status/index.ts'
+import { DEFAULT_SPEC, specFromParams, specParams } from '../../../src/report/spec.ts'
+import type { ReportSpec } from '../../../src/report/spec.ts'
 
 export type Depth = 'skim' | 'swim' | 'dive'
 export const DEPTHS: Depth[] = ['skim', 'swim', 'dive']
-export type ViewKind = 'matrix' | 'place' | 'map'
+export type ViewKind = 'matrix' | 'place' | 'map' | 'report'
 export const METHOD_IDS: MethodId[] = ['iea-sd', 'names-pct', 'values']
 /** what the Matrix's rows are: places (the default) or indicators */
 export type Axes = 'places' | 'indicators'
@@ -41,12 +45,14 @@ export interface ViewState {
   color: MapColor | null
   t: string | null
   cls: string | null
+  /** the Report view's spec (the default spec in every other view) */
+  spec: ReportSpec
 }
 
 export const DEFAULT_STATE: ViewState = {
   view: 'matrix', colls: [], q: '', vocab: 'onms', leads: true, depth: 'swim', cell: null,
   place: null, coll: null, method: null, ind: null,
-  axes: 'places', hidePlaces: [], hideInds: [], addInds: [], color: null, t: null, cls: null,
+  axes: 'places', hidePlaces: [], hideInds: [], addInds: [], color: null, t: null, cls: null, spec: DEFAULT_SPEC,
 }
 
 // keep the readable characters of ids (NMS:FKNMS, erddap:dhw_5km:CRW_SST:mean, a|b) out of percent-encoding
@@ -71,7 +77,7 @@ export function parseHash(hash: string): ViewState {
   const t = kv.get('t') ?? ''
   return {
     // a Place view without a place is the matrix; a Map view picks its indicator when it has none
-    view: kv.get('view') === 'place' && place ? 'place' : kv.get('view') === 'map' ? 'map' : 'matrix',
+    view: kv.get('view') === 'place' && place ? 'place' : kv.get('view') === 'map' ? 'map' : kv.get('view') === 'report' ? 'report' : 'matrix',
     colls: (kv.get('colls') ?? '').split(',').filter(Boolean),
     q: kv.get('q') ?? '',
     vocab: vocab === 'names' || vocab === 'eov' || vocab === 'onms' ? vocab : DEFAULT_STATE.vocab,
@@ -89,8 +95,11 @@ export function parseHash(hash: string): ViewState {
     color: MAP_COLORS.includes(color as MapColor) ? (color as MapColor) : null,
     t: /^\d{4}(-\d{2}(-\d{2})?)?$/.test(t) ? t : null,
     cls: kv.get('cls') || null,
+    spec: kv.get('view') === 'report' ? specFromParams(kv, depth === 'skim' || depth === 'dive' ? depth : 'swim') : DEFAULT_SPEC,
   }
 }
+
+const SPEC_LISTS = new Set(['pi', 'px', 'ii', 'ix'])
 
 /** the hash of a state; each view writes only its own keys */
 export function serializeHash(s: ViewState): string {
@@ -105,6 +114,13 @@ export function serializeHash(s: ViewState): string {
     shared()
     if (s.method) parts.push('method=' + s.method)
     if (s.ind) parts.push('ind=' + enc(s.ind))
+    return parts.join('&')
+  }
+  if (s.view === 'report') {
+    parts.push('view=report')
+    // the rule lists keep their commas readable; a title is one value, its commas encoded
+    for (const [k, v] of specParams(s.spec)) parts.push(k + '=' + (SPEC_LISTS.has(k) ? v.split(',').map(enc).join(',') : enc(v)))
+    shared()
     return parts.join('&')
   }
   if (s.view === 'map') {
@@ -129,6 +145,11 @@ export function serializeHash(s: ViewState): string {
   if (s.hideInds.length) parts.push('xi=' + s.hideInds.map(enc).join(','))
   if (s.addInds.length) parts.push('ai=' + s.addInds.map(enc).join(','))
   return parts.join('&')
+}
+
+/** the href of a Report view (with `#`) for a spec; its depth is the view's shared depth key */
+export function reportHref(from: Pick<ViewState, 'vocab' | 'depth'>, spec: ReportSpec): string {
+  return '#' + serializeHash({ ...DEFAULT_STATE, view: 'report', spec: { ...spec, depth: from.depth }, vocab: from.vocab, depth: from.depth })
 }
 
 /** the href of the Map view of an indicator (with `#`), carrying the shared keys of the state it is opened from */
