@@ -1,0 +1,76 @@
+/* ============================================================================
+   Data colours for maps (oceanmetrics/indicators brand/themes)
+   One set for every brand: a value keeps its colour whichever instance shows it. Loaded by the viewer beside the
+   brand theme; components use these tokens only, never hex. Validated 2026-10-20 with the dataviz skill's
+   validate_palette.js against the map basemaps (Esri Light Gray Canvas ~#e8e8e6, Dark Gray Canvas ~#262626):
+   - sequential (magnitude, record length; ordinal classes such as alert levels): one blue hue, five steps, monotone
+     lightness, adjacent dL >= 0.06, light end >= 2:1 on the basemap; dark mode flips the anchor (low recedes).
+   - diverging (departure from a place's own record, in SD): blue below, orange above, a neutral grey middle; the
+     two arms are matched in OKLCH lightness step for step (orange hue 40.8, blue 255).
+   - status and trend: the diverging poles and a grey, so "above" and "rising" sit on the same side as a positive
+     departure. Directional, never better/worse (no red/green, no ONMS colours). Worst all-pairs CVD dE 19.8 light,
+     13.6 dark; the grey sits under 3:1 on the basemap by design, so the map always ships its glyph legend and the
+     companion table (the relief channel).
+   - categorical (largest class): three slots, the all-pairs cap for a choropleth, then "other".
+   ========================================================================== */
+
+:root,
+[data-theme="light"] {
+  --map-seq-1: #6da7ec;
+  --map-seq-2: #3987e5;
+  --map-seq-3: #256abf;
+  --map-seq-4: #184f95;
+  --map-seq-5: #0d366b;
+
+  --map-div-1: #256abf;                /* at or beyond 1 SD below */
+  --map-div-2: #6da7ec;
+  --map-div-3: #c3c2bc;                /* within 0.5 SD */
+  --map-div-4: #e38968;
+  --map-div-5: #af4517;                /* at or beyond 1 SD above */
+
+  --map-st-below:  #256abf;
+  --map-st-within: #a3a29c;
+  --map-st-above:  #af4517;
+  --map-tr-down:   #256abf;
+  --map-tr-flat:   #a3a29c;
+  --map-tr-up:     #af4517;
+
+  --map-cat-1: #2a78d6;
+  --map-cat-2: #eb6834;
+  --map-cat-3: #1baf7a;
+  --map-cat-other: #a3a29c;
+
+  --map-line: #ffffff;                 /* outline between filled places */
+  --map-none: #6f6e69;                 /* outline of a place with no value (no fill) */
+  --map-focus: #082129;                /* outline of the selected place */
+}
+
+[data-theme="dark"] {
+  --map-seq-1: #1c5cab;
+  --map-seq-2: #2a78d6;
+  --map-seq-3: #5598e7;
+  --map-seq-4: #86b6ef;
+  --map-seq-5: #cde2fb;
+
+  --map-div-1: #5598e7;
+  --map-div-2: #1c5cab;
+  --map-div-3: #4d4c48;
+  --map-div-4: #9c390c;
+  --map-div-5: #da7550;
+
+  --map-st-below:  #5598e7;
+  --map-st-within: #62615c;
+  --map-st-above:  #da7550;
+  --map-tr-down:   #5598e7;
+  --map-tr-flat:   #62615c;
+  --map-tr-up:     #da7550;
+
+  --map-cat-1: #3987e5;
+  --map-cat-2: #d95926;
+  --map-cat-3: #199e70;
+  --map-cat-other: #62615c;
+
+  --map-line: #1a1a19;
+  --map-none: #a9a8a2;
+  --map-focus: #f1f9fb;
+}

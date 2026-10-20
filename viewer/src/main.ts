@@ -1,6 +1,7 @@
 import { mount } from 'svelte'
 import '@marinebon/ui/styles.css'
 import './app.css'
+import '../../brand/themes/dataviz.css'
 import { initTheme } from '@marinebon/ui'
 import { applyBrand, parseBrand } from './lib/brand/brand.ts'
 import App from './App.svelte'

@@ -4,7 +4,7 @@
   import { Icon } from '../../src/icons/index.ts'
   import { loadCatalog, loadLayerTitles, resolveDataBase, collTitle } from './lib/data.ts'
   import type { Catalog, Indicator } from './lib/data.ts'
-  import { matrixHref, parseHash, placeHref, serializeHash } from './lib/hash.ts'
+  import { DEFAULT_STATE, mapHref, matrixHref, parseHash, placeHref, serializeHash } from './lib/hash.ts'
   import type { ViewState } from './lib/hash.ts'
   import { cellModel, groupColumns, groupRows, indexCoverage, matrixStats, pickRow } from './lib/matrix.ts'
   import { producerCredits } from './lib/delivery.ts'
@@ -16,6 +16,7 @@
   import Matrix from './lib/Matrix.svelte'
   import MatrixLegend from './lib/MatrixLegend.svelte'
   import Drawer from './lib/Drawer.svelte'
+  import ViewNav from './lib/ViewNav.svelte'
   import { placeCoverage } from './lib/place.ts'
   import { SOURCE_HREF } from './lib/credits.ts'
 
@@ -30,8 +31,19 @@
 
   // the Place view is its own chunk: the Matrix never pays for the charts, the CSV or the Parquet writer
   let PlaceView = $state.raw<typeof import('./lib/PlaceView.svelte').default | null>(null)
+  // the Map view is its own chunk too (MapLibre)
+  let MapView = $state.raw<typeof import('./lib/map/MapView.svelte').default | null>(null)
   // the Matrix state the reader left to open a place, so "Back to the matrix" can restore it; null on a cold permalink
   let cameFrom = $state.raw<ViewState | null>(null)
+  // the last Matrix and Map states, so the view switch returns to each as it was left
+  let lastMatrix = $state.raw<ViewState | null>(null)
+  let lastMap = $state.raw<ViewState | null>(null)
+  $effect(() => {
+    if (view.view === 'matrix') lastMatrix = view
+    else if (view.view === 'map') lastMap = view
+  })
+  const navMatrix = $derived('#' + serializeHash(lastMatrix ?? { ...DEFAULT_STATE, vocab: view.vocab, depth: view.depth }))
+  const navMap = $derived(lastMap ? '#' + serializeHash(lastMap) : mapHref(view, view.view === 'place' ? null : view.cell?.indicator ?? null))
   // when the Place view was entered (0 on a cold page), and how long its lead cards took
   let placeT0 = $state(0)
   let placeMs = $state<number | null>(null)
@@ -82,9 +94,10 @@
 
   // ---- the page title: "<view> · Ocean Metrics Indicators" (or "· MBON") ----
   const placeName = $derived(catalog && view.view === 'place' ? placeCoverage(catalog.coverage, view.place ?? '', view.coll).place?.name ?? view.place : null)
-  $effect(() => { document.title = pageTitle(brand, view.view === 'place' ? (placeName ?? 'Place') : 'Matrix') })
+  $effect(() => { document.title = pageTitle(brand, view.view === 'place' ? (placeName ?? 'Place') : view.view === 'map' ? 'Map' : 'Matrix') })
   $effect(() => {
     if (view.view === 'place' && !PlaceView) import('./lib/PlaceView.svelte').then(m => { PlaceView = m.default })
+    if (view.view === 'map' && !MapView) import('./lib/map/MapView.svelte').then(m => { MapView = m.default })
   })
   const backHref = $derived(matrixHref(cameFrom, { vocab: view.vocab, depth: view.depth, coll: catalog && view.place ? placeCoverage(catalog.coverage, view.place, view.coll).place?.coll ?? null : null }))
   const linkToPlace = (placeId: string, coll: string) => placeHref(view, placeId, coll)
@@ -118,7 +131,7 @@
 
 <svelte:window onhashchange={onHashChange} />
 
-{#snippet lensWord()}{view.view === 'place' ? 'place' : 'matrix'}{/snippet}
+{#snippet lensWord()}{view.view}{/snippet}
 {#snippet helpItems(close: () => void)}
   <button type="button" onclick={() => { document.getElementById('legend')?.scrollIntoView({ block: 'start' }); close() }}>How to read a cell</button>
   <a href={SOURCE_HREF} target="_blank" rel="noopener">Source on GitHub</a>
@@ -135,7 +148,8 @@
 
 <main class="lens" data-state={phase} data-brand={brand}>
   <div class="wrap">
-    <h1 class="mbon-sr-only">{APP_NAME}: {view.view === 'place' ? `${placeName} (place view)` : 'places by indicators'}</h1>
+    <h1 class="mbon-sr-only">{APP_NAME}: {view.view === 'place' ? `${placeName} (place view)` : view.view === 'map' ? 'map of one indicator' : 'places by indicators'}</h1>
+    {#if catalog}<ViewNav current={view.view} matrixHref={navMatrix} mapHref={navMap} {placeName} />{/if}
     {#if phase === 'loading'}
       <p class="status" role="status">Loading the manifest and the coverage table…</p>
     {:else if phase === 'error'}
@@ -145,6 +159,12 @@
         <PlaceView {catalog} {view} titles={title} {backHref} onpatch={patch} onready={ms => (placeMs = ms)} t0={placeT0} />
       {:else}
         <p class="status" role="status">Loading the place view…</p>
+      {/if}
+    {:else if catalog && view.view === 'map'}
+      {#if MapView}
+        <MapView {catalog} {view} titles={title} onpatch={patch} />
+      {:else}
+        <p class="status" role="status">Loading the map…</p>
       {/if}
     {:else if catalog && idx}
       <Toolbar view={view} colls={collChips} onchange={patch} />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_STATE, matrixHref, parseHash, placeHref, serializeHash } from './hash.ts'
+import { DEFAULT_STATE, mapHref, matrixHref, parseHash, placeHref, serializeHash } from './hash.ts'
 import type { ViewState } from './hash.ts'
 
 describe('the hash is the view state', () => {
@@ -76,3 +76,47 @@ describe('the Place view hash', () => {
   })
 })
 
+
+describe('the Matrix edit keys (flip, remove, add)', () => {
+  it('writes axes, xp, xi and ai after the older keys, and round-trips them', () => {
+    const s: ViewState = { ...DEFAULT_STATE, colls: ['places'], axes: 'indicators', hidePlaces: ['NMS:TBNMS', 'NMS:LONMS'], hideInds: ['sdg:ER_MRN_MPA'], addInds: ['erddap:dhw_5km:CRW_DHW:mean'] }
+    expect(serializeHash(s)).toBe('colls=places&axes=t&xp=NMS:TBNMS,NMS:LONMS&xi=sdg:ER_MRN_MPA&ai=erddap:dhw_5km:CRW_DHW:mean')
+    expect(parseHash('#' + serializeHash(s))).toEqual(s)
+  })
+  it('places in rows is the default and leaves axes out; an unknown axes value is the default', () => {
+    expect(serializeHash({ ...DEFAULT_STATE, axes: 'places' })).toBe('')
+    expect(parseHash('#axes=sideways').axes).toBe('places')
+  })
+  it('the edit keys do not leak into a Place or a Map hash', () => {
+    const edits = { axes: 'indicators' as const, hidePlaces: ['a:b'], hideInds: ['c:d'], addInds: ['e:f'] }
+    expect(serializeHash({ ...DEFAULT_STATE, ...edits, view: 'place', place: 'NMS:CINMS' })).toBe('view=place&place=NMS:CINMS')
+    expect(serializeHash({ ...DEFAULT_STATE, ...edits, view: 'map', ind: 'x:y' })).toBe('view=map&ind=x:y')
+  })
+})
+
+describe('the Map view hash', () => {
+  const map: ViewState = { ...DEFAULT_STATE, view: 'map', ind: 'obis:species', coll: 'mr_eez', color: 'value', t: '2019', vocab: 'eov', depth: 'dive', method: 'names-pct' }
+  it('writes view first, then ind, coll, color, t, cls, the shared keys and method', () => {
+    expect(serializeHash(map)).toBe('view=map&ind=obis:species&coll=mr_eez&color=value&t=2019&vocab=eov&depth=dive&method=names-pct')
+    expect(serializeHash({ ...map, color: 'share', cls: 'Tropical Seas', t: null, vocab: 'onms', depth: 'swim', method: null }))
+      .toBe('view=map&ind=obis:species&coll=mr_eez&color=share&cls=Tropical%20Seas')
+  })
+  it('round-trips, and a bare view=map is a Map with nothing chosen yet', () => {
+    expect(parseHash('#' + serializeHash(map))).toEqual(map)
+    expect(parseHash('#view=map')).toEqual({ ...DEFAULT_STATE, view: 'map' })
+    expect(serializeHash({ ...DEFAULT_STATE, view: 'map' })).toBe('view=map')
+  })
+  it('an unknown color or a malformed period is dropped', () => {
+    const s = parseHash('#view=map&ind=a:b&color=rainbow&t=last')
+    expect(s.color).toBeNull()
+    expect(s.t).toBeNull()
+    expect(parseHash('#view=map&t=2024-07').t).toBe('2024-07')
+  })
+  it('the Map keys do not leak into a Matrix hash', () => {
+    expect(serializeHash({ ...DEFAULT_STATE, color: 'status', t: '2020', cls: 'x', ind: 'a:b', coll: 'places' })).toBe('')
+  })
+  it('mapHref carries the vocabulary, the detail level and the method', () => {
+    expect(mapHref({ vocab: 'eov', depth: 'swim', method: null }, 'erddap:dhw_5km:CRW_SST:mean', 'places', 'status'))
+      .toBe('#view=map&ind=erddap:dhw_5km:CRW_SST:mean&coll=places&color=status&vocab=eov')
+  })
+})

@@ -1,16 +1,26 @@
-// the URL hash is the view's state, so every view is a permalink. keys: view (matrix | place; the matrix is the
-// default and leaves it out), colls (comma list of collections), q (place search), vocab, leads, depth, cell (an open
-// drawer: place_id|indicator), and for the Place view place (a place_id), coll (its collection, only to tell apart a
-// place_id that lives in two), method (iea-sd | names-pct | values: overrides every continuous card's status
-// method) and ind (an indicator id to open and scroll to). defaults are left out. `?brand=` and `?theme=` are query
-// switches, never hash keys. an old Matrix permalink has none of the new keys and parses to the same state as before.
+// the URL hash is the view's state, so every view is a permalink. keys: view (matrix | place | map; the matrix is the
+// default and leaves it out), and per view:
+// - Matrix: colls (comma list of collections), q (place search), vocab, leads, depth, cell (an open drawer:
+//   place_id|indicator), axes=t (indicators in rows, places in columns), xp and xi (places and indicators removed from
+//   the display), ai (indicators added beyond the leads).
+// - Place: place (a place_id), coll (its collection, only to tell apart a place_id that lives in two), method
+//   (iea-sd | names-pct | values: overrides every continuous card's status method), ind (an indicator to scroll to).
+// - Map: ind (the indicator), coll (the collection), color (value | departure | status | trend | record | class |
+//   share), t (the period shown: "2024", "2024-07"; none = the latest), cls (the class of `share`), method.
+// vocab and depth are shared. defaults are left out. `?brand=` and `?theme=` are query switches, never hash keys. an
+// old Matrix or Place permalink has none of the new keys and parses to the same state as before.
 import type { VocabId } from './data.ts'
 import type { MethodId } from '../../../src/status/index.ts'
 
 export type Depth = 'skim' | 'swim' | 'dive'
 export const DEPTHS: Depth[] = ['skim', 'swim', 'dive']
-export type ViewKind = 'matrix' | 'place'
+export type ViewKind = 'matrix' | 'place' | 'map'
 export const METHOD_IDS: MethodId[] = ['iea-sd', 'names-pct', 'values']
+/** what the Matrix's rows are: places (the default) or indicators */
+export type Axes = 'places' | 'indicators'
+/** what the Map colours each place by */
+export type MapColor = 'value' | 'departure' | 'status' | 'trend' | 'record' | 'class' | 'share'
+export const MAP_COLORS: MapColor[] = ['value', 'departure', 'status', 'trend', 'record', 'class', 'share']
 
 export interface ViewState {
   view: ViewKind
@@ -24,11 +34,19 @@ export interface ViewState {
   coll: string | null
   method: MethodId | null
   ind: string | null
+  axes: Axes
+  hidePlaces: string[]
+  hideInds: string[]
+  addInds: string[]
+  color: MapColor | null
+  t: string | null
+  cls: string | null
 }
 
 export const DEFAULT_STATE: ViewState = {
   view: 'matrix', colls: [], q: '', vocab: 'onms', leads: true, depth: 'swim', cell: null,
   place: null, coll: null, method: null, ind: null,
+  axes: 'places', hidePlaces: [], hideInds: [], addInds: [], color: null, t: null, cls: null,
 }
 
 // keep the readable characters of ids (NMS:FKNMS, erddap:dhw_5km:CRW_SST:mean, a|b) out of percent-encoding
@@ -48,9 +66,12 @@ export function parseHash(hash: string): ViewState {
   const method = kv.get('method')
   const sep = cell ? cell.indexOf('|') : -1
   const place = kv.get('place') || null
+  const color = kv.get('color')
+  const list = (k: string) => (kv.get(k) ?? '').split(',').filter(Boolean)
+  const t = kv.get('t') ?? ''
   return {
-    // a Place view without a place is the matrix
-    view: kv.get('view') === 'place' && place ? 'place' : 'matrix',
+    // a Place view without a place is the matrix; a Map view picks its indicator when it has none
+    view: kv.get('view') === 'place' && place ? 'place' : kv.get('view') === 'map' ? 'map' : 'matrix',
     colls: (kv.get('colls') ?? '').split(',').filter(Boolean),
     q: kv.get('q') ?? '',
     vocab: vocab === 'names' || vocab === 'eov' || vocab === 'onms' ? vocab : DEFAULT_STATE.vocab,
@@ -61,10 +82,17 @@ export function parseHash(hash: string): ViewState {
     coll: kv.get('coll') || null,
     method: METHOD_IDS.includes(method as MethodId) ? (method as MethodId) : null,
     ind: kv.get('ind') || null,
+    axes: kv.get('axes') === 't' ? 'indicators' : 'places',
+    hidePlaces: list('xp'),
+    hideInds: list('xi'),
+    addInds: list('ai'),
+    color: MAP_COLORS.includes(color as MapColor) ? (color as MapColor) : null,
+    t: /^\d{4}(-\d{2}(-\d{2})?)?$/.test(t) ? t : null,
+    cls: kv.get('cls') || null,
   }
 }
 
-/** the hash of a state; the Matrix and the Place view each write only their own keys */
+/** the hash of a state; each view writes only its own keys */
 export function serializeHash(s: ViewState): string {
   const parts: string[] = []
   const shared = () => {
@@ -79,13 +107,33 @@ export function serializeHash(s: ViewState): string {
     if (s.ind) parts.push('ind=' + enc(s.ind))
     return parts.join('&')
   }
+  if (s.view === 'map') {
+    parts.push('view=map')
+    if (s.ind) parts.push('ind=' + enc(s.ind))
+    if (s.coll) parts.push('coll=' + enc(s.coll))
+    if (s.color) parts.push('color=' + s.color)
+    if (s.t) parts.push('t=' + s.t)
+    if (s.cls) parts.push('cls=' + enc(s.cls))
+    shared()
+    if (s.method) parts.push('method=' + s.method)
+    return parts.join('&')
+  }
   if (s.colls.length) parts.push('colls=' + s.colls.map(enc).join(','))
   if (s.q) parts.push('q=' + enc(s.q))
   if (s.vocab !== DEFAULT_STATE.vocab) parts.push('vocab=' + s.vocab)
   if (!s.leads) parts.push('leads=0')
   if (s.depth !== DEFAULT_STATE.depth) parts.push('depth=' + s.depth)
   if (s.cell) parts.push('cell=' + enc(s.cell.place) + '|' + enc(s.cell.indicator))
+  if (s.axes === 'indicators') parts.push('axes=t')
+  if (s.hidePlaces.length) parts.push('xp=' + s.hidePlaces.map(enc).join(','))
+  if (s.hideInds.length) parts.push('xi=' + s.hideInds.map(enc).join(','))
+  if (s.addInds.length) parts.push('ai=' + s.addInds.map(enc).join(','))
   return parts.join('&')
+}
+
+/** the href of the Map view of an indicator (with `#`), carrying the shared keys of the state it is opened from */
+export function mapHref(from: Pick<ViewState, 'vocab' | 'depth' | 'method'>, ind: string | null, coll?: string | null, color?: MapColor | null): string {
+  return '#' + serializeHash({ ...DEFAULT_STATE, view: 'map', ind, coll: coll ?? null, color: color ?? null, vocab: from.vocab, depth: from.depth, method: from.method })
 }
 
 /** the href of a place's view (with `#`), carrying the shared keys of the state it is opened from */
