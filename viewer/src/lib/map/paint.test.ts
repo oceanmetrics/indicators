@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { TRANSPARENT, classedIds, fillColorExpr, lineColorExpr, lineWidthExpr } from './paint.ts'
+import { TRANSPARENT, classedIds, fillColorExpr, lineColorExpr, lineWidthExpr, haloWidthExpr } from './paint.ts'
 
 const classOf = new Map([['NMS:B', 1], ['NMS:A', 0], ['NMS:C', 1]])
 
@@ -26,5 +26,12 @@ describe('the vector paint', () => {
     expect(ids).toEqual(['NMS:A', 'NMS:B', 'NMS:C'])
     expect(lineWidthExpr(ids)).toEqual(['case', ['in', ['get', 'place_id'], ['literal', ids]], 2.5, 1.2])
     expect(lineWidthExpr([])).toBe(1.2)
+  })
+})
+
+describe('the halo under classed outlines', () => {
+  it('a darker ring under each classed place only', () => {
+    expect(haloWidthExpr(['NMS:A', 'NMS:B'])).toEqual(['case', ['in', ['get', 'place_id'], ['literal', ['NMS:A', 'NMS:B']]], 4.5, 0])
+    expect(haloWidthExpr([])).toBe(0)
   })
 })

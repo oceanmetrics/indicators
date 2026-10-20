@@ -9,7 +9,7 @@
   import { Protocol } from 'pmtiles'
   import type { GazLayer } from './gazetteer.ts'
   import { ESRI_TILES } from './credit.ts'
-  import { classedIds, fillColorExpr, lineColorExpr, lineWidthExpr } from './paint.ts'
+  import { classedIds, fillColorExpr, lineColorExpr, lineWidthExpr, haloWidthExpr } from './paint.ts'
   import type { Expr } from './paint.ts'
   import { infoUrl, mrgidOf, wmsTileUrl } from './wms.ts'
   import type { WmsEntry } from './wms.ts'
@@ -143,6 +143,7 @@
         m.addSource('places', { type: 'vector', url: `pmtiles://${layer.pmtiles}` })
         const sl = layer.source_layer
         m.addLayer({ id: 'fill', type: 'fill', source: 'places', 'source-layer': sl, paint: { 'fill-color': fillColorExpr(classOf, colors) as never, 'fill-opacity': 0.85 } })
+        m.addLayer({ id: 'halo', type: 'line', source: 'places', 'source-layer': sl, paint: { 'line-color': none, 'line-width': haloWidthExpr(ids) as never } })
         m.addLayer({ id: 'line', type: 'line', source: 'places', 'source-layer': sl, paint: { 'line-color': lineColorExpr(classOf, colors, none) as never, 'line-width': lineWidthExpr(ids) as never } })
         m.addLayer({ id: 'focus', type: 'line', source: 'places', 'source-layer': sl, filter: ['==', ['get', 'place_id'], ''], paint: { 'line-color': focus, 'line-width': 3 } })
       } else if (layer.raster) {
@@ -164,6 +165,8 @@
       m.setPaintProperty('fill', 'fill-color', fillColorExpr(classOf, colors) as never)
       m.setPaintProperty('line', 'line-color', lineColorExpr(classOf, colors, none) as never)
       m.setPaintProperty('line', 'line-width', lineWidthExpr(ids) as never)
+      m.setPaintProperty('halo', 'line-color', none)
+      m.setPaintProperty('halo', 'line-width', haloWidthExpr(ids) as never)
       m.setPaintProperty('focus', 'line-color', focus)
       m.setFilter('focus', ['==', ['get', 'place_id'], selected ?? ''])
     } else if (layer.raster) {

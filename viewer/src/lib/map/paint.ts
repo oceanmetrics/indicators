@@ -35,3 +35,11 @@ export function lineColorExpr(classOf: Map<string, number>, colors: string[], no
 export function lineWidthExpr(ids: string[]): Expr {
   return ids.length ? ['case', ['in', ['get', 'place_id'], ['literal', ids]], 2.5, 1.2] : 1.2
 }
+
+/**
+ * the halo under a classed place's outline: a darker ring, so a fill close to the basemap's water (the grey of
+ * "within" or "flat" on the light canvas) still reads as a shape; unclassed places get none
+ */
+export function haloWidthExpr(ids: string[]): Expr {
+  return ids.length ? ['case', ['in', ['get', 'place_id'], ['literal', ids]], 4.5, 0] : 0
+}
