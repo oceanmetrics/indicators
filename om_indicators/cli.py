@@ -3,6 +3,7 @@
   om-ind erddap-places [--base URL] [--cache DIR] [--out catalog] [--only dataset/variable ...]
   om-ind sdg [--values PATH] [--out catalog]
   om-ind eco-indicators [--out catalog] [--ref SHA] [--cache DIR]
+  om-ind cmems-places [--out catalog] [--base URL|DIR] [--cache DIR]
   om-ind obis [--out catalog] [--release vYYYYMMDD] [--cache DIR]
   om-ind manifest [--out catalog] [--sdg-values PATH] [--version YYYY.MM.DD]
   om-ind validate [catalog]
@@ -87,6 +88,22 @@ def _add_eco_indicators(sub: argparse._SubParsersAction) -> None:
   p.set_defaults(func=func)
 
 
+# cmems-places ----
+def _add_cmems_places(sub: argparse._SubParsersAction) -> None:
+  from om_indicators.producers import cmems_place
+  p = sub.add_parser("cmems-places", help="the Copernicus Marine place producer's published output -> month and year rows "
+                     "(places a maintainer accepted from a request)")
+  p.add_argument("--out", type=Path, default=Path("catalog"))
+  p.add_argument("--base", default=cmems_place.PUBLIC_BASE, help="the producer folder (URL or directory)")
+  p.add_argument("--cache", type=Path, default=Path("cache/cmems-places"))
+
+  def func(a: argparse.Namespace) -> int:
+    from om_indicators.adapters import cmems_places
+    print_summary(cmems_places.run(a.out, base=a.base, cache=a.cache))
+    return 0
+  p.set_defaults(func=func)
+
+
 # obis ----
 def _add_obis(sub: argparse._SubParsersAction) -> None:
   p = sub.add_parser("obis", help="the obis-h3 release's exact place indicators -> year, decade and all-years rows")
@@ -164,7 +181,7 @@ def _add_validate(sub: argparse._SubParsersAction) -> None:
 
 
 COMMANDS: list[Callable[[argparse._SubParsersAction], None]] = [
-  _add_erddap_places, _add_sdg, _add_eco_indicators, _add_obis, _add_manifest, _add_validate, _add_pull]
+  _add_erddap_places, _add_sdg, _add_eco_indicators, _add_cmems_places, _add_obis, _add_manifest, _add_validate, _add_pull]
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -72,7 +72,9 @@ PRODUCERS = {
       "continuous": (
         "Monthly means of a Copernicus Marine Service product over each sanctuary polygon, extracted by "
         "noaa-onms/eco-indicators (mean of the grid cells under the polygon, with the spatial SD in x_sd). A year is the "
-        "mean of its 12 monthly means, written only when all 12 months have a value."),
+        "mean of its 12 monthly means, written only when all 12 months have a value. A place outside the sanctuaries is "
+        "computed on request by om_indicators.producers.cmems_place from the same product, by the same method (the mean "
+        "of the cells whose centres fall inside the place polygon, at the surface level)."),
     },
   },
   "obis": {
@@ -146,6 +148,11 @@ def scan_values(root: Path) -> dict[str, dict]:
     if len(units) != 1:
       raise ValueError(f"{f}: one unit per values file, found {sorted(units)}")
     e = out.setdefault(ind, {"units": set(), "grains": set(), "times": [], "classes": set(), "colls": [], "prov": prov})
+    # an indicator can have values files from two producers (Copernicus Marine: the sanctuaries from eco-indicators, any
+    # other place from the place producer): the manifest states the dataset of the family's own producer, whatever the
+    # order of the collections
+    if prov and not _from_family_producer(ind, e["prov"]) and _from_family_producer(ind, prov):
+      e["prov"] = prov
     e["units"] |= units
     e["grains"] |= set(table.column("time_grain").to_pylist())
     e["times"] += times
@@ -158,6 +165,12 @@ def scan_values(root: Path) -> dict[str, dict]:
       "time_range": [min(times).isoformat(), max(times).isoformat()] if times else [None, None],
     })
   return out
+
+
+def _from_family_producer(ind: str, prov: dict | None) -> bool:
+  """whether a values file's provenance names the producer the manifest lists for the indicator's family"""
+  name = PRODUCERS.get(producer_family(ind), {}).get("name")
+  return bool(prov and name) and (prov.get("producer") or {}).get("name") == name
 
 
 # producer metadata ----

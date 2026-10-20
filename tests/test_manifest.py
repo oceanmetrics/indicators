@@ -353,3 +353,25 @@ def test_repo_place_sets_political_is_eezs_and_fao_high_seas_and_ecological_is_n
 
 def test_place_sets_file_absent_is_no_sets(tmp_path):
   assert m.load_place_sets(tmp_path) == []
+
+
+def test_an_indicator_with_two_producers_files_states_the_family_producers_dataset_in_either_order(tmp_path):
+  # the sanctuaries (coll=places) come from eco-indicators, a requested EEZ (coll=mr_eez) from the place producer. the
+  # collections sort mr_eez first, so the first file read is the place producer's: the manifest must still state the
+  # dataset of noaa-onms/eco-indicators, and list both collections once each with their own places and rows.
+  mine = {**DATASET, "via": "https://data.marine.copernicus.eu/product/GLOBAL_MULTIYEAR_PHY_001_030/description",
+          "providers": [DATASET["providers"][0], {"name": "oceanmetrics/indicators", "roles": ["processor"]}]}
+  mine_prov = {**PROV, "producer": {"name": "om-indicators/producers/cmems_place", "url": "https://example.org/indicators"},
+               "dataset": mine}
+  eco_prov = {**PROV, "producer": {"name": "noaa-onms/eco-indicators", "url": "https://example.org/eco-indicators"},
+              "dataset": DATASET}
+  for coll, place, prov in (("places", "NMS:A", eco_prov), ("mr_eez", "MRGID:5670", mine_prov)):
+    rows = [{"place_id": place, "coll": coll, "indicator": CMEMS, "time_grain": "year", "time": dt.date(y, 1, 1), "class": None,
+             "value": 1.0, "n": 12.0, "unit": "degrees_C"} for y in (2019, 2020)]
+    contract.write_values(rows, tmp_path, prov)
+  e = entry(id=CMEMS, variable="sst", series="cmems-physics", preferred=True)
+  man, _ = m.build_manifest(m.scan_values(tmp_path), {CMEMS: e}, VOCABS, no_lookup, "2026.10.20", "2026-10-20T00:00:00Z")
+  (i,) = man["indicators"]
+  assert i["dataset"] == DATASET and i["producer"]["name"] == "noaa-onms/eco-indicators"
+  assert [(c["coll"], c["places"], c["rows"]) for c in i["collections"]] == [("mr_eez", 1, 2), ("places", 1, 2)]
+  assert "computed on request by om_indicators.producers.cmems_place" in i["method"]["summary"]
