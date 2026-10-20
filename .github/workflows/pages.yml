@@ -1,0 +1,53 @@
+# build the viewer and publish it to GitHub Pages at https://oceanmetrics.io/indicators/ (the org site's custom
+# domain serves project pages under it). the viewer reads the published catalog from the bucket at run time.
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['viewer/**', 'src/**', 'brand/**', 'assets/goos-eov/**', 'package.json', 'package-lock.json',
+            'vitest.config.ts', 'tsconfig.json', 'scripts/size-budget.mjs', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      # tests that read catalog/ or the network skip themselves; the catalog is not in git
+      - run: npm test
+        env:
+          OM_OFFLINE: '1'
+      - run: npm run check
+      - run: npm run build
+        env:
+          VITE_BASE: /indicators/
+      - run: node scripts/size-budget.mjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: viewer/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

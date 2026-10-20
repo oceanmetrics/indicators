@@ -4,6 +4,7 @@
   om-ind sdg [--values PATH] [--out catalog]
   om-ind manifest [--out catalog] [--sdg-values PATH] [--version YYYY.MM.DD]
   om-ind validate [catalog]
+  om-ind pull --family sdg [--base URL] [--out catalog]
 
 to add a subcommand, write `_add_<name>(sub)` that registers the parser and sets `func` (taking the parsed args and
 returning an exit code), and list it in COMMANDS.
@@ -86,6 +87,23 @@ def _add_manifest(sub: argparse._SubParsersAction) -> None:
   p.set_defaults(func=func)
 
 
+# pull ----
+def _add_pull(sub: argparse._SubParsersAction) -> None:
+  from om_indicators import publish
+  p = sub.add_parser("pull", help="copy published values files of producer families this run does not rebuild")
+  p.add_argument("--family", nargs="+", required=True, help="indicator id families, e.g. sdg")
+  p.add_argument("--base", default=publish.PUBLIC_BASE, help="the published catalog (URL or directory)")
+  p.add_argument("--out", type=Path, default=Path("catalog"))
+
+  def func(a: argparse.Namespace) -> int:
+    got = publish.pull(a.base, a.out, a.family)
+    for f in got:
+      print(f"pulled {f}")
+    print(f"{len(got)} values files from {a.base}")
+    return 0
+  p.set_defaults(func=func)
+
+
 # validate ----
 def _add_validate(sub: argparse._SubParsersAction) -> None:
   p = sub.add_parser("validate", help="every values file under a catalog against the contract")
@@ -108,7 +126,7 @@ def _add_validate(sub: argparse._SubParsersAction) -> None:
   p.set_defaults(func=func)
 
 
-COMMANDS: list[Callable[[argparse._SubParsersAction], None]] = [_add_erddap_places, _add_sdg, _add_manifest, _add_validate]
+COMMANDS: list[Callable[[argparse._SubParsersAction], None]] = [_add_erddap_places, _add_sdg, _add_manifest, _add_validate, _add_pull]
 
 
 def build_parser() -> argparse.ArgumentParser:

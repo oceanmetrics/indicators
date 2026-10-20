@@ -60,3 +60,17 @@ def test_a_series_without_values_writes_no_file(tmp_path):
   summary = sdg.run(f, tmp_path / "out")
   assert summary["empty"] == ["sdg:ER_MRN_MPA"]
   assert not c.values_path(tmp_path / "out", "sdg:ER_MRN_MPA", "mr_eez").exists()
+
+
+def test_provenance_carries_the_dataset(tmp_path):
+  """contract 1.1: the series metadata travels with the values, so the manifest needs no values.json."""
+  from om_indicators import contract
+  from om_indicators.adapters import sdg
+  fixture = Path(__file__).parent / "fixtures" / "sdg" / "values.json"
+  sdg.run(fixture, tmp_path)
+  _, prov = contract.read_values(contract.values_path(tmp_path, "sdg:ER_MRN_MPA", "mr_eez"))
+  ds = prov["dataset"]
+  assert ds["id"] == "ER_MRN_MPA"
+  assert ds["title"] == "Average proportion of Marine KBAs covered by protected areas (%) (SDG 14.5.1)"
+  assert ds["providers"][1]["name"] == "UN Statistics Division, SDG Global Database"
+  assert ds["license"] == "other" and prov["contract"] == contract.CONTRACT_VERSION

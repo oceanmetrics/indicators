@@ -30,6 +30,20 @@ METHOD = ("latest year with a numeric value per M49 area from the UN SDG Global 
           "value (un_ter1), else its sovereign's (un_sov1); joint regimes and overlapping claims get none")
 
 
+def dataset_meta(code: str, series: dict, eez_attribution: str | None = None) -> dict:
+  """the UN series as provenance.dataset (contract 1.1): what the manifest shows and cites, from values.json alone."""
+  source = series.get("source") or "UN SDG Global Database"
+  citation = source if not eez_attribution else f"{source} EEZ boundaries: {eez_attribution}"
+  return {
+    "id": code, "title": f"{series['description']} (SDG {series['indicator']})", "via": series.get("link"),
+    "providers": [
+      {"name": source.split(". ")[0].strip(), "roles": ["producer"]},
+      {"name": "UN Statistics Division, SDG Global Database", "roles": ["host"], "url": "https://unstats.un.org/sdgs/dataportal"},
+    ],
+    "license": "other", "citation": citation, "doi": None,
+  }
+
+
 def series_rows(code: str, series: dict, eez: dict[str, dict]) -> list[dict]:
   """contract rows of one series over every EEZ that has a value."""
   rows = []
@@ -58,6 +72,7 @@ def run(values: Path, out: Path) -> dict:
             "sources": [{"href": UN_API + code, "title": series.get("description")},
                         {"href": f"values.json (oceanmetrics/places proto/eez_indicators, built {built})"}],
             "source_version": None, "method": METHOD,
+            "dataset": dataset_meta(code, series, data.get("eez_attribution")),
             "code": {"name": "om-indicators", "version": __version__, "commit": _commit(), "adapter": ADAPTER},
             "license": LICENSE, "created": contract.utc_now()}
     path = contract.write_values(rows, out, prov)

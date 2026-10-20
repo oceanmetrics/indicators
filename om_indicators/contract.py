@@ -19,7 +19,7 @@ import jsonschema
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-CONTRACT_VERSION = "1.0.0"
+CONTRACT_VERSION = "1.1.0"
 PROVENANCE_KEY = b"om:provenance"
 SCHEMA_DIR = Path(__file__).resolve().parent.parent / "schema"
 GRAINS = ("all", "decade", "year", "month", "day")

@@ -4,23 +4,56 @@
   "title": "Provenance of one contract values file",
   "description": "JSON stored in the Parquet key-value metadata of every values file under the key `om:provenance`: where the values came from, how they were derived, by which code and when.",
   "type": "object",
-  "required": ["contract", "indicator", "coll", "producer", "sources", "method", "code", "created", "license", "rows"],
+  "required": [
+    "contract",
+    "indicator",
+    "coll",
+    "producer",
+    "sources",
+    "method",
+    "code",
+    "created",
+    "license",
+    "rows"
+  ],
   "properties": {
     "contract": {
       "description": "Version of the value contract the file follows (semver; this schema is 1.x).",
       "type": "string",
       "pattern": "^1\\.\\d+\\.\\d+$"
     },
-    "indicator": { "type": "string" },
-    "coll": { "type": "string" },
+    "indicator": {
+      "type": "string"
+    },
+    "coll": {
+      "type": "string"
+    },
     "producer": {
       "description": "The producer whose published output the values come from.",
       "type": "object",
-      "required": ["name", "url"],
+      "required": [
+        "name",
+        "url"
+      ],
       "properties": {
-        "name": { "type": "string", "examples": ["erddap-places", "obisindicators", "places/proto/eez_indicators"] },
-        "url": { "type": "string", "format": "uri" },
-        "version": { "type": ["string", "null"] }
+        "name": {
+          "type": "string",
+          "examples": [
+            "erddap-places",
+            "obisindicators",
+            "places/proto/eez_indicators"
+          ]
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       },
       "additionalProperties": false
     },
@@ -30,20 +63,50 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["href"],
+        "required": [
+          "href"
+        ],
         "properties": {
-          "href": { "type": "string" },
-          "title": { "type": ["string", "null"] },
-          "updated": { "type": ["string", "null"], "description": "The input's own updated/created stamp, when it has one." },
-          "end_datetime": { "type": ["string", "null"], "description": "Last time step the input covers." },
-          "checksum": { "type": ["string", "null"], "description": "multihash or sha256 of the input, when known." }
+          "href": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The input's own updated/created stamp, when it has one."
+          },
+          "end_datetime": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Last time step the input covers."
+          },
+          "checksum": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "multihash or sha256 of the input, when known."
+          }
         },
         "additionalProperties": false
       }
     },
     "source_version": {
       "description": "One line naming the upstream snapshot or release (e.g. 'OBIS snapshot 2026-10-11', 'gazetteer/stats updated 2026-10-19T20:59:51Z').",
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "method": {
       "description": "How the rows were derived from the sources, in one or two sentences.",
@@ -52,12 +115,27 @@
     },
     "code": {
       "type": "object",
-      "required": ["name", "version", "adapter"],
+      "required": [
+        "name",
+        "version",
+        "adapter"
+      ],
       "properties": {
-        "name": { "type": "string" },
-        "version": { "type": "string" },
-        "commit": { "type": ["string", "null"] },
-        "adapter": { "type": "string" }
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "adapter": {
+          "type": "string"
+        }
       },
       "additionalProperties": false
     },
@@ -69,7 +147,74 @@
       "description": "SPDX licence of the values (the derived product), e.g. CC-BY-4.0. Upstream credit is carried in the manifest.",
       "type": "string"
     },
-    "rows": { "type": "integer", "minimum": 0 }
+    "rows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "dataset": {
+      "description": "Optional (contract 1.1): the upstream dataset as the producer states it, for producers without a STAC collection to read it from (e.g. the UN SDG series). The manifest prefers it over any lookup.",
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "providers",
+        "license"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "via": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "providers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "roles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "license": {
+          "type": "string"
+        },
+        "citation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "doi": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
   },
   "additionalProperties": false
 }

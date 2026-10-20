@@ -37,9 +37,9 @@ in the Parquet key-value metadata under `om:provenance`. Schemas: [`schema/`](sc
 [`om_indicators/contract.py`](om_indicators/contract.py).
 
 ```sql
--- every SST value for every sanctuary, straight from the bucket
+-- every SST value for every sanctuary, straight from the bucket (published daily)
 SELECT place_id, time, value FROM read_parquet(
-  'https://storage.oceanmetrics.io/indicators/values/indicator=erddap:dhw_5km:CRW_SST:mean/coll=places/data.parquet')
+  'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/values/indicator=erddap:dhw_5km:CRW_SST:mean/coll=places/data.parquet')
 WHERE time_grain = 'year' ORDER BY place_id, time;
 ```
 
@@ -85,6 +85,23 @@ npm run icons:sheet                          # contact sheet screenshots -> docs
 node brand/build-favicons.mjs                # brand/favicons/{oceanmetrics,mbon}/ incl. head.html to paste verbatim
 Rscript fixtures/ecoidx/build_iea_sd_fixtures.R ~/Github/noaa-iea/ecoidx   # the iea-sd cross-check
 ```
+
+## Publishing
+
+- **Catalog:** `.github/workflows/catalog.yml` runs daily (08:07 UTC) on the self-hosted `macmini` runner:
+  `scripts/build_catalog.sh` (erddap-places rebuilt from the published stats, the SDG series pulled from the published
+  catalog), then `scripts/publish_catalog.sh` syncs to `s3://oceanmetrics.io-public/indicators/` (values first, the
+  manifest last; `--delete` only under `indicators/values/`). Read it at
+  https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/ (`storage.oceanmetrics.io/indicators/` once
+  that host's Caddy allow-list includes the prefix). To refresh the SDG series from the places prototype:
+  `SDG_VALUES=../places/proto/eez_indicators/data/values.json scripts/build_catalog.sh && scripts/publish_catalog.sh`.
+- **Viewer:** `.github/workflows/pages.yml` tests, builds (`VITE_BASE=/indicators/`) and checks the size budget on
+  every push touching the viewer, then deploys to https://oceanmetrics.io/indicators/.
+
+## Size budget
+
+`node scripts/size-budget.mjs` after `npm run build`, in gzip: entry JS ≤ 110 kB, all JS ≤ 200 kB, CSS ≤ 15 kB.
+At the first deploy (2026-10-20) the entry was 86.5 kB and the CSS 6.7 kB. Raise a budget only with the reason here.
 
 ## Brand and icons
 

@@ -1,0 +1,48 @@
+# build the indicator catalog from what the producers publish and sync it to s3://oceanmetrics.io-public/indicators/
+#
+# runs on the self-hosted `macmini` runner (the oceanmetrics org runner that also runs erddap-places `stats` and
+# places `sync`, one job at a time): uv, node and the aws cli come from Homebrew, and the sync uses the host's AWS
+# profile (~/.aws); the repository holds no secrets. Triggers are schedule and dispatch only, never a pull request,
+# so no fork's code reaches the runner.
+name: catalog
+
+on:
+  schedule:
+    - cron: '7 8 * * *'      # 08:07 UTC daily, before the erddap-places stats run (09:17) starts the next day's work
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'sync to S3 when the catalog validates'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: catalog
+  cancel-in-progress: false
+
+jobs:
+  catalog:
+    runs-on: [self-hosted, macmini]
+    timeout-minutes: 60
+    env:
+      AWS_DEFAULT_REGION: us-east-1
+    steps:
+      - uses: actions/checkout@v4
+      - name: host tools
+        run: |
+          export PATH=/opt/homebrew/bin:$PATH
+          uv --version; node --version; aws --version
+      - run: uv sync --group dev
+      - run: npm ci
+      - name: tests (contract, adapters, manifest, status, coverage)
+        run: |
+          uv run --group dev pytest -q
+          npx vitest run src
+      - name: build the catalog (erddap-places rebuilt, SDG pulled from the published catalog)
+        run: scripts/build_catalog.sh catalog
+      - name: publish
+        if: github.event_name == 'schedule' || inputs.publish
+        run: scripts/publish_catalog.sh catalog

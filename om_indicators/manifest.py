@@ -178,7 +178,9 @@ def build_manifest(values: dict[str, dict], entries: dict[str, dict], vocabs: di
     e, v = entries[ind_id], values[ind_id]
     fam = producer_family(ind_id)
     prod = PRODUCERS[fam]
-    ds = dataset_of(ind_id)
+    # the producer's own statement of its dataset (provenance.dataset, contract 1.1) wins over any lookup
+    stated = (v.get("prov") or {}).get("dataset")
+    ds = dict(stated) if stated else dataset_of(ind_id)
     kind = e.get("kind", "continuous")
     variables = ds.pop("_variables", {})
     out = {
@@ -207,7 +209,8 @@ def build_manifest(values: dict[str, dict], entries: dict[str, dict], vocabs: di
       what = variables.get(ind_id.split(":")[2], {}).get("description") if fam == "erddap" else None
       out["description"] = (f"{(what or e['title']).capitalize()} from {ds['title']}, " +
                             ("area-weighted over the place, as monthly and yearly means." if fam == "erddap" else "joined to the place."))
-    out["citation"] = citation(out, version, f"EEZ boundaries: {eez_attribution}" if fam == "sdg" and eez_attribution else None)
+    eez_note = f"EEZ boundaries: {eez_attribution}" if fam == "sdg" and eez_attribution and not stated else None
+    out["citation"] = citation(out, version, eez_note)
     inds.append({k: x for k, x in out.items() if x is not None})
   # series titles follow the lead
   titles = {i["series"]: i["series_title"] for i in inds if i.get("series_title")}
@@ -285,7 +288,7 @@ def run(out: Path = Path("catalog"), sdg_values: Path | None = None, cache: Path
       return erddap_dataset(rest.split(":")[0], fetch)
     if fam == "sdg":
       if sdg is None:
-        raise ValueError(f"{ind_id}: pass --sdg-values (the prototype's values.json) for the series metadata")
+        raise ValueError(f"{ind_id}: its values carry no provenance.dataset; pass --sdg-values (the prototype's values.json)")
       return sdg_dataset(rest, sdg)
     raise ValueError(f"{ind_id}: no metadata source for producer family {fam!r}")
 
