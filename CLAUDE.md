@@ -59,7 +59,13 @@ indicators.json + coverage.parquet ──► viewer/ (imports src/status/, src/i
   `colls`, `q`, `vocab`, `leads`, `depth`, `cell`, `axes=p`, `empty=1`, `xp`, `xi`, `ai` (README "Matrix view").
 - **The Map view** (`viewer/src/lib/map/`): classes, legends and the table come from `classes.ts` (status and trend
   only through `src/status`); reference collections (Marine Regions `mr_*`) are drawn by Marine Regions' own WMS
-  (`wms.ts`: an SLD plus `ENV`, one request per tile) and never from geometry we host.
+  (`wms.ts`: an SLD plus `ENV`, one request per tile) and never from geometry we host. The map's `coll` is a place group
+  (`place_coll ?? coll`, `pick.ts`), read from every values file that holds its places; the group's members that are not
+  computed are drawn faint in a vector group.
+- **The pickers** (`viewer/src/lib/pick/`): one place picker and one indicator picker for every view, the rules in plain
+  `.ts` (`places.ts`, `placesTree.ts`, `indicators.ts`, `indicatorsTree.ts`; the `*Tree` files and the panels load on the
+  first open, so keep them out of the entry). Shared look-alike CSS lives once in `viewer/src/app.css` as `om-*` classes
+  (gzip is per file, so a copy in every stylesheet costs): the CSS budget was met that way, not raised.
 - **Statuses are statistical, never better/worse.** No ONMS colours, no ▲ ▬ ▼; glyphs `st-above|within|below`,
   `tr-up|flat|down` differ in shape, and captions say "relative to its own record".
 - **The contract** (`schema/values.schema.json`, `om_indicators/contract.py`): every adapter writes through

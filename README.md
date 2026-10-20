@@ -57,7 +57,7 @@ WHERE time_grain = 'year' ORDER BY place_id, time;
 | `fixtures/ecoidx/` | R | runs ecoidx `PlotTimeSeries()` on the CCIEA example data: the cross-check for `iea-sd` |
 | `brand/` | Python, Node | icon pipeline (MDI by export name + generated glyphs + traced GOOS EOV glyphs), themes, favicons |
 | `assets/goos-eov/` | PNG, WebP | the GOOS EOV badges, unmodified (see its `SOURCE.md`) |
-| `viewer/` | Svelte 5 + Vite | the Matrix view on `indicators.json` + `coverage.parquet`, with `@marinebon/ui`; places as rows with `#axes=p`, remove places or indicators with the x on a header (`xp=`, `xi=`), add more indicators from the Add or restore menu (`ai=`) |
+| `viewer/` | Svelte 5 + Vite | the Matrix view on `indicators.json` + `coverage.parquet`, with `@marinebon/ui`; two pickers (places, indicators) choose what the Matrix, Map, Place and Report views show; places as rows with `#axes=p`, remove places or indicators with the x on a header (`xp=`, `xi=`) and tick them back in a picker |
 | `catalog/` | (git-ignored) | build output, published to `s3://oceanmetrics.io-public/indicators/` |
 
 ## Commands
@@ -98,9 +98,29 @@ under `cache/gazetteer/`). A place in two values collections (Pitcairn's EEZ: `p
 cell reads the values file of its own coverage row. Each group says how many of its places are computed of the
 gazetteer's total and links to it. Opens on the sanctuaries; the other groups are chips. An indicator with no value for
 any place on display is hidden.
-Hash keys: `colls` (comma list of groups; none = the sanctuaries, every group while searching), `q`, `vocab`, `leads`,
-`depth`, `cell` (an open drawer: `place|indicator`), `axes=p` (places as rows; the old `axes=t` reads as the default),
-`empty=1` (show the indicators without values), `xp` and `xi` (removed places and indicators), `ai` (added indicators).
+Hash keys: `colls` (comma list of groups; none = the sanctuaries, every group while searching), `q` (a place search kept from old
+links; the toolbar shows it as a chip), `vocab`, `leads`, `depth`, `cell` (an open drawer: `place|indicator`), `axes=p` (places as rows;
+the old `axes=t` reads as the default), `empty=1` (show the indicators without values), `xp` and `xi` (removed places and indicators),
+`ai` (added indicators).
+
+**The two pickers** (`viewer/src/lib/pick/`, one component each for every view; their rules are in `places.ts` / `placesTree.ts` and
+`indicators.ts` / `indicatorsTree.ts`, tested; the panels load on the first open). Each is a button that says what is selected
+("Sanctuaries and Tortugas reserve · 19 places", "11 indicators · ONMS sections · leads only") and opens a popover (a full-width sheet
+at 600 px and below; Esc closes it and focus returns to the button, Tab stays inside, arrow keys move through the list).
+- **Places** (`multi` in the Matrix and the Report builder, `group` in the Map, `place` in the Place view): a search over the computed
+  places (name and id), every group with computed places as a tick tree (groups, then places) with "n of N" computed of the gazetteer's
+  total and its "in the gazetteer" link, and **Not computed yet**: every polygon collection of the gazetteer with no computed place,
+  each with its gazetteer link and a request link (the indicator-request issue form with `collection` only; a maintainer reviews).
+  In the Matrix a group ticked on shows it (`colls`), a place unticked is removed (`xp`).
+- **Indicators** (`multi` in the Matrix, `single` in the Map and the Place view): a search, the vocabulary switch (ONMS, NaMES, GOOS EOVs),
+  the leads and "show indicators without values here" switches, and the tree category -> series -> indicator with how many of the places
+  on display have a value. In the Matrix a tick is `xi` (removed) or `ai` (added beyond the leads). The Report builder keeps its own
+  indicator tree, which writes rules rather than ids.
+
+**Context carried between views:** Matrix -> Map opens the group of the last opened cell and that cell's indicator (else the first
+group on display and its first lead with values); Map -> Matrix opens the Map's group with the drawer on the cell of the selected
+place; Place -> Map opens the place's group and the opened indicator with the place selected (`hash.ts`: `matrixToMapHref`,
+`mapToMatrixHref`, `placeToMapHref`).
 A cell is a value with its status and trend glyphs, **not computed yet** (open it: compute it now in erddap-places, or
 ask for it by a prefilled issue), **no data here** (the indicator has a values file for this place's collection, with
 nothing for the place), or a dash (**not offered** for this kind of place).
@@ -109,7 +129,7 @@ nothing for the place), or a dash (**not offered** for this kind of place).
 erddap-places indicator **Compute it now in erddap-places** (`<base>erddap-places/#place=…&dataset=…&variable=…`) and **Ask to add
 it to the catalog** (the repo's `indicator-request.yml` issue form, pre-filled: `place`, `collection`, `indicator`); for a cell
 the indicator is not offered for, the place groups it is computed for and the request link; for no data, the reason and the
-dataset's time range. **Place view** (`#view=place&place=<id>&ind=<indicator>`): the indicator opened comes first under "You
+dataset's time range. **Place view** (`#view=place&place=<id>&ind=<indicator>`): the place picker (`place` mode) switches place, keeping the indicator when the new place has it, and the indicator picker (`single`) jumps to a card; the indicator opened comes first under "You
 opened" (its card, or a "not computed yet" card with the same ways forward), the others follow, and a breadcrumb
 `Matrix › <place> › <indicator>` leads back to the Matrix with the drawer open on that cell (`cell=<place>|<indicator>`).
 
@@ -143,14 +163,24 @@ back to the Place view; `?theme=` and `?brand=` work as in the app, and `main.em
 
 ## Map view
 
-`#view=map` colours one indicator over one collection of places: by its value (five quantile classes), its departure
-from the place's own mean (in SD), its status or trend (iea-sd or names-pct, computed by `src/status` as of the period
-shown), the length of its record, or, for a categorical indicator, its largest class or the share of one class. A slider
-walks the periods. Hash keys: `ind`, `coll`, `color` (`value|departure|status|trend|record|class|share`), `t` (`2024` or
-`2024-07`; none = each place's latest), `cls` (the class `share` maps) and `method`. Vector collections (`places`) are
-drawn from the gazetteer's PMTiles; reference collections (`mr_eez`) are drawn by Marine Regions' own WMS, one request per
-tile, coloured by an SLD and the request's `ENV`, so no Marine Regions geometry is hosted by us. The legend and "The map
-as a table" carry every class in words and glyphs, so nothing depends on colour.
+`#view=map` colours one indicator over one **place group** (a gazetteer collection: a place's home collection, `place_coll`): by its
+value (five quantile classes), its departure from the place's own mean (in SD), its status or trend (iea-sd or names-pct, computed by
+`src/status` as of the period shown), the length of its record, or, for a categorical indicator, its largest class or the share of
+one class. A slider walks the periods. Hash keys: `ind`, `coll` (the group; an old link's values collection still resolves to the
+group holding most of its places), `place` (the place selected), `color` (`value|departure|status|trend|record|class|share`), `t`
+(`2024` or `2024-07`; none = each place's latest), `cls` (the class `share` maps), `grain` and `method`.
+- **Group picker:** every group with computed places, those with values for the indicator shown first (with how many), the others
+  marked "no values for <indicator>". Choosing one of those switches to that group's own lead (the sea surface temperature when it has
+  it) and says so above the map ("SST is not computed for National Estuarine Research Reserves; showing Precipitation (NASA IMERG).").
+  The indicator picker lists, per indicator, the groups that have values. The OBIS indicators are one choice (OBIS biodiversity) with a
+  metric and an EOV switch.
+- **Geometry** is the group's gazetteer collection: vector collections (`places`, `noaa_nerrs`) from the gazetteer's PMTiles, reference
+  collections (`mr_eez`) by Marine Regions' own WMS (one request per tile, an SLD plus `ENV`; no Marine Regions geometry is hosted by
+  us). Values are read from every values file of the indicator that holds places of the group (the EEZ group: `mr_eez`'s file plus
+  Pitcairn's in `places`).
+- **Members that are not computed** are drawn as faint outlines (`--map-member`) in a vector group (the other 29 reserves beside Wells);
+  clicking one, or opening a link to it, frames it and offers the same ways forward as an empty Matrix cell. A reference group draws
+  them in the "no data" class. The legend and "The map as a table" carry every class in words and glyphs, so nothing depends on colour.
 
 ## Embeds
 
@@ -169,7 +199,7 @@ as a table" carry every class in words and glyphs, so nothing depends on colour.
 
 Anyone with a GitHub account can ask for an indicator the catalog does not hold yet for a place:
 
-1. **In the viewer:** a cell that reads "not computed yet" is a dataset erddap-places can compute for that place.
+1. **In the viewer:** a place picker row under "Not computed yet" asks for a whole collection (the form with the collection only). A cell that reads "not computed yet" is a dataset erddap-places can compute for that place.
    Opening it offers "Compute it now in erddap-places" (in the browser, nothing saved) and "Ask to add it to the
    catalog", which opens the issue form `.github/ISSUE_TEMPLATE/indicator-request.yml` filled in with the place, its
    collection and the indicator. The requester adds a purpose and submits.
@@ -198,7 +228,7 @@ People" (PPG-26-197).
 `node scripts/size-budget.mjs` after `npm run build`, in gzip: entry JS ≤ 110 kB, all JS except the map chunk ≤ 200 kB,
 the map chunk (MapLibre, pmtiles and the map components) ≤ 330 kB, CSS except the map's ≤ 15 kB, the map's CSS ≤ 15 kB.
 At the first deploy (2026-10-20) the entry was 86.5 kB and the CSS 6.7 kB. The map chunk has its own budget because
-MapLibre is about 230 kB gzip and is loaded only when the Map view is opened. Raise a budget only with the reason here.
+MapLibre is about 230 kB gzip and is loaded only when the Map view is opened. With the two pickers (2026-10-20) the entry is 107.0 kB and the CSS 14.98 kB: the picker panels and their rules load on the first open, and rules that several components repeated live once in `viewer/src/app.css` as `om-*` classes (gzip is per file, so each copy cost bytes). Nothing was raised. Raise a budget only with the reason here.
 
 ## Brand and icons
 

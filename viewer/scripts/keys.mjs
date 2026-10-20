@@ -148,6 +148,81 @@ if (edit) {
   }
 }
 
+// the pickers, keys only: Tab to the button, Enter opens the panel (focus in its search box), arrows move through the tree or the
+// results, Space or Enter chooses, Esc closes and focus returns to the button
+const fresh = async hash => {
+  await page.goto('about:blank')
+  await page.goto(`${URL_BASE}?theme=light${hash}`, { waitUntil: 'networkidle0' })
+  await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
+  await page.evaluate(() => (document.activeElement instanceof HTMLElement) && document.activeElement.blur())
+}
+const openWith = async (re, what) => {
+  const t = await tabUntil(f => f.tag === 'BUTTON' && /\btrig\b/.test(f.cls) && re.test(f.label ?? ''), 300)
+  check(!!t, `${what}: Tab reaches its button${t ? ` ("${t.f.label}")` : ''}`)
+  if (!t) return null
+  await page.keyboard.press('Enter')
+  check(await page.waitForSelector('.pop[role=dialog] input[type=search]', { timeout: 10000 }).then(() => true, () => false), `${what}: Enter opens the panel`)
+  check(await page.evaluate(() => document.activeElement?.matches('.pop input[type=search]')), `${what}: focus is in the search box`)
+  return t
+}
+const closeWithEsc = async (t, what) => {
+  await page.keyboard.press('Escape')
+  check(await page.waitForSelector('.pop', { hidden: true, timeout: 5000 }).then(() => true, () => false), `${what}: Esc closes the panel`)
+  // the button's words follow the selection, so it is the same button, not the same words
+  check(/\btrig\b/.test((await focused())?.cls ?? '') && (await page.evaluate(() => !document.activeElement?.closest('.pop'))), `${what}: focus returns to its button`)
+}
+const hashChanged = (was, k) => page.waitForFunction((w, key) => location.hash !== w && location.hash.includes(key), { timeout: 5000 }, was, k).then(() => true, () => false)
+
+// Matrix, places: search "channel", arrow to the result, Enter takes it off the display (xp=)
+await fresh('')
+let was = await page.evaluate(() => location.hash)
+let t = await openWith(/places?\b/, 'places picker')
+if (t) {
+  await page.keyboard.type('channel')
+  await page.keyboard.press('ArrowDown')
+  check(await page.evaluate(() => document.activeElement?.matches('.pop button.cb')), 'places picker: ArrowDown moves from the search box to the first group in the results')
+  await page.keyboard.press('ArrowDown')   // the first result under it
+  await page.keyboard.press('Enter')
+  check(await hashChanged(was, 'xp='), `places picker: Enter on a result toggles it (${await page.evaluate(() => location.hash)})`)
+  await closeWithEsc(t, 'places picker')
+}
+// Matrix, indicators: arrow to the first box in the tree, Space unticks it (xi=)
+await fresh('')
+was = await page.evaluate(() => location.hash)
+t = await openWith(/indicators?\b/, 'indicators picker')
+if (t) {
+  await page.keyboard.press('Tab')   // the first control after the search box (the vocabulary switch)
+  const box = await tabUntil(f => f.role === 'checkbox', 12)
+  check(!!box, `indicators picker: Tab reaches a tree checkbox${box ? ` ("${box.f.label}")` : ''}`)
+  await page.keyboard.press('Space')
+  check(await hashChanged(was, 'xi='), `indicators picker: Space unticks it (${await page.evaluate(() => location.hash)})`)
+  await closeWithEsc(t, 'indicators picker')
+}
+// Map, group: ArrowDown to the second group, Enter chooses it, the panel closes and focus returns to the button
+await fresh('#view=map&ind=erddap:dhw_5km:CRW_SST:mean&coll=places')
+was = await page.evaluate(() => location.hash)
+t = await openWith(/places?\b/, 'group picker')
+if (t) {
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+  check(await hashChanged(was, 'coll='), `group picker: Enter chooses a group (${await page.evaluate(() => location.hash)})`)
+  check(await page.waitForSelector('.pop', { hidden: true, timeout: 5000 }).then(() => true, () => false), 'group picker: choosing closes the panel')
+  check(/trig/.test((await focused())?.cls ?? ''), 'group picker: focus returns to its button')
+}
+// Place view, place: type "channel", ArrowDown, Enter goes to that place
+await fresh('#view=place&place=NMS:FKNMS')
+await page.waitForSelector('.pv .controls', { timeout: 30000 })
+was = await page.evaluate(() => location.hash)
+t = await openWith(/Florida Keys/, 'place picker')
+if (t) {
+  await page.keyboard.type('channel')
+  await page.keyboard.press('ArrowDown')   // the group the match is in
+  await page.keyboard.press('ArrowDown')   // the match
+  await page.keyboard.press('Enter')
+  check(await hashChanged(was, 'place=NMS:CINMS'), `place picker: Enter on a result opens that place (${await page.evaluate(() => location.hash)})`)
+}
+
 await browser.close()
 console.log(fails.length ? `${fails.length} keyboard check(s) failed` : 'keyboard checks passed')
 process.exit(fails.length ? 1 : 0)
