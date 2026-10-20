@@ -76,3 +76,39 @@ export function afterChange(mode: FullMode, el: object, doc: object): FullMode {
 export function escLeaves(mode: FullMode, key: string): boolean {
   return mode === 'expanded' && key === 'Escape'
 }
+
+// ---- the whole sphere in the frame ----
+
+/** is a box world-scale: wider than 90 degrees of longitude or taller than 90 of latitude? (a smaller one keeps the normal fit) */
+export function isWorldScale(b: [number, number, number, number]): boolean {
+  return b[2] - b[0] > 90 || b[3] - b[1] > 90
+}
+
+/** MapLibre's camera: a vertical field of view of 0.6435 rad (tan(fov / 2) = 1/3), so its focal length is 1.5 x the frame's height in pixels */
+const FOCAL_PER_HEIGHT = 1.5
+
+/**
+ * the zoom at which the globe fits its frame. at zoom z the sphere's radius is R = 512 x 2^z / (2 pi) pixels, and the camera
+ * (focal length f = 1.5 x the frame's height, at distance f + R, which is what keeps the scale at the centre that of the flat
+ * map) draws its outline 2 R f / sqrt(f^2 + 2 f R) pixels across. this solves that for the outline `fill` (0.9: a small margin)
+ * of the frame's shorter side, so the whole sphere is seen on a wide desktop frame and on a phone alike.
+ */
+export function globeZoom(width: number, height: number, fill = 0.9): number {
+  const a = Math.max(1, Math.min(width, height)) * fill
+  const f = FOCAL_PER_HEIGHT * Math.max(1, height)
+  const r = (a * a + a * Math.sqrt(a * a + 4 * f * f)) / (4 * f)
+  return Math.max(0, Math.log2((2 * Math.PI * r) / 512))
+}
+
+/** the apparent diameter of the globe's outline at a zoom in a frame of this height (the inverse of globeZoom) */
+export function globeDiameter(zoom: number, height: number): number {
+  const r = (512 * 2 ** zoom) / (2 * Math.PI)
+  const f = FOCAL_PER_HEIGHT * Math.max(1, height)
+  return (2 * r * f) / Math.sqrt(f * f + 2 * f * r)
+}
+
+/** the centre of a box [west, south, east, north] as a longitude in [-180, 180] and a latitude (east may exceed 180) */
+export function boxCentre(b: [number, number, number, number]): { lng: number; lat: number } {
+  const lng = (b[0] + b[2]) / 2
+  return { lng: ((((lng + 180) % 360) + 360) % 360) - 180, lat: (b[1] + b[3]) / 2 }
+}

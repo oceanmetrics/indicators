@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { afterChange, canNative, enterFull, escLeaves, exitFull, fullLabel, nativeElement, projectionSpec, PROJ_CHOICES } from './frame.ts'
+import { boxCentre, globeDiameter, globeZoom, isWorldScale, afterChange, canNative, enterFull, escLeaves, exitFull, fullLabel, nativeElement, projectionSpec, PROJ_CHOICES } from './frame.ts'
 
 describe('the projection', () => {
   it('the hash value maps to the MapLibre projection; anything not the globe is mercator', () => {
@@ -51,5 +51,38 @@ describe('the Fullscreen API on a wrapper', () => {
     expect(afterChange('native', wrapper, { webkitFullscreenElement: {} as Element })).toBe('off')
     expect(afterChange('expanded', wrapper, {})).toBe('expanded')
     expect(nativeElement({ webkitFullscreenElement: wrapper })).toBe(wrapper)
+  })
+})
+
+describe('the whole sphere in the frame', () => {
+  it('the outline of the globe at the zoom is 90% of the shorter side of the frame: wide, tall and phone frames', () => {
+    for (const [w, h] of [[1440, 927], [1440, 500], [390, 1344], [390, 400]]) {
+      expect(globeDiameter(globeZoom(w, h), h)).toBeCloseTo(Math.min(w, h) * 0.9, 6)
+    }
+    expect(globeDiameter(globeZoom(1440, 927, 1), 927)).toBeCloseTo(927, 6)
+  })
+  it('measured on screen: a 1440 x 927 frame at zoom 2.35 drew an outline 659 px across (the model says 658)', () => {
+    expect(globeDiameter(2.35, 927)).toBeGreaterThan(655)
+    expect(globeDiameter(2.35, 927)).toBeLessThan(662)
+  })
+  it('a bigger globe needs a bigger zoom', () => {
+    expect(globeZoom(1440, 900)).toBeGreaterThan(globeZoom(700, 900))
+  })
+  it('never below zoom 0, and a zero frame is finite', () => {
+    expect(globeZoom(40, 40)).toBe(0)   // a sphere that small is under zoom 0 and stays at 0
+    expect(Number.isFinite(globeZoom(0, 0))).toBe(true)
+  })
+  it('a box is world-scale past 90 degrees of longitude or of latitude; smaller ones keep the normal fit', () => {
+    expect(isWorldScale([-180, -85, 180, 85])).toBe(true)
+    expect(isWorldScale([160, 18, 294, 48])).toBe(true)
+    expect(isWorldScale([-10, -80, 0, 80])).toBe(true)
+    expect(isWorldScale([-125, 32, -117, 40])).toBe(false)
+    expect(isWorldScale([-158, 18, -66, 60])).toBe(true)
+    expect(isWorldScale([-100, 20, -11, 60])).toBe(false)
+  })
+  it('the centre of a box, a longitude past 180 wrapped back', () => {
+    expect(boxCentre([-180, -85, 180, 85])).toEqual({ lng: 0, lat: 0 })
+    expect(boxCentre([160, 18, 294, 48])).toEqual({ lng: 227 - 360, lat: 33 })
+    expect(boxCentre([-125, 32, -117, 40])).toEqual({ lng: -121, lat: 36 })
   })
 })

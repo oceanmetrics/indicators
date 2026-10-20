@@ -196,6 +196,9 @@ const SHOTS = [
   ['map_political_species_mbon_light', 'mbon', 'light', MAP, POLITICAL],
   ['map_political_species_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, POLITICAL],
   ['map_political_species_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, POLITICAL],
+  // the political set on the globe: the whole sphere in the frame, centred
+  ['map_political_globe_oceanmetrics_light', 'oceanmetrics', 'light', MAP, POLITICAL + '&proj=globe'],
+  ['map_political_globe_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, POLITICAL + '&proj=globe'],
   // a click on the high seas (south-east Pacific, FAO 87) selects the piece, not the FAO area; a click inside an EEZ (Easter Island)
   // selects the EEZ, though the FAO area lies below it
   ['map_political_click_highseas_oceanmetrics_light', 'oceanmetrics', 'light', MAP, POLITICAL, clickAt(-105, -45)],
