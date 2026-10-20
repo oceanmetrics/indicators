@@ -124,6 +124,7 @@ export async function loadCatalog(base: string, fetchFn: typeof fetch = fetch): 
 export const COLL_FALLBACK: Record<string, string> = {
   places: 'Sanctuaries and other places',
   mr_eez: 'Exclusive Economic Zones',
+  mr_high_seas: 'High seas',
 }
 export const LAYERS_URL = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer/index/layers.json'
 

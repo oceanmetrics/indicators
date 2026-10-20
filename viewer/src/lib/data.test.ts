@@ -21,6 +21,7 @@ describe('collection titles', () => {
     const g = layerTitles({ layers: [{ slug: 'mr_eez', title: 'Marine Regions EEZ' }, { slug: 'x', collection: 'noaa_sanctuaries', title: 'NOAA sanctuaries' }, { slug: 'no_title' }] })
     expect(g).toEqual({ mr_eez: 'Marine Regions EEZ', noaa_sanctuaries: 'NOAA sanctuaries' })
     expect(collTitle('mr_eez', g)).toBe('Exclusive Economic Zones')
+    expect(collTitle('mr_high_seas')).toBe('High seas')
     expect(collTitle('noaa_sanctuaries', g)).toBe('NOAA sanctuaries')
     expect(collTitle('places', g)).toBe('Sanctuaries and other places')
     expect(collTitle('mystery', g)).toBe('mystery')

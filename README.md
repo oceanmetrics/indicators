@@ -128,6 +128,19 @@ drawn from the gazetteer's PMTiles; reference collections (`mr_eez`) are drawn b
 tile, coloured by an SLD and the request's `ENV`, so no Marine Regions geometry is hosted by us. The legend and "The map
 as a table" carry every class in words and glyphs, so nothing depends on colour.
 
+## Embeds
+
+`<base>embed/` draws one view without the app's chrome, for iframes on other sites:
+
+- one card: `embed/#card=<place_id>|<indicator>[&method=][&depth=][&fig=1]` (`fig=1`: a still figure, which the daily job
+  saves as `indicators/sanctuarywatch/<place>/<figure>/figure.png`);
+- one map: `embed/#view=map&…` with the Map view's keys, for example the live CoastWatch OBIS for the MBON tools page:
+
+```html
+<iframe src="https://oceanmetrics.io/indicators/embed/?brand=mbon#view=map&ind=obis:species&coll=mr_eez&grain=decade"
+  title="OBIS species richness by EEZ (Ocean Metrics Indicators)" width="100%" height="900" style="border:0"></iframe>
+```
+
 ## The paper
 
 `node scripts/paper_matrix.mjs` turns the manifest and coverage into the figure and table of what is computed where
