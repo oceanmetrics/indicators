@@ -70,7 +70,12 @@ export default defineConfig({
   plugins: [svelte(), serveDir('/catalog/', CATALOG), serveDir('/goos-eov/', GOOS), assets()],
   // vitest otherwise resolves svelte's `ssr` export condition and `mount()` refuses to run
   resolve: { conditions: ['browser'] },
-  build: { target: 'es2022', outDir: 'dist', emptyOutDir: true, chunkSizeWarningLimit: 600 },
+  // two pages: the app (index.html) and the embed route (embed/index.html, served at <base>embed/); the app's entry keeps
+  // the name `index`, which scripts/size-budget.mjs looks for
+  build: {
+    target: 'es2022', outDir: 'dist', emptyOutDir: true, chunkSizeWarningLimit: 600,
+    rollupOptions: { input: { index: resolve(HERE, 'index.html'), embed: resolve(HERE, 'embed/index.html') } },
+  },
   server: { port: 5181, strictPort: true, fs: { allow: [REPO] } },
   preview: { port: 5181, strictPort: true },
 })

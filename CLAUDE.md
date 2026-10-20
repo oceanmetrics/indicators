@@ -46,6 +46,7 @@ indicators.json + coverage.parquet ──► viewer/ (imports src/status/, src/i
   sentence or alt text is computed. The coverage builder (Node) and the viewer import it, as the erddap-places
   precompute imports the app's modules. Python never computes a status. R appears only in `fixtures/ecoidx/`, to run
   the real ecoidx `PlotTimeSeries()` and record what it draws; vitest asserts `iea-sd` matches every series.
+- **`src/report/` is the report spec** (rules, expansion, layout caps and the panel budget, report id), shared by the viewer's Report view and the Node figure job; the tri-state trees, presets and layouts are in `viewer/src/lib/report/`, and the embed route is `viewer/embed/` + `viewer/src/embed.ts`.
 - **`iea-sd` is ported from ecoidx `PlotTimeSeries()`, not `plot_ts()`.** `plot_ts()` compares the recent mean
   itself with 1 SD rather than its departure from the long-term mean (`R/plot.R:167-168`), and its +/− captions are
   reversed. The recent window is the last `recent` rows of the series (NA rows count), the SD is the sample SD, a

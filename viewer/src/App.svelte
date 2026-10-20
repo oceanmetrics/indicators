@@ -19,6 +19,7 @@
   import Drawer from './lib/Drawer.svelte'
   import ViewNav from './lib/ViewNav.svelte'
   import { placeCoverage } from './lib/place.ts'
+  import { matrixToSpec } from './lib/report/fromMatrix.ts'
   import { SOURCE_HREF } from './lib/credits.ts'
 
   let { brand }: { brand: Brand } = $props()
@@ -70,6 +71,8 @@
     idx ? idx.colls.map(c => ({ id: c, title: title(c), places: idx.places.filter(p => p.coll === c).length })) : [],
   )
   const credits = $derived(catalog ? producerCredits(catalog.manifest) : [])
+  // "Report" in the Matrix toolbar: what the Matrix shows now, as a report spec
+  const matrixReportHref = $derived(catalog && idx && view.view === 'matrix' ? reportHref(view, matrixToSpec(view, { idx, indicators: catalog.manifest.indicators })) : '')
   const opened = $derived.by(() => {
     if (!catalog || !idx || !view.cell) return null
     const ind: Indicator | undefined = catalog.manifest.indicators.find(i => i.id === view.cell!.indicator)
@@ -192,7 +195,7 @@
         <p class="status" role="status">Loading the report…</p>
       {/if}
     {:else if catalog && idx}
-      <Toolbar view={view} colls={collChips} onchange={patch} indicators={catalog.manifest.indicators} {shown} {removedPlaces} />
+      <Toolbar view={view} colls={collChips} onchange={patch} indicators={catalog.manifest.indicators} {shown} {removedPlaces} reportHref={matrixReportHref} />
       <p class="summary" role="status" aria-live="polite">
         <Icon name="view-matrix" size={18} />
         <span>

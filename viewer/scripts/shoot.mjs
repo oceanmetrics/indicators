@@ -1,6 +1,7 @@
-// screenshots of the Matrix, the Place view and the Map view with the real catalog: docs/shots/matrix_<brand>_<theme>[_390].png,
-// the flipped matrix (matrix_*_flipped*), the Add or restore menu (matrix_*_addmenu), the drawer,
-// place_<place>_<brand>_<theme>[_390].png and map_<indicator>_<color>_<theme>[_390].png.
+// screenshots with the real catalog: the Matrix (matrix_<brand>_<theme>[_390].png, the flipped matrix matrix_*_flipped*,
+// the Add or restore menu matrix_*_addmenu, the drawer), the Place view (place_<place>_<brand>_<theme>[_390].png), the
+// Map view (map_<indicator>_<color>_<theme>[_390].png), the Report view (report_*: the Scorecard, the Cards report, the
+// open builder over budget, the print preview) and the embed route (embed_*).
 // headless Chrome through puppeteer-core, against the dev server (started here when nothing answers on the port).
 //   node viewer/scripts/shoot.mjs [--url http://localhost:5181/] [--only matrix_mbon_dark] [--out docs/shots/live]
 import { spawn } from 'node:child_process'
@@ -29,6 +30,18 @@ const SST = 'view=map&ind=erddap:dhw_5km:CRW_SST:mean&coll=places'
 const MPA = 'view=map&ind=sdg:ER_MRN_MPA&coll=mr_eez&color=value'
 const FKNMS = 'view=place&place=NMS:FKNMS'
 const FKNMS_SST = 'cell=NMS:FKNMS|erddap:dhw_5km:CRW_SST:mean'
+
+// the Report view: a report is tall, so a fixed window (the top of it), not the whole page
+const REPORT = { width: 1440, height: 1500, deviceScaleFactor: 2 }
+const REPORT_PHONE = { width: 390, height: 2000, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
+const PAPER = { width: 794, height: 1123, deviceScaleFactor: 2 }
+const SANCT = 'view=report&pi=coll:places&layout=scorecard&title=Sanctuary%20condition'
+const CINMS = 'view=report&pi=NMS:CINMS&title=One%20sanctuary%3A%20Channel%20Islands'
+const OVER = 'view=report&pi=coll:places&layout=cards&title=Too%20many%20cards'
+const CARD = { width: 760, height: 1000, deviceScaleFactor: 2 }
+const CARD_PHONE = { width: 390, height: 1000, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
+const EMBED_HASH = 'card=NMS:CINMS|erddap:dhw_5km:CRW_SST:mean'
+const print = async page => { await page.emulateMediaType('print') }
 
 const REMOVED = 'xp=NMS:NMSAS,NMS:FKNMS&xi=erddap:IMERG_monthly_global_precip:precipitation:mean'
 const openMenu = async page => { await page.click('details.add > summary') }
@@ -66,6 +79,18 @@ const SHOTS = [
   // OBIS, the CoastWatch OBIS replacement: species of fish per EEZ, by year and by decade
   ['map_obis_fish_year_oceanmetrics_light', 'oceanmetrics', 'light', MAP, 'view=map&ind=obis:species:fish&coll=mr_eez'],
   ['map_obis_fish_decade_mbon_dark', 'mbon', 'dark', MAP, 'view=map&ind=obis:species:fish&coll=mr_eez&grain=decade&t=2010'],
+  // the Report view
+  ['report_scorecard_oceanmetrics_light', 'oceanmetrics', 'light', REPORT, SANCT],
+  ['report_scorecard_oceanmetrics_dark', 'oceanmetrics', 'dark', REPORT, SANCT],
+  ['report_scorecard_oceanmetrics_light_390', 'oceanmetrics', 'light', REPORT_PHONE, SANCT],
+  ['report_cards_CINMS_oceanmetrics_light', 'oceanmetrics', 'light', REPORT, CINMS],
+  ['report_cards_CINMS_oceanmetrics_light_390', 'oceanmetrics', 'light', REPORT_PHONE, CINMS],
+  ['report_builder_overbudget_oceanmetrics_light', 'oceanmetrics', 'light', REPORT, OVER],
+  ['report_print_CINMS_oceanmetrics_light', 'oceanmetrics', 'light', PAPER, CINMS, print],
+  // the embed route: one card, no chrome
+  ['embed_card_oceanmetrics_light', 'oceanmetrics', 'light', CARD, EMBED_HASH],
+  ['embed_card_oceanmetrics_dark', 'oceanmetrics', 'dark', CARD, EMBED_HASH],
+  ['embed_card_oceanmetrics_light_390', 'oceanmetrics', 'light', CARD_PHONE, EMBED_HASH],
 ]
 
 async function alive(url) { try { return (await fetch(url)).ok } catch { return false } }
@@ -86,15 +111,21 @@ try {
     const errors = []
     page.on('pageerror', e => errors.push(String(e)))
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
-    await page.goto(`${URL_BASE}?brand=${brand}&theme=${theme}${hash ? '#' + hash : ''}`, { waitUntil: 'networkidle0' })
-    await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
+    const embed = name.startsWith('embed_')
+    await page.goto(`${URL_BASE}${embed ? 'embed/' : ''}?brand=${brand}&theme=${theme}${hash ? '#' + hash : ''}`, { waitUntil: 'networkidle0' })
+    await page.waitForSelector(embed ? 'main.embed[data-state=done]' : '.lens[data-state=done]', { timeout: 30000 })
+    // a report is ready when its layout is drawn and no card or recomputation is still waiting
+    if (hash.includes('view=report')) {
+      await page.waitForSelector('.rv table, .rv article.card, .rv .heads, .rv [role=status]', { timeout: 30000 })
+      await page.waitForFunction(() => !document.querySelector('article.card[aria-busy="true"]') && ![...document.querySelectorAll('.rv .note')].some(n => /Recomputing/.test(n.textContent ?? '')), { timeout: 30000 })
+    }
     // a Place view is ready when it has cards and none is still loading
     if (hash.includes('view=map')) await page.waitForSelector('.map[data-state=done]', { timeout: 60000 })
     if (hash.includes('view=place')) await page.waitForFunction(() => document.querySelector('article.card') && !document.querySelector('article.card[aria-busy="true"]'), { timeout: 30000 })
     await page.evaluate(() => document.fonts.ready)
     await new Promise(r => setTimeout(r, 400))
     if (act) { await act(page); await new Promise(r => setTimeout(r, 200)) }
-    await page.screenshot({ path: resolve(OUT, name + '.png'), fullPage: !hash.includes('cell=') && !hash.includes('view=place') })
+    await page.screenshot({ path: resolve(OUT, name + '.png'), fullPage: !hash.includes('cell=') && !hash.includes('view=place') && !hash.includes('view=report') && !embed })
     // a page-level sideways scroll is a layout bug at any width
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     console.log(name, overflow > 0 ? `PAGE OVERFLOW ${overflow}px` : 'ok', errors.length ? errors : '')

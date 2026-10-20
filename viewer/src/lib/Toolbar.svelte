@@ -19,8 +19,10 @@
     shown?: Set<string>
     /** the places removed from the display */
     removedPlaces?: Place[]
+    /** the Report view opened with what the Matrix shows now (matrixToSpec) */
+    reportHref?: string
   }
-  let { view, colls, onchange, indicators = [], shown = new Set(), removedPlaces = [] }: Props = $props()
+  let { view, colls, onchange, indicators = [], shown = new Set(), removedPlaces = [], reportHref = '' }: Props = $props()
 
   const VOCABS: { id: VocabId; label: string }[] = [
     { id: 'onms', label: 'ONMS sections' },
@@ -146,6 +148,14 @@
       {/each}
     </div>
   </div>
+  {#if reportHref}
+    <div class="group" role="group" aria-label="Report">
+      <span class="mbon-label">Report</span>
+      <div class="row">
+        <Button variant="quiet" size="sm" href={reportHref}><Icon name="view-report" size={16} />Report</Button>
+      </div>
+    </div>
+  {/if}
   <p class="note">{DEPTH_UI[view.depth].note}</p>
 </section>
 

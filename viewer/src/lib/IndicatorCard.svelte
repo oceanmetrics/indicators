@@ -17,6 +17,7 @@
   import { STATUS_WORDS, TREND_WORDS } from './matrix.ts'
   import type { Place } from './matrix.ts'
   import { cardModel, defaultMethod, fileName, METHOD_IDS, METHOD_NOTES, placeCitation, placeCsv } from './place.ts'
+  import type { CardOptions } from './place.ts'
   import { loadPlaceRows } from './valuesData.ts'
   import type { PlaceRow } from './valuesData.ts'
   import { asIcon } from './icons.ts'
@@ -42,8 +43,12 @@
     focused?: boolean
     /** called once when the values have loaded or failed */
     onsettled?: () => void
+    /** a report's style: the recent window, a baseline and the years kept (the Place view passes none) */
+    opts?: Pick<CardOptions, 'recent' | 'baseline' | 'from' | 'to'>
+    /** a prefix for the card's element ids, when the same indicator is drawn for several places on one page */
+    uid?: string
   }
-  let { catalog, ind, place, collTitle, term, vocab, depth, method, cov, focused = false, onsettled }: Props = $props()
+  let { catalog, ind, place, collTitle, term, vocab, depth, method, cov, focused = false, onsettled, opts = {}, uid = "" }: Props = $props()
 
   type Load = { s: 'loading' } | { s: 'ok'; rows: PlaceRow[] } | { s: 'error'; msg: string }
   let load = $state.raw<Load>({ s: 'loading' })
@@ -68,7 +73,7 @@
   })
 
   const wanted = $derived(localMethod ?? method ?? defaultMethod(ind))
-  const model = $derived(load.s === 'ok' ? cardModel(ind, place.name, load.rows, { method: wanted, grain }) : null)
+  const model = $derived(load.s === 'ok' ? cardModel(ind, place.name, load.rows, { method: wanted, grain, ...opts }) : null)
   const rows = $derived(load.s === 'ok' ? load.rows : [])
   const eov = $derived(catalog.manifest.vocabularies.eov.terms.find(t => t.id === ind.category.eov))
   const glyph = $derived(asIcon(term.glyph))
@@ -92,7 +97,7 @@
   const cell = (v: number | null) => fmt(v, dec)
 </script>
 
-<article class="card" class:focused data-ind={ind.id} aria-labelledby="t-{ind.id}" aria-busy={load.s === 'loading'}>
+<article class="card" class:focused data-ind={ind.id} aria-labelledby="t-{uid}{ind.id}" aria-busy={load.s === 'loading'}>
   <header class="head">
     {#if vocab === 'eov' && eov && badgeOk}
       <img class="badge" src={badgeUrl(import.meta.env.BASE_URL, eov.id)} alt="{eov.label} (GOOS EOV badge)" width="40" height="40" onerror={() => (badgeOk = false)} />
@@ -100,7 +105,7 @@
       <span class="glyph"><Icon name={glyph} size={22} /></span>
     {/if}
     <div class="titles">
-      <h4 id="t-{ind.id}">{ind.title}</h4>
+      <h4 id="t-{uid}{ind.id}">{ind.title}</h4>
       <p class="sub">{unit || 'unitless'} · status by {ind.status_grain}{model?.grain && model.grain !== ind.status_grain ? ` · shown by ${model.grain}` : ''}</p>
     </div>
   </header>
@@ -124,7 +129,7 @@
       {:else if model.kind === 'categorical'}
         <StackChart {model} />
       {:else}
-        <TimeChart {model} {unit} recent={ind.recent} />
+        <TimeChart {model} {unit} recent={opts.recent ?? ind.recent} />
       {/if}
 
       {#if model.kind !== 'empty'}

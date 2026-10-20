@@ -14,7 +14,7 @@ const fails = []
 const check = (ok, what) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${what}`); if (!ok) fails.push(what) }
 const focused = () => page.evaluate(() => {
   const e = document.activeElement
-  return e ? { tag: e.tagName, cls: e.className?.toString() ?? '', label: e.getAttribute('aria-label') ?? e.textContent?.trim().slice(0, 60), href: e.getAttribute('href'), kind: e.dataset?.kind } : null
+  return e ? { tag: e.tagName, cls: e.className?.toString() ?? '', label: e.getAttribute('aria-label') ?? e.textContent?.trim().slice(0, 60), href: e.getAttribute('href'), kind: e.dataset?.kind, role: e.getAttribute('role') } : null
 })
 const tabUntil = async (pred, max = 600) => {
   for (let i = 0; i < max; i++) {
@@ -85,7 +85,7 @@ for (const [kind, key] of [['place', 'xp='], ['indicator', 'xi=']]) {
   await page.goto(`${URL_BASE}?theme=light#axes=t`, { waitUntil: 'networkidle0' })
   await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
   await page.evaluate(() => (document.activeElement instanceof HTMLElement) && document.activeElement.blur())
-  const rm = await tabUntil(f => f.tag === 'BUTTON' && f.kind === kind && /^Remove .* from the matrix$/.test(f.label ?? ''))
+  const rm = await tabUntil(f => f.tag === 'BUTTON' && f.kind === kind && /^Remove .* from the matrix$/.test(f.label ?? ''), 1500)
   check(!!rm, `flipped: Tab reaches a ${kind} remove button${rm ? ` ("${rm.f.label}")` : ''}`)
   if (rm) {
     await page.keyboard.press('Enter')
@@ -94,6 +94,28 @@ for (const [kind, key] of [['place', 'xp='], ['indicator', 'xi=']]) {
     check(hash.includes(key), `Enter removes it: the hash has ${key} (${hash})`)
     const f = await focused()
     check(!!f && f.tag === 'BUTTON' && f.kind === kind, 'focus moves to the next remove button, not lost to the page')
+  }
+}
+
+// the Report view: Tab reaches Edit, Enter opens the builder, Tab reaches a tree checkbox (role=checkbox), Space toggles it
+// and the hash changes (every report is a permalink)
+await page.goto('about:blank')
+await page.goto(`${URL_BASE}?theme=light#view=report&pi=coll:places&layout=scorecard`, { waitUntil: 'networkidle0' })
+await page.waitForSelector('.lens[data-state=done] .rv', { timeout: 30000 })
+const edit = await tabUntil(f => f.tag === 'BUTTON' && f.label === 'Edit', 80)
+check(!!edit, `report: Tab reaches the Edit button${edit ? ` (${edit.presses} presses)` : ''}`)
+if (edit) {
+  await page.keyboard.press('Enter')
+  check(await page.waitForSelector('.builder', { timeout: 5000 }).then(() => true, () => false), 'report: Enter opens the builder')
+  const box = await tabUntil(f => f.role === 'checkbox', 60)
+  check(!!box, `report: Tab reaches a tree checkbox${box ? ` ("${box.f.label}")` : ''}`)
+  if (box) {
+    const before = await page.evaluate(() => ({ hash: location.hash, on: document.activeElement.getAttribute('aria-checked') }))
+    await page.keyboard.press('Space')
+    await page.waitForFunction(h => location.hash !== h, { timeout: 5000 }, before.hash).catch(() => {})
+    const after = await page.evaluate(() => ({ hash: location.hash, on: document.activeElement?.getAttribute('aria-checked') }))
+    check(after.hash !== before.hash, `report: Space toggles it and the hash changes (${before.hash} -> ${after.hash})`)
+    check(after.on !== before.on, `report: aria-checked follows (${before.on} -> ${after.on})`)
   }
 }
 

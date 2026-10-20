@@ -144,6 +144,20 @@ export interface CardOptions {
   method?: MethodId | null
   /** a grain; the primary grain by default (ignored when the place has no rows there) */
   grain?: Grain | null
+  /** a report's style: the recent window (the indicator's by default), a baseline [from, to] years, and the years kept */
+  recent?: number | null
+  baseline?: [number, number] | null
+  from?: number | null
+  to?: number | null
+}
+
+/** a series cut to the years from..to (either end open) */
+export function clipYears(series: Point[], from?: number | null, to?: number | null): Point[] {
+  if (from == null && to == null) return series
+  return series.filter(p => {
+    const y = Number(p.t.slice(0, 4))
+    return (from == null || y >= from) && (to == null || y <= to)
+  })
 }
 
 function statLike(r: StatusResult, grain: Grain): StatLike {
@@ -168,11 +182,11 @@ export function cardModel(ind: Indicator, placeName: string, rows: ValueRow[], o
     return { ...EMPTY, requested, sentence: none, alt: none }
   }
   if (ind.kind === 'categorical') return categoricalCard(ind, placeName, rows, grain, grains, requested)
-  const series = seriesOf(rows, grain)
+  const series = clipYears(seriesOf(rows, grain), opts.from, opts.to)
   // a status exists at the indicator's status grain only; any other grain shows its values
   const method: MethodId = grain === ind.status_grain ? requested : 'values'
   const ctx = { title: ind.short, place: placeName, unit: ind.unit_label ?? '', decimals: ind.decimals ?? 2 }
-  const a = assess(series, method, { grain, recent: ind.recent, minPeriods: ind.min_periods }, ctx)
+  const a = assess(series, method, { grain, recent: opts.recent ?? ind.recent, minPeriods: ind.min_periods, baseline: opts.baseline ?? null }, ctx)
   const vals = series.filter(p => p.v != null)
   return {
     kind: 'continuous', grain, grains, method, requested, sentence: a.sentence, alt: a.alt, status: a.result.status, trend: a.result.trend,

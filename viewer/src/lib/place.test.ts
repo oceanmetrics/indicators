@@ -113,6 +113,14 @@ describe('a card’s model', () => {
     expect(m.sentence).toBe('SST in Test Place over the last 5 years (2015–2019) was between the 10th and 90th percentiles of its 2005–2019 record, and changed by less than 1 SD.')
     expect(m.result?.p90).not.toBeNull()
   })
+  it('a report\'s window, baseline and years change what the card assesses (and leave the default alone)', () => {
+    const base = cardModel(ind({}), 'Test Place', rows)
+    expect(cardModel(ind({}), 'Test Place', rows, {})).toEqual(base)
+    expect(cardModel(ind({}), 'Test Place', rows, { recent: 3 }).result).toMatchObject({ recentFrom: '2017-01-01', recentTo: '2019-01-01' })
+    expect(cardModel(ind({}), 'Test Place', rows, { baseline: [2005, 2014] }).result).toMatchObject({ ltMean: 11 })
+    const cut = cardModel(ind({}), 'Test Place', rows, { from: 2008, to: 2016 })
+    expect([cut.series[0].t, cut.series[cut.series.length - 1].t]).toEqual(['2008-01-01', '2016-01-01'])
+  })
   it('values has no status', () => {
     const m = cardModel(ind({}), 'Test Place', rows, { method: 'values' })
     expect(m.status).toBeNull()

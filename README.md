@@ -89,6 +89,21 @@ node brand/build-favicons.mjs                # brand/favicons/{oceanmetrics,mbon
 Rscript fixtures/ecoidx/build_iea_sd_fixtures.R ~/Github/noaa-iea/ecoidx   # the iea-sd cross-check
 ```
 
+## Report view
+
+`#view=report` lays out chosen places x chosen indicators; the spec (`src/report/spec.ts`: rules such as `coll:places`,
+`cat:water-quality`, `series:sst:*`, with each untick in an exclude list) is in the URL hash, so every report is a
+permalink, and `report.json` (Export menu) is the same spec. **Edit** opens the builder: a preset, two trees of tri-state
+checkboxes (places by collection, indicators by category then series; Tab to a box, Space toggles it, the counts are
+places with a value of the places chosen), the layout with its panel budget and, over budget, the fixes (switch layout,
+split into sections, collapse series to leads), the status method, recent window, baseline and years. Layouts drawn today:
+**Cards** (1 to 3 places, a tab per category, the Place view's cards) and **Scorecard** (places x indicators, glyphs and the
+last value; one card per place at 390 px); the others show a notice with their budget. The Matrix toolbar's **Report**
+button opens the builder with what the Matrix shows. Cells with no value are listed under the report with a prefilled
+GitHub issue. Print (Export, Print) hides the app chrome, prints the title, permalink and report id, and uses the light theme.
+**Embed:** `<base>embed/#card=<place_id>|<indicator>[&method=][&depth=][&vocab=]` renders one card with no chrome and a link
+back to the Place view; `?theme=` and `?brand=` work as in the app, and `main.embed[data-state=done]` marks it drawn.
+
 ## Publishing
 
 - **Catalog:** `.github/workflows/catalog.yml` runs daily (08:07 UTC) on the self-hosted `macmini` runner:

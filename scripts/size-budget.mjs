@@ -14,7 +14,12 @@ const isMap = f => f.startsWith('MapView-')
 const js = files.filter(f => f.endsWith('.js')).map(f => ({ f, gz: gz(f) }))
 const css = files.filter(f => f.endsWith('.css')).map(f => ({ f, gz: gz(f) }))
 const sum = xs => xs.reduce((s, x) => s + x.gz, 0)
-const entry = js.find(x => x.f.startsWith('index-')) ?? [...js].sort((a, b) => b.gz - a.gz)[0]
+// the entry is what index.html loads up front: its module script and its modulepreloads (the viewer has two pages, the
+// app and embed/, so Vite splits what they share into chunks of their own). any base: ./assets/ or /indicators/assets/
+const html = readFileSync(join(DIST, '..', 'index.html'), 'utf8')
+const upfront = new Set([...html.matchAll(/(?:src|href)="[^"]*\/assets\/([^"\/]+\.js)"/g)].map(m => m[1]))
+if (!upfront.size) throw new Error('size budget: found no script in viewer/dist/index.html')
+const entry = { gz: sum(js.filter(x => upfront.has(x.f))) }
 const rows = [
   ['entry JS', entry?.gz ?? 0, BUDGET.jsEntry],
   ['JS but map', sum(js.filter(x => !isMap(x.f))), BUDGET.jsRest],
