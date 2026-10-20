@@ -105,6 +105,14 @@ def load_config(config: Path = CONFIG) -> tuple[dict, dict[str, dict]]:
   return entries, vocabs
 
 
+def load_place_sets(config: Path = CONFIG) -> list[dict]:
+  """config/place_sets.yml: the named lists of place groups the viewer offers above the groups (none when the file is absent)"""
+  f = config / "place_sets.yml"
+  if not f.exists():
+    return []
+  return [{**s, "note": " ".join(s["note"].split())} if s.get("note") else dict(s) for s in (yaml.safe_load(f.read_text()) or {}).get("sets", [])]
+
+
 def vocabularies(vocabs: dict[str, dict], goos: dict | None) -> dict[str, dict]:
   """the vocabularies as the manifest carries them: eov terms get their glyph and, where GOOS has one, its badge."""
   out = {}
@@ -204,7 +212,8 @@ def citation(ind: dict, version: str, extra: str | None = None, cite_dataset: bo
 # assembly ----
 def build_manifest(values: dict[str, dict], entries: dict[str, dict], vocabs: dict[str, dict],
                    dataset_of: Callable[[str], dict], version: str, created: str,
-                   goos: dict | None = None, eez_attribution: str | None = None) -> tuple[dict, list[str]]:
+                   goos: dict | None = None, eez_attribution: str | None = None,
+                   place_sets: list[dict] | None = None) -> tuple[dict, list[str]]:
   """the manifest dict and the list of config entries without values. raises ValueError on a broken rule."""
   inds = []
   for ind_id in sorted(values):
@@ -258,6 +267,8 @@ def build_manifest(values: dict[str, dict], entries: dict[str, dict], vocabs: di
       i["series_title"] = titles[i["series"]]
   manifest = {"version": version, "contract": contract.CONTRACT_VERSION, "created": created,
               "vocabularies": vocabularies(vocabs, goos), "indicators": inds}
+  if place_sets:
+    manifest["place_sets"] = [dict(s) for s in place_sets]
   errors = check_manifest(manifest, values)
   if errors:
     raise ValueError("manifest rules broken:\n  " + "\n  ".join(errors))
@@ -288,6 +299,8 @@ def check_manifest(m: dict, values: dict[str, dict] | None = None) -> list[str]:
         errors.append(f"{i['id']}: kind {i['kind']} but its values {'carry' if has_class else 'carry no'} class")
     if i["kind"] == "categorical" and i["status_method"] in ("iea-sd", "names-pct"):
       errors.append(f"{i['id']}: a categorical indicator cannot use {i['status_method']}")
+  set_ids = [s["id"] for s in m.get("place_sets", [])]
+  errors += [f"place set {i}: listed twice" for i in sorted({i for i in set_ids if set_ids.count(i) > 1})]
   for s in sorted({i["series"] for i in m.get("indicators", [])}):
     if len(leads[s]) != 1:
       errors.append(f"series {s}: {len(leads[s])} leads {leads[s]}, needs exactly one")
@@ -335,7 +348,7 @@ def run(out: Path = Path("catalog"), sdg_values: Path | None = None, cache: Path
   version = version or dt.datetime.now(dt.timezone.utc).strftime("%Y.%m.%d")
   goos = json.loads(GOOS_MANIFEST.read_text()) if GOOS_MANIFEST.exists() else None
   manifest, missing = build_manifest(values, entries, vocabs, dataset_of, version, created, goos,
-                                     sdg.get("eez_attribution") if sdg else None)
+                                     sdg.get("eez_attribution") if sdg else None, load_place_sets(config))
   path = Path(out) / "indicators.json"
   path.write_text(json.dumps(manifest, indent=1, ensure_ascii=False) + "\n")
   return {"path": str(path), "version": version, "indicators": len(manifest["indicators"]),

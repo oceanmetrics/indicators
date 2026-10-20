@@ -22,6 +22,11 @@
     "indicators": {
       "type": "array",
       "items": { "$ref": "#/$defs/indicator" }
+    },
+    "place_sets": {
+      "description": "Optional. Named lists of gazetteer place groups (collections) that a viewer offers as one choice above the groups: the Map draws them layered, with one legend and one colour scale. From config/place_sets.yml.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/placeSet" }
     }
   },
   "additionalProperties": false,
@@ -51,6 +56,17 @@
             "additionalProperties": false
           }
         }
+      },
+      "additionalProperties": false
+    },
+    "placeSet": {
+      "type": "object",
+      "required": ["id", "title", "groups"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "Written in a link as `set:<id>`." },
+        "title": { "type": "string" },
+        "groups": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }, "description": "Gazetteer collection slugs, in the order a viewer lists them (a map draws vector and derived groups first and reference groups on top, whatever the order)." },
+        "note": { "type": "string", "description": "What the set covers and how its places must be read (for example that totals across places are never summed)." }
       },
       "additionalProperties": false
     },

@@ -300,3 +300,56 @@ def test_regression_every_configured_short_fits_the_schemas_max_length():
   limit = schema["$defs"]["indicator"]["properties"]["short"]["maxLength"]
   entries, _ = m.load_config()
   assert {i: e["short"] for i, e in entries.items() if len(e["short"]) > limit} == {}
+
+
+# place sets ----
+POLITICAL = {"id": "political", "title": "Ocean by jurisdiction", "groups": ["mr_eez", "fao_high_seas"],
+             "note": "the exclusive economic zones and the high seas"}
+
+
+def build_sets(tmp_path, sets):
+  return m.build_manifest(m.scan_values(tmp_path), {SST: entry()}, VOCABS, dataset_of, "2026.10.20", "2026-10-20T00:00:00Z",
+                          place_sets=sets)
+
+
+def test_place_sets_are_written_to_the_manifest_exactly(tmp_path):
+  write(tmp_path)
+  man, _ = build_sets(tmp_path, [POLITICAL])
+  assert man["place_sets"] == [POLITICAL]
+
+
+def test_no_place_sets_leaves_the_key_out(tmp_path):
+  write(tmp_path)
+  man, _ = build(tmp_path, [entry()])
+  assert "place_sets" not in man
+
+
+def test_a_place_set_is_validated_by_the_schema(tmp_path):
+  write(tmp_path)
+  bad = [
+    ({**POLITICAL, "groups": []}, "place_sets/0/groups"),
+    ({**POLITICAL, "groups": ["mr_eez", "mr_eez"]}, "place_sets/0/groups"),
+    ({**POLITICAL, "id": "Political"}, "place_sets/0/id"),
+    ({**POLITICAL, "geometry": "no"}, "place_sets/0"),
+  ]
+  for ps, where in bad:
+    with pytest.raises(ValueError, match=where):
+      build_sets(tmp_path, [ps])
+
+
+def test_a_place_set_id_is_listed_once(tmp_path):
+  write(tmp_path)
+  with pytest.raises(ValueError, match="place set political: listed twice"):
+    build_sets(tmp_path, [POLITICAL, POLITICAL])
+
+
+def test_repo_place_sets_political_is_eezs_and_fao_high_seas_and_ecological_is_not_added():
+  sets = m.load_place_sets()
+  assert [s["id"] for s in sets] == ["political"]
+  political = sets[0]
+  assert political["title"] == "Ocean by jurisdiction" and political["groups"] == ["mr_eez", "fao_high_seas"]
+  assert "never summed" in political["note"] and "\n" not in political["note"]
+
+
+def test_place_sets_file_absent_is_no_sets(tmp_path):
+  assert m.load_place_sets(tmp_path) == []

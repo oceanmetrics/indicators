@@ -1,0 +1,20 @@
+# place sets: named lists of gazetteer place groups (collections) that the viewer offers as one choice, above the groups, in
+# the place picker and on the Map. a set is ours (like indicators.yml); the groups are gazetteer collection slugs, listed in
+# the order the picker and the table show them (the Map draws the vector and derived groups first and the reference/WMS
+# groups on top, whatever the order here). the manifest writes them to indicators.json as
+# `place_sets`; a set whose groups have no computed place is simply not offered.
+
+sets:
+  - id: political
+    title: Ocean by jurisdiction
+    groups: [mr_eez, fao_high_seas]
+    note: >-
+      the exclusive economic zones and the high seas by FAO major fishing area: together they cover the ocean; a record on a
+      shared boundary counts in each place, so place totals are never summed
+
+  # - id: ecological
+  #   title: Ocean by ecoregion
+  #   groups: [meow, ppow]   # Marine Ecoregions of the World and Pelagic Provinces of the World
+  #   note: ...
+  # waits on UNEP-WCMC's permission to redistribute MEOW and PPOW (as a reference collection, not as geometry of ours): no
+  # data, glyph or collection is added for it until that is confirmed in writing.
