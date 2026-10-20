@@ -129,16 +129,19 @@ def read_means(text: str) -> dict[tuple[str, str, str], dict[str, dict[dt.date, 
   return dict(out)
 
 
-def month_rows(pid: str, ind: str, unit: str, mean: dict[dt.date, float | None], sd: dict[dt.date, float | None]) -> list[dict]:
-  """month rows of one place and variable: value = the monthly mean, n = 1, x_sd = the spatial SD; no row without a mean."""
-  return [{"place_id": pid, "coll": COLL, "indicator": ind, "time_grain": "month", "time": m, "class": None,
+def month_rows(pid: str, ind: str, unit: str, mean: dict[dt.date, float | None], sd: dict[dt.date, float | None],
+               coll: str = COLL) -> list[dict]:
+  """month rows of one place and variable: value = the monthly mean, n = 1, x_sd = the spatial SD; no row without a mean.
+  `coll` is the sanctuaries' `places` here; the place producer (om_indicators/producers/cmems_place.py) shares these rules
+  for any other collection."""
+  return [{"place_id": pid, "coll": coll, "indicator": ind, "time_grain": "month", "time": m, "class": None,
            "value": v, "n": 1.0, "unit": unit, "x_sd": sd.get(m)}
           for m, v in sorted(mean.items()) if v is not None]
 
 
-def year_rows(pid: str, ind: str, unit: str, months: list[dict]) -> list[dict]:
+def year_rows(pid: str, ind: str, unit: str, months: list[dict], coll: str = COLL) -> list[dict]:
   """year rows: only years with all 12 month rows; value = the mean of the 12 monthly means, n = 12."""
-  return [{"place_id": pid, "coll": COLL, "indicator": ind, "time_grain": "year", "time": y["time"], "class": None,
+  return [{"place_id": pid, "coll": coll, "indicator": ind, "time_grain": "year", "time": y["time"], "class": None,
            "value": y["value"], "n": y["n"], "unit": unit, "x_sd": None}
           for y in ep.year_rows(months)]
 

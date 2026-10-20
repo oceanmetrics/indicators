@@ -21,6 +21,10 @@ om-ind = "om_indicators.cli:main"
 dev = ["pytest>=8"]
 # brand: the traced GOOS EOV glyphs and the badge resizing (brand/eov_trace.py)
 brand = ["pillow>=11", "potracer>=0.0.4"]
+# cmems: the Copernicus Marine place producer (om_indicators/producers/cmems_place.py); not needed by the catalog build
+# or CI. h5netcdf, h5py and netCDF4 are the backends xarray needs to read the toolbox's NetCDF (a first run on the Mac
+# mini failed with "No module named 'h5py'" without them)
+cmems = ["copernicusmarine>=2.0", "xarray>=2024.1", "shapely>=2.0", "numpy>=1.26", "h5netcdf>=1.3", "h5py>=3.10", "netCDF4>=1.7"]
 
 [build-system]
 requires = ["hatchling"]
