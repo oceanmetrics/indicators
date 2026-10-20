@@ -2,11 +2,11 @@
 import { describe, expect, it } from 'vitest'
 import type { CoverageRow } from '../../../../src/coverage/build.ts'
 import type { Indicator } from '../data.ts'
-import { DEFAULT_MAP_INDICATOR, mapColls, mappable, pickMap } from './pick.ts'
+import { DEFAULT_MAP_INDICATOR, groupOf, leadForGroup, mapColls, mapGroups, mappable, pickMap, resolveGroup, switchNotice, valuesCollsOfGroup } from './pick.ts'
 import { directUrl, parseLayers } from './gazetteer.ts'
 
 const ind = (id: string, colls: string[], lead = false): Indicator => ({ id, lead, collections: colls.map(coll => ({ coll })) }) as unknown as Indicator
-const cov = (indicator: string, coll: string, last_value: number | null = 1): CoverageRow => ({ indicator, coll, last_value, last_class: null }) as unknown as CoverageRow
+const cov = (indicator: string, coll: string, last_value: number | null = 1, place_coll?: string, place_id = 'P'): CoverageRow => ({ indicator, coll, place_coll, place_id, last_value, last_class: null }) as unknown as CoverageRow
 
 describe('which indicators can be mapped', () => {
   const inds = [ind('a', ['c1']), ind(DEFAULT_MAP_INDICATOR, ['c1', 'c2'], true), ind('z', ['c1'], true)]
@@ -31,6 +31,61 @@ describe('which indicators can be mapped', () => {
   })
   it('nothing to map gives nothing', () => {
     expect(pickMap([], [], { ind: null, coll: null })).toEqual({ ind: null, coll: null, colls: [] })
+  })
+})
+
+describe('place groups on the Map', () => {
+  // SST: Pitcairn (home group mr_eez) is in the `places` values file with 2 sanctuaries; OBIS is in the mr_eez file; Wells has precipitation only
+  const sst = ind(DEFAULT_MAP_INDICATOR, ['places'], true)
+  const obis = ind('obis:species', ['mr_eez', 'places'], true)
+  const pcp = ind('pcp', ['noaa_nerrs'], true)
+  const rows = [
+    cov(DEFAULT_MAP_INDICATOR, 'places', 1, 'places', 'NMS:A'), cov(DEFAULT_MAP_INDICATOR, 'places', 1, 'places', 'NMS:B'), cov(DEFAULT_MAP_INDICATOR, 'places', 1, 'mr_eez', 'MRGID:1'),
+    cov('obis:species', 'mr_eez', 5, 'mr_eez', 'MRGID:1'), cov('obis:species', 'mr_eez', 5, 'mr_eez', 'MRGID:2'), cov('obis:species', 'places', 5, 'mr_eez', 'MRGID:1'),
+    cov('pcp', 'noaa_nerrs', 3, 'noaa_nerrs', 'NERRS:WEL'),
+  ]
+  it('a place’s group is its home collection, the values collection for a coverage table built before place_coll', () => {
+    expect(groupOf({ coll: 'places', place_coll: 'mr_eez' })).toBe('mr_eez')
+    expect(groupOf({ coll: 'places' })).toBe('places')
+    expect(groupOf({ coll: 'places', place_coll: null })).toBe('places')
+  })
+  it('an indicator’s groups are those with a value, in the Matrix order', () => {
+    expect(mapGroups(sst, rows)).toEqual(['places', 'mr_eez'])
+    expect(mapGroups(pcp, rows)).toEqual(['noaa_nerrs'])
+    expect(mapGroups(sst, [cov(DEFAULT_MAP_INDICATOR, 'places', null, 'places')])).toEqual([])
+  })
+  it('the EEZ group reads every values file that holds its places: SST from `places` (Pitcairn), OBIS from `mr_eez` and `places`', () => {
+    expect(valuesCollsOfGroup(sst, rows, 'mr_eez')).toEqual(['places'])
+    expect(valuesCollsOfGroup(obis, rows, 'mr_eez')).toEqual(['mr_eez', 'places'])
+    expect(valuesCollsOfGroup(sst, rows, 'places')).toEqual(['places'])
+    expect(valuesCollsOfGroup(sst, rows, 'noaa_nerrs')).toEqual([])
+  })
+  it('the hash’s coll names a group; an old link’s values collection resolves to the group holding most of its places', () => {
+    expect(resolveGroup(obis, rows, 'mr_eez')).toBe('mr_eez')
+    expect(resolveGroup(sst, rows, 'places')).toBe('places')
+    // old link: coll=places was the values collection; for OBIS it holds one place, of the group mr_eez
+    expect(resolveGroup(obis, rows, 'places')).toBe('mr_eez')
+    // a group the indicator has no values in falls to its first group
+    expect(resolveGroup(sst, rows, 'noaa_nerrs')).toBe('places')
+    expect(resolveGroup(sst, rows, null)).toBe('places')
+    expect(resolveGroup(pcp, [], 'x')).toBeNull()
+  })
+  it('pickMap names the group, and the groups of the indicator', () => {
+    const p = pickMap([sst, obis, pcp], rows, { ind: DEFAULT_MAP_INDICATOR, coll: 'mr_eez' })
+    expect([p.ind?.id, p.coll, p.colls]).toEqual([DEFAULT_MAP_INDICATOR, 'mr_eez', ['places', 'mr_eez']])
+  })
+  it('a group with no value for the indicator shown switches to its sea surface temperature, else its first lead, else its first indicator', () => {
+    expect(leadForGroup([sst, obis, pcp], rows, 'noaa_nerrs')?.id).toBe('pcp')
+    expect(leadForGroup([obis, sst, pcp], rows, 'mr_eez')?.id).toBe(DEFAULT_MAP_INDICATOR)
+    expect(leadForGroup([ind('a', ['places']), ind('b', ['places'], true)], [cov('a', 'places', 1, 'places'), cov('b', 'places', 1, 'places')], 'places')?.id).toBe('b')
+    expect(leadForGroup([ind('a', ['places'])], [cov('a', 'places', 1, 'places')], 'places')?.id).toBe('a')
+    expect(leadForGroup([sst], rows, 'noaa_nerrs')).toBeNull()
+  })
+  it('the sentence above the map after a switch says what was not computed and what is shown', () => {
+    expect(switchNotice({ short: 'SST' }, { title: 'OBIS species richness, all taxa.' }, 'Exclusive Economic Zones'))
+      .toBe('SST is not computed for Exclusive Economic Zones; showing OBIS species richness, all taxa.')
+    expect(switchNotice({ short: 'SST' }, { title: 'Precipitation' }, 'National Estuarine Research Reserves'))
+      .toBe('SST is not computed for National Estuarine Research Reserves; showing Precipitation.')
   })
 })
 

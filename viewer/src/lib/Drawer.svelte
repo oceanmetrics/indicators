@@ -92,41 +92,41 @@
     <a class="plink" href={placeHref({ vocab, depth, method: null }, place.id, place.coll, ind.id)}>
       <Icon name="view-place" size={16} />Open in place view <span class="mbon-sr-only">: {place.name}, {ind.short}</span>
     </a>
-    <a class="plink" href={mapHref({ vocab, depth, method: null }, ind.id, valuesColl)}>
+    <a class="plink" href={mapHref({ vocab, depth, method: null }, ind.id, place.coll, null, place.id)}>
       <Icon name="view-map" size={16} />Open in map view <span class="mbon-sr-only">: {ind.short}</span>
     </a>
   </p>
 
   {#if model.kind === 'value' && row}
-    <div class="read">
+    <div class="read om-read">
       <div class="big">
         <span class="num">{valueText(ind, row)}</span>
         <span class="per">in {periodText(row)}</span>
       </div>
-      <ul class="marks">
+      <ul class="marks om-marks">
         <li><Icon name={model.statusIcon ?? 'st-none'} size={22} /><span>{model.statusIcon ? STATUS_WORDS[model.statusIcon.slice(3) as keyof typeof STATUS_WORDS] : 'no status at this grain'}</span></li>
         {#if row.trend}<li><Icon name={model.trendIcon!} size={22} /><span>trend {TREND_WORDS[row.trend]}</span></li>{/if}
       </ul>
       <div class="chart"><Spark spark={row.spark} width={320} height={64} fluid /></div>
-      <p class="cap">{row.n_periods} {row.time_grain === 'year' ? 'years' : 'periods'} of record, {row.t0 ? spanLabel(row.t0, row.t1 ?? row.t0, row.time_grain) : ''}; the line shows the last 40 periods. {STATUS_NOTE}</p>
+      <p class="cap om-note">{row.n_periods} {row.time_grain === 'year' ? 'years' : 'periods'} of record, {row.t0 ? spanLabel(row.t0, row.t1 ?? row.t0, row.time_grain) : ''}; the line shows the last 40 periods. {STATUS_NOTE}</p>
     </div>
   {:else if model.kind === 'class' && row}
-    <div class="read">
+    <div class="read om-read">
       <div class="big"><span class="num">{classText(ind, row)}</span><span class="per">of the area in {periodText(row)}</span></div>
-      <p class="cap">The largest class of {ind.short}. Categorical indicators show class shares and have no status.</p>
+      <p class="cap om-note">The largest class of {ind.short}. Categorical indicators show class shares and have no status.</p>
     </div>
   {/if}
 
   <Elements {catalog} {ind} {place} {collTitle} {valuesColl} {row} {depth} />
 
   <section class="config" aria-label="Configuration">
-    <h3 class="k"><Icon name="el-config" size={18} />Configuration <code>{hash}</code></h3>
-    <p class="small">The place, indicator, status method and manifest <code>{m.version}</code> that pin this number.</p>
-    {#if depth === 'dive'}<pre class="code">{lines.join('\n')}</pre>{/if}
+    <h3 class="k om-k"><Icon name="el-config" size={18} />Configuration <code>{hash}</code></h3>
+    <p class="small om-small">The place, indicator, status method and manifest <code>{m.version}</code> that pin this number.</p>
+    {#if depth === 'dive'}<pre class="code om-code">{lines.join('\n')}</pre>{/if}
   </section>
 
   <section class="cite" aria-label="Citation">
-    <h3 class="k"><Icon name="el-cite" size={18} />Cite</h3>
+    <h3 class="k om-k"><Icon name="el-cite" size={18} />Cite</h3>
     <p class="citation">{citation}</p>
     <CopyButton text={citation} label="Copy citation" />
   </section>
@@ -137,9 +137,9 @@
         <img src={badgeUrl(base, eovTerm.id)} alt="{eovTerm.label} (GOOS EOV badge)" width="64" height="64" onerror={() => (badgeOk = false)} />
       {/if}
       <div>
-        <p class="main">GOOS EOV: {eovTerm.label}</p>
-        <p class="small">Badge used unmodified. {GOOS_CREDIT}</p>
-        <p class="small"><Icon name={`eov-${eovTerm.id}` as IconName} size={16} /> The small glyph is {EOV_GLYPH_CREDIT.charAt(0).toLowerCase() + EOV_GLYPH_CREDIT.slice(1)}.</p>
+        <p class="main om-main">GOOS EOV: {eovTerm.label}</p>
+        <p class="small om-small">Badge used unmodified. {GOOS_CREDIT}</p>
+        <p class="small om-small"><Icon name={`eov-${eovTerm.id}` as IconName} size={16} /> The small glyph is {EOV_GLYPH_CREDIT.charAt(0).toLowerCase() + EOV_GLYPH_CREDIT.slice(1)}.</p>
       </div>
     </section>
   {/if}
@@ -173,24 +173,16 @@
   }
   .close:hover { background: var(--control-hover); }
   .headline { margin: 0; font: var(--fw-medium) var(--text-md) / 1.4 var(--font-display); color: var(--text-strong); text-wrap: pretty; }
-  .read { display: grid; gap: var(--space-2); background: var(--bg-tint); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); }
   .big { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
   .num { font: var(--fw-bold) var(--text-lg) / 1.1 var(--font-display); color: var(--text-strong); font-variant-numeric: tabular-nums; }
   .per { font: var(--type-small); color: var(--text-body); }
-  .marks { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); }
-  .marks li { display: flex; align-items: center; gap: var(--space-2); color: var(--text-strong); font: var(--type-small); }
   .chart { max-width: 22rem; }
-  .cap { margin: 0; font: var(--type-small); color: var(--text-body); }
 
   .config, .cite, .goos { background: var(--bg-tint); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); min-width: 0; }
   .toplace { margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
   .plink { display: inline-flex; align-items: center; gap: var(--space-2); font: var(--fw-semibold) var(--text-sm) / 1.2 var(--font-sans); }
-  .k { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-2); font: var(--type-label); text-transform: uppercase; letter-spacing: var(--ls-label); }
   .config .k, .cite .k { color: var(--text-body); }
-  .main { margin: 0 0 var(--space-1); font: var(--fw-semibold) var(--text-sm) / 1.35 var(--font-sans); color: var(--text-strong); overflow-wrap: anywhere; }
-  .small { margin: 0 0 var(--space-1); font: var(--type-small); font-size: 0.8125rem; line-height: 1.45; color: var(--text-body); overflow-wrap: anywhere; }
   .small code, .k code { font-size: 0.75rem; }
-  .code { margin: var(--space-2) 0; padding: var(--space-2) var(--space-3); background: var(--bg-page); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow-x: auto; font: var(--fw-regular) 0.75rem / 1.5 var(--font-mono); color: var(--text-strong); white-space: pre-wrap; overflow-wrap: anywhere; }
   .citation { margin: 0 0 var(--space-2); font: var(--type-small); font-size: 0.8125rem; line-height: 1.5; color: var(--text-body); overflow-wrap: anywhere; }
   .goos { display: flex; gap: var(--space-4); align-items: center; }
   .goos img { flex: none; border-radius: 50%; }

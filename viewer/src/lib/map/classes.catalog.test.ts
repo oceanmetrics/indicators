@@ -10,7 +10,7 @@ import type { Manifest } from '../data.ts'
 import { groupByPlace, readValues } from '../valuesData.ts'
 import type { PlaceRow } from '../valuesData.ts'
 import type { CoverageRow } from '../../../../src/coverage/build.ts'
-import { mapColls, mappable } from './pick.ts'
+import { mapColls, mapGroups, mappable, valuesCollsOfGroup } from './pick.ts'
 import { mapModel } from './classes.ts'
 
 const DIR = resolve(__dirname, '../../../../catalog')
@@ -78,5 +78,23 @@ describe.skipIf(!have)('the Map on the real catalog', () => {
         }
       }
     }
+  }, 120_000)
+
+  it('every group of every indicator reads values files that hold exactly its places with a value, from the merged files', () => {
+    let groups = 0
+    for (const ind of mappable(manifest.indicators, cov)) {
+      for (const group of mapGroups(ind, cov)) {
+        const colls = valuesCollsOfGroup(ind, cov, group)
+        expect(colls.length, `${ind.id} ${group}`).toBeGreaterThan(0)
+        const merged = new Map<string, PlaceRow[]>()
+        for (const c of colls) for (const [id, rows] of values.get(ind.collections.find(x => x.coll === c)!.path)!) merged.set(id, [...(merged.get(id) ?? []), ...rows])
+        const m = mapModel(ind, cov, merged, { group, color: null, t: null, method: null, cls: null })
+        const want = new Set(cov.filter(r => r.indicator === ind.id && (r.place_coll ?? r.coll) === group).map(r => r.place_id))
+        expect(new Set(m.items.map(i => i.placeId)), `${ind.id} ${group}`).toEqual(want)
+        expect(m.pending, `${ind.id} ${group}`).toBe(false)
+        groups++
+      }
+    }
+    expect(groups).toBeGreaterThan(100)
   }, 120_000)
 })

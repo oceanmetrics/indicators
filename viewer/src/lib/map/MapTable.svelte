@@ -17,7 +17,7 @@
 </script>
 
 <details class="table" open>
-  <summary>The map as a table <span class="n">{rows.length} places</span></summary>
+  <summary>The map as a table <span class="n">{rows.length} {rows.length === 1 ? 'place' : 'places'}</span></summary>
   <div class="scroll" class:tall={rows.length > 40}>
     <table>
       <caption class="mbon-sr-only">{caption}</caption>

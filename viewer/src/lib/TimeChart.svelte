@@ -55,7 +55,7 @@
     {#if g.empty}<text class="tick" x={(g.plot.x0 + g.plot.x1) / 2} y={(g.plot.y0 + g.plot.y1) / 2} text-anchor="middle">No values to draw</text>{/if}
   </svg>
   {#if overlay}
-    <ul class="key" aria-hidden="true">
+    <ul class="key om-key" aria-hidden="true">
       <li><span class="sw line"></span>value</li>
       <li><span class="sw mean"></span>{overlay.kind === 'pct' ? 'median' : 'mean'}</li>
       <li><span class="sw band"></span>{bandLabel}</li>
@@ -80,7 +80,6 @@
   .line { fill: none; stroke: var(--link); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
   .pt { fill: var(--bg-surface); stroke: var(--link); stroke-width: 1.6; }
   .last { fill: var(--link); stroke: var(--bg-surface); stroke-width: 1.5; }
-  .key { list-style: none; margin: var(--space-1) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); font: var(--type-small); font-size: 0.75rem; color: var(--text-body); }
   .key li { display: inline-flex; align-items: center; gap: var(--space-2); }
   .sw { display: inline-block; width: 1.25rem; height: 0.75rem; box-sizing: border-box; }
   .sw.line { height: 0; border-top: 2px solid var(--link); }

@@ -77,3 +77,14 @@ describe('datasetCoverage', () => {
     expect(datasetCoverage({ time_grains: ['year'] })).toBeNull()
   })
 })
+
+describe('requestHref for a whole collection', () => {
+  it('pre-fills the collection only: no place or indicator field, and an issue title that names the collection', () => {
+    expect(requestHref({ collection: 'noaa_nerrs', collectionTitle: 'National Estuarine Research Reserves' }))
+      .toBe('https://github.com/oceanmetrics/indicators/issues/new?template=indicator-request.yml&title=Request:%20indicators%20for%20National%20Estuarine%20Research%20Reserves&collection=noaa_nerrs')
+  })
+  it('falls back to the slug for the title when the collection has no title', () => {
+    expect(requestHref({ collection: 'boem_wind_leases' })).toContain('title=Request:%20indicators%20for%20boem_wind_leases&collection=boem_wind_leases')
+    expect(requestHref({ collection: 'x' })).not.toMatch(/place=|indicator=/)
+  })
+})

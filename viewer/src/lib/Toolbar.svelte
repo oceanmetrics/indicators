@@ -1,153 +1,79 @@
 <script lang="ts">
-  // the Matrix's controls: place groups (gazetteer collections, each with its computed of total) and a search over place
-  // names, the vocabulary the indicators group by, the leads-only and show-empty toggles, the swap of rows and columns,
-  // the depth switch, and the "Add or restore" menu for what was removed from the display or lies beyond the leads.
-  // all state lives in `view` (the URL hash).
-  import { Button, Toggle } from '@marinebon/ui'
+  // the Matrix's controls: the two pickers (places: groups and places; indicators: the vocabulary, the leads and show-empty
+  // switches and the tree), the swap of rows and columns, the depth switch and the Report button. what was removed from the
+  // display (the x on a header) is brought back by ticking it in a picker. all state lives in `view` (the URL hash).
+  import { Button } from '@marinebon/ui'
   import { Icon } from '../../../src/icons/index.ts'
-  import type { Indicator, VocabId } from './data.ts'
+  import type { Indicator, Layers, Vocab, VocabId } from './data.ts'
   import { DEPTHS } from './hash.ts'
   import type { Depth, ViewState } from './hash.ts'
-  import { addableIndicators, computedOf } from './matrix.ts'
-  import type { Place } from './matrix.ts'
+  import type { CoverageIndex, Place } from './matrix.ts'
+  import type { TreeNode } from './report/tree.ts'
+  import PlacePicker from './pick/PlacePicker.svelte'
+  import IndicatorPicker from './pick/IndicatorPicker.svelte'
+  import { matrixChosen, multiLabel, placeGroups } from './pick/places.ts'
+  import { multiIndicatorLabel } from './pick/indicators.ts'
 
   interface Props {
     view: ViewState
-    colls: { id: string; title: string; computed: number; total: number | null }[]
+    idx: CoverageIndex
+    layers: Layers
     /** the groups on display (view.colls, or the default when none is asked for) */
     groups: string[]
     onchange: (patch: Partial<ViewState>) => void
-    /** the manifest's indicators, and the ids on display now */
-    indicators?: Indicator[]
-    shown?: Set<string>
-    /** the places removed from the display */
-    removedPlaces?: Place[]
+    /** the manifest's indicators and vocabularies, and the ids on display now */
+    indicators: Indicator[]
+    vocabs: Record<VocabId, Vocab>
+    shown: Set<string>
+    /** the places on display (the rows of the groups on display, after the search) */
+    displayed: Place[]
     /** the Report view opened with what the Matrix shows now (matrixToSpec) */
     reportHref?: string
   }
-  let { view, colls, groups, onchange, indicators = [], shown = new Set(), removedPlaces = [], reportHref = '' }: Props = $props()
+  let { view, idx, layers, groups, onchange, indicators, vocabs, shown, displayed, reportHref = '' }: Props = $props()
 
-  const VOCABS: { id: VocabId; label: string }[] = [
-    { id: 'onms', label: 'ONMS sections' },
-    { id: 'names', label: 'NaMES themes' },
-    { id: 'eov', label: 'GOOS EOVs' },
-  ]
   const DEPTH_UI: Record<Depth, { label: string; icon: 'depth-skim' | 'depth-swim' | 'depth-dive'; note: string }> = {
     skim: { label: 'Skimmer', icon: 'depth-skim', note: 'Glyphs and the last value for each place.' },
     swim: { label: 'Swimmer', icon: 'depth-swim', note: 'Adds a sparkline of the recent record. Open a cell for the sentence, sources and method.' },
     dive: { label: 'Diver', icon: 'depth-dive', note: 'Adds the values file and the status method. Open a cell for the configuration and a query.' },
   }
 
-  // the groups on display are the starting point; the last one cannot be switched off (no groups = the default again)
-  function toggleColl(id: string) {
-    const next = groups.includes(id) ? groups.filter(c => c !== id) : [...groups, id]
-    if (next.length) onchange({ colls: next })
+  // ---- places ----
+  const chosenPlaces = $derived(matrixChosen(idx, groups, view.hidePlaces))
+  const placeLabel = $derived(multiLabel(placeGroups(idx, layers), chosenPlaces))
+  // the rules of a tick arrive with the panel (a tick only happens in an open panel)
+  async function tickPlace(node: { kind: 'collection' | 'place'; key: string }, on: boolean) {
+    const { toggleMatrixPlaces } = await import('./pick/placesTree.ts')
+    onchange(toggleMatrixPlaces(idx, { colls: groups, hidePlaces: view.hidePlaces }, node, on))
   }
 
-  // ---- add or restore ----
-  let menuOpen = $state(false)
-  let menu = $state<HTMLDetailsElement>()
-  const removedInds = $derived(view.hideInds.map(id => indicators.find(i => i.id === id)).filter((i): i is Indicator => !!i))
-  // a removed indicator is restored from the list above, not offered again under "More indicators"
-  const more = $derived(addableIndicators(indicators, new Set([...shown, ...view.hideInds])))
-  const removedN = $derived(removedPlaces.length + removedInds.length)
-  const restorePlace = (id: string) => onchange({ hidePlaces: view.hidePlaces.filter(x => x !== id) })
-  const restoreInd = (id: string) => onchange({ hideInds: view.hideInds.filter(x => x !== id) })
-  const addInd = (id: string) => onchange({ addInds: [...view.addInds.filter(x => x !== id), id] })
-  const restoreAll = () => onchange({ hidePlaces: [], hideInds: [] })
-  function onkey(e: KeyboardEvent) {
-    if (e.key === 'Escape' && menuOpen) {
-      menuOpen = false
-      menu?.querySelector('summary')?.focus()
-      e.stopPropagation()
-    }
+  // ---- indicators ----
+  const pool = $derived(new Set(indicators.filter(i => !view.leads || i.lead).map(i => i.id)))
+  async function tickInd(n: TreeNode, on: boolean) {
+    const { nodeIndicatorIds, toggleMatrixIndicators } = await import('./pick/indicatorsTree.ts')
+    onchange(toggleMatrixIndicators({ hideInds: view.hideInds, addInds: view.addInds }, nodeIndicatorIds(n, on), on, pool))
   }
 </script>
 
-<svelte:window onkeydown={onkey} onclick={e => { if (menuOpen && menu && !menu.contains(e.target as Node)) menuOpen = false }} />
-
 <section class="controls" aria-label="Matrix controls">
-  <div class="group" role="group" aria-label="Places">
-    <span class="mbon-label">Place groups</span>
-    <div class="row">
-      {#each colls as c (c.id)}
-        <Button variant="quiet" size="sm" pressed={groups.includes(c.id)} onclick={() => toggleColl(c.id)}>
-          {c.title} <span class="n">{computedOf(c.computed, c.total)}</span>
-        </Button>
-      {/each}
-      <label class="search">
-        <Icon name="ui-search" size={16} />
-        <span class="mbon-sr-only">Search place names</span>
-        <input type="search" placeholder="Search places" value={view.q} oninput={e => onchange({ q: e.currentTarget.value })} autocomplete="off" />
-      </label>
-    </div>
-  </div>
+  <PlacePicker mode="multi" {idx} {layers} label={placeLabel} chosen={chosenPlaces} ontoggle={tickPlace}
+    removed={view.hidePlaces.length} onrestore={() => onchange({ hidePlaces: [] })} />
+  <IndicatorPicker mode="multi" label={multiIndicatorLabel(shown.size, view.vocab, view.leads)} {indicators} {vocabs} vocab={view.vocab}
+    onvocab={v => onchange({ vocab: v })} chosen={shown} {idx} places={displayed} ontoggle={tickInd}
+    leads={view.leads} onleads={v => onchange({ leads: v })} showEmpty={view.showEmpty} onempty={v => onchange({ showEmpty: v })}
+    removed={view.hideInds.length} onrestore={() => onchange({ hideInds: [] })} />
 
-  <div class="group" role="group" aria-label="Indicators">
-    <span class="mbon-label">Group indicators by</span>
-    <div class="row">
-      {#each VOCABS as v (v.id)}
-        <Button variant="quiet" size="sm" pressed={view.vocab === v.id} onclick={() => onchange({ vocab: v.id })}>{v.label}</Button>
-      {/each}
-      <Toggle checked={view.leads} label="Leads only" onchange={(v: boolean) => onchange({ leads: v })} />
-      <Toggle checked={view.showEmpty} label="Show indicators without values here" onchange={(v: boolean) => onchange({ showEmpty: v })} />
+  <div class="group om-stack-s" role="group" aria-label="Layout">
+    <span class="mbon-label">Layout</span>
+    <div class="row om-row">
       <Button variant="quiet" size="sm" pressed={view.axes === 'places'} onclick={() => onchange({ axes: view.axes === 'places' ? 'indicators' : 'places' })}>
         Places as rows
       </Button>
     </div>
   </div>
-
-  <div class="group menu" role="group" aria-label="Add or restore">
-    <span class="mbon-label">Show or hide</span>
-    <div class="row">
-      <details class="add" bind:open={menuOpen} bind:this={menu}>
-        <summary>Add or restore{#if removedN} <span class="n">{removedN} removed</span>{/if}</summary>
-        <div class="panel">
-          {#if removedN}
-            <div class="sect">
-              <div class="sh"><span class="mbon-label">Removed</span><Button variant="quiet" size="sm" onclick={restoreAll}>Restore all</Button></div>
-              {#if removedPlaces.length}
-                <div class="chips" role="group" aria-label="Removed places">
-                  {#each removedPlaces as p (p.id)}
-                    <Button variant="quiet" size="sm" aria-label="Restore {p.name}" onclick={() => restorePlace(p.id)}>{p.name}</Button>
-                  {/each}
-                </div>
-              {/if}
-              {#if removedInds.length}
-                <div class="chips" role="group" aria-label="Removed indicators">
-                  {#each removedInds as i (i.id)}
-                    <Button variant="quiet" size="sm" aria-label="Restore {i.short}" onclick={() => restoreInd(i.id)}>{i.short}</Button>
-                  {/each}
-                </div>
-              {/if}
-              <p class="hint">Select a name to put it back.</p>
-            </div>
-          {:else}
-            <p class="hint">Nothing is removed. Use the <Icon name="ui-close" size={14} /> on a place or indicator header to take it off the display.</p>
-          {/if}
-          {#if more.length}
-            <div class="sect">
-              <span class="mbon-label">More indicators</span>
-              {#each more as g (g.series)}
-                <div class="series">
-                  <span class="st">{g.title}</span>
-                  <div class="chips" role="group" aria-label="Add from {g.title}">
-                    {#each g.indicators as i (i.id)}
-                      <Button variant="quiet" size="sm" aria-label="Add {i.short}" title={i.title} onclick={() => addInd(i.id)}>{i.short}</Button>
-                    {/each}
-                  </div>
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </div>
-      </details>
-    </div>
-  </div>
-
-  <div class="group" role="group" aria-label="Detail level">
+  <div class="group om-stack-s" role="group" aria-label="Detail level">
     <span class="mbon-label">Detail</span>
-    <div class="row">
+    <div class="row om-row">
       {#each DEPTHS as d (d)}
         <Button variant="quiet" size="sm" pressed={view.depth === d} onclick={() => onchange({ depth: d })}>
           <Icon name={DEPTH_UI[d].icon} size={16} />{DEPTH_UI[d].label}
@@ -156,83 +82,24 @@
     </div>
   </div>
   {#if reportHref}
-    <div class="group" role="group" aria-label="Report">
+    <div class="group om-stack-s" role="group" aria-label="Report">
       <span class="mbon-label">Report</span>
-      <div class="row">
+      <div class="row om-row">
         <Button variant="quiet" size="sm" href={reportHref}><Icon name="view-report" size={16} />Report</Button>
       </div>
     </div>
   {/if}
-  <p class="note">{DEPTH_UI[view.depth].note}</p>
+  {#if view.q}
+    <div class="group om-stack-s" role="group" aria-label="Place search">
+      <span class="mbon-label">Place search</span>
+      <div class="row om-row">
+        <Button variant="quiet" size="sm" aria-label="Clear the place search “{view.q}”" onclick={() => onchange({ q: '' })}>“{view.q}” <Icon name="ui-close" size={14} /></Button>
+      </div>
+    </div>
+  {/if}
+  <p class="note om-note-w">{DEPTH_UI[view.depth].note}</p>
 </section>
 
 <style>
-  .controls { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: flex-start; }
-  .group { display: grid; gap: var(--space-2); min-width: 0; }
-  .row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
-  .n { font: var(--type-label); letter-spacing: 0; color: var(--text-body); }
-  .search {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: 0 var(--space-3);
-    min-width: 0;
-    height: 2rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: var(--control-bg);
-    color: var(--text-body);
-  }
-  .search:focus-within { border-color: var(--accent); }
-  .search input { border: 0; background: none; outline: none; width: 11rem; min-width: 0; font: var(--type-small); color: var(--text-strong); }
-  .search input:focus-visible { outline: none; }
-  .search input::placeholder { color: var(--text-body); opacity: 1; }
-  .menu { position: relative; }
-  .add { position: relative; }
-  .add summary {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    height: 2rem;
-    padding: 0 var(--space-3);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: var(--control-bg);
-    color: var(--text-strong);
-    font: var(--type-small);
-    cursor: pointer;
-    list-style: none;
-  }
-  .add summary::-webkit-details-marker { display: none; }
-  .add[open] summary { border-color: var(--accent); }
-  .panel {
-    position: absolute;
-    z-index: 30;
-    top: calc(100% + var(--space-1));
-    left: 0;
-    display: grid;
-    gap: var(--space-4);
-    width: min(36rem, calc(100vw - 2 * var(--space-4)));
-    max-height: min(26rem, 60dvh);
-    overflow: auto;
-    padding: var(--space-3) var(--space-4);
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-md);
-  }
-  .sect { display: grid; gap: var(--space-2); }
-  .sh { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
-  .chips { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); }
-  .series { display: grid; gap: var(--space-1); }
-  .st { font: var(--type-small); color: var(--text-strong); }
-  .hint { margin: 0; font: var(--type-small); color: var(--text-body); }
-  .hint :global(svg) { vertical-align: -2px; }
-  .note { flex-basis: 100%; margin: 0; font: var(--type-small); color: var(--text-body); }
-  /* the menu sits toward the right of the controls: open it leftwards so it stays on the page */
-  @media (min-width: 900px) { .panel { left: auto; right: 0; } }
-  @media (max-width: 640px) {
-    .search input { width: 8rem; }
-    .menu { flex-basis: 100%; }
-  }
+  .controls { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: flex-start; min-width: 0; }
 </style>

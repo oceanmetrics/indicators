@@ -42,6 +42,7 @@
 
   --map-line: #ffffff;                 /* outline between filled places */
   --map-none: #6f6e69;                 /* outline of a place with no value (no fill) */
+  --map-member: #b9b8b2;               /* faint outline of a place of the collection that is not computed (no fill) */
   --map-focus: #082129;                /* outline of the selected place */
 }
 
@@ -72,5 +73,6 @@
 
   --map-line: #1a1a19;
   --map-none: #a9a8a2;
+  --map-member: #55544f;
   --map-focus: #f1f9fb;
 }

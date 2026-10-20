@@ -8,7 +8,8 @@
 // - Place: place (a place_id), coll (its group; kept for old links, the place is found by its id), method
 //   (iea-sd | names-pct | values: overrides every continuous card's status method), ind (the indicator opened: its card
 //   comes first).
-// - Map: ind (the indicator), coll (the collection), color (value | departure | status | trend | record | class |
+// - Map: ind (the indicator), coll (the place group: a gazetteer collection; an old link's values collection still resolves),
+//   place (the place selected), color (value | departure | status | trend | record | class |
 //   share), t (the period shown: "2024", "2024-07"; none = the latest), cls (the class of `share`), grain (year |
 //   decade | month: the grain read; the indicator's status grain when absent), method.
 // - Report: the report spec's own flat keys (src/report/spec.ts: pi, px, ctx, ii, ix, layout, status, recent, base,
@@ -139,6 +140,7 @@ export function serializeHash(s: ViewState): string {
     parts.push('view=map')
     if (s.ind) parts.push('ind=' + enc(s.ind))
     if (s.coll) parts.push('coll=' + enc(s.coll))
+    if (s.place) parts.push('place=' + enc(s.place))
     if (s.color) parts.push('color=' + s.color)
     if (s.t) parts.push('t=' + s.t)
     if (s.cls) parts.push('cls=' + enc(s.cls))
@@ -167,8 +169,8 @@ export function reportHref(from: Pick<ViewState, 'vocab' | 'depth'>, spec: Repor
 }
 
 /** the href of the Map view of an indicator (with `#`), carrying the shared keys of the state it is opened from */
-export function mapHref(from: Pick<ViewState, 'vocab' | 'depth' | 'method'>, ind: string | null, coll?: string | null, color?: MapColor | null): string {
-  return '#' + serializeHash({ ...DEFAULT_STATE, view: 'map', ind, coll: coll ?? null, color: color ?? null, vocab: from.vocab, depth: from.depth, method: from.method })
+export function mapHref(from: Pick<ViewState, 'vocab' | 'depth' | 'method'>, ind: string | null, coll?: string | null, color?: MapColor | null, place?: string | null): string {
+  return '#' + serializeHash({ ...DEFAULT_STATE, view: 'map', ind, coll: coll ?? null, place: place ?? null, color: color ?? null, vocab: from.vocab, depth: from.depth, method: from.method })
 }
 
 /** the href of a place's view (with `#`), carrying the shared keys of the state it is opened from */
@@ -191,4 +193,29 @@ export function matrixHref(came: ViewState | null, place: { vocab: VocabId; dept
 /** the href of the Matrix narrowed to one place group (with `#`), carrying the shared keys of the state it is opened from */
 export function groupHref(from: Pick<ViewState, 'vocab' | 'depth'>, coll: string): string {
   return '#' + serializeHash({ ...DEFAULT_STATE, colls: [coll], vocab: from.vocab, depth: from.depth })
+}
+
+// ---- the context a view switch carries ----
+
+/**
+ * the Map opened from the Matrix: the group of the last opened cell (else the first group on display) and that cell's
+ * indicator; with no cell opened yet, the first lead with values in the group (`fallback`)
+ */
+export function matrixToMapHref(
+  from: Pick<ViewState, 'vocab' | 'depth' | 'method'>, groups: string[], last: { indicator: string; group: string } | null, fallback: (group: string) => string | null,
+): string {
+  const group = last?.group ?? groups[0] ?? null
+  return mapHref(from, last?.indicator ?? (group ? fallback(group) : null), group)
+}
+
+/** the Matrix opened from the Map: the Map's group, and the cell of the selected place when there is one */
+export function mapToMatrixHref(from: Pick<ViewState, 'vocab' | 'depth'>, group: string | null, ind: string | null, place: string | null): string {
+  return '#' + serializeHash({ ...DEFAULT_STATE, colls: group ? [group] : [], cell: place && ind ? { place, indicator: ind } : null, vocab: from.vocab, depth: from.depth })
+}
+
+/** the Map opened from the Place view: the place's group and the indicator opened (else `fallback(group)`), with the place selected */
+export function placeToMapHref(
+  from: Pick<ViewState, 'vocab' | 'depth' | 'method'>, place: { id: string; coll: string }, ind: string | null, fallback: (group: string) => string | null,
+): string {
+  return mapHref(from, ind ?? fallback(place.coll), place.coll, null, place.id)
 }

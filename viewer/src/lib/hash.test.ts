@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_STATE, groupHref, mapHref, matrixHref, parseHash, placeHref, reportHref, serializeHash } from './hash.ts'
+import { DEFAULT_STATE, groupHref, mapHref, mapToMatrixHref, matrixHref, matrixToMapHref, placeToMapHref, parseHash, placeHref, reportHref, serializeHash } from './hash.ts'
 import { DEFAULT_SPEC } from '../../../src/report/spec.ts'
 import type { ViewState } from './hash.ts'
 
@@ -169,5 +169,35 @@ describe('the Report view hash', () => {
   })
   it('reportHref carries the vocabulary and the depth', () => {
     expect(reportHref({ vocab: 'eov', depth: 'skim' }, spec)).toBe('#view=report&pi=coll:places&px=NMS:TBNMS&ii=cat:water-quality,series:sst&layout=scorecard&title=Sanctuaries%2C%20water%20%26%20heat&vocab=eov&depth=skim')
+  })
+})
+
+describe('the context a view switch carries', () => {
+  const from = { vocab: 'onms' as const, depth: 'swim' as const, method: null }
+  const lead = (g: string) => (g === 'mr_eez' ? 'obis:species' : g === 'places' ? 'erddap:dhw_5km:CRW_SST:mean' : null)
+  it('Matrix to Map opens the group and the indicator of the last opened cell', () => {
+    expect(matrixToMapHref(from, ['places'], { indicator: 'sdg:ER_MRN_MPA', group: 'mr_eez' }, lead)).toBe('#view=map&ind=sdg:ER_MRN_MPA&coll=mr_eez')
+  })
+  it('with no cell opened yet it opens the first group on display on that group first lead with values', () => {
+    expect(matrixToMapHref(from, ['mr_eez', 'places'], null, lead)).toBe('#view=map&ind=obis:species&coll=mr_eez')
+    expect(matrixToMapHref({ ...from, depth: 'dive', vocab: 'eov' }, ['places'], null, lead)).toBe('#view=map&ind=erddap:dhw_5km:CRW_SST:mean&coll=places&vocab=eov&depth=dive')
+  })
+  it('a group with no lead with values opens the Map with no indicator, which then opens on its default', () => {
+    expect(matrixToMapHref(from, ['noaa_nerrs'], null, lead)).toBe('#view=map&coll=noaa_nerrs')
+  })
+  it('Map to Matrix opens the Map group and the cell of the selected place, with the vocabulary and detail', () => {
+    expect(mapToMatrixHref(from, 'noaa_nerrs', 'erddap:IMERG:precipitation:mean', 'NERRS:WEL')).toBe('#colls=noaa_nerrs&cell=NERRS:WEL|erddap:IMERG:precipitation:mean')
+    expect(mapToMatrixHref({ vocab: 'eov', depth: 'dive' }, 'mr_eez', 'sdg:x', null)).toBe('#colls=mr_eez&vocab=eov&depth=dive')
+    expect(mapToMatrixHref(from, null, null, null)).toBe('#')
+  })
+  it('Place to Map opens the place group and the indicator opened, with the place selected', () => {
+    expect(placeToMapHref(from, { id: 'NMS:FKNMS', coll: 'places' }, 'sdg:x', lead)).toBe('#view=map&ind=sdg:x&coll=places&place=NMS:FKNMS')
+    expect(placeToMapHref(from, { id: 'NMS:FKNMS', coll: 'places' }, null, lead)).toBe('#view=map&ind=erddap:dhw_5km:CRW_SST:mean&coll=places&place=NMS:FKNMS')
+  })
+  it('the Map hash round-trips its selected place; an old Map link has none', () => {
+    const s = parseHash('#view=map&ind=sdg:x&coll=mr_eez&place=MRGID:8371&color=value')
+    expect([s.view, s.coll, s.place]).toEqual(['map', 'mr_eez', 'MRGID:8371'])
+    expect(serializeHash(s)).toBe('view=map&ind=sdg:x&coll=mr_eez&place=MRGID:8371&color=value')
+    expect(parseHash('#view=map&ind=sdg:x&coll=mr_eez').place).toBeNull()
   })
 })

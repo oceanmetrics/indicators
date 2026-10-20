@@ -385,3 +385,28 @@ describe('placeTokens and tableOrder', () => {
     expect(tableOrder(m.items).map(i => i.placeId)).toEqual(['B', 'A', 'D', 'C'])
   })
 })
+
+// ---- a place group reads every values collection that holds its places ----
+
+describe('the Map of a place group', () => {
+  const ind = cont()
+  // E is in the values collection `c2` and home group `g`; A is in `c` with home group `g` too; B is in `c` with home group `h`
+  const withColl = (rows: CoverageRow[], coll: string, place_coll: string) => rows.map(r => ({ ...r, coll, place_coll }))
+  const cov = [
+    ...withColl(covOf(A, ind, NAMES), 'c', 'g'),
+    ...withColl(covOf(years('E', 2000, 2019, y => 5 + (y % 2)), ind, { E: 'Echo' }), 'c2', 'g'),
+    ...withColl(covOf(B, ind, NAMES), 'c', 'h'),
+  ]
+  it('a group holds its places from every values collection, and none of another group', () => {
+    const m = mapModel(ind, cov, null, opts({ group: 'g' }))
+    expect(m.items.map(i => i.placeId)).toEqual(['A', 'E'])
+    expect(mapModel(ind, cov, null, opts({ group: 'h' })).items.map(i => i.placeId)).toEqual(['B'])
+  })
+  it('no group (and no collection) is every place, as before', () => {
+    expect(mapModel(ind, cov, null, opts()).items.map(i => i.placeId)).toEqual(['A', 'B', 'E'])
+  })
+  it('a coverage table built before place_coll groups by the values collection', () => {
+    const old = cov.map(r => ({ ...r, place_coll: undefined }))
+    expect(mapModel(ind, old, null, opts({ group: 'c2' })).items.map(i => i.placeId)).toEqual(['E'])
+  })
+})

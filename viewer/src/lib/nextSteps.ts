@@ -17,19 +17,30 @@ export function erddapPlacesHref(placeId: string, dataset: string, variable: str
 }
 
 export interface RequestInput {
-  placeId: string
-  placeName: string
-  /** the gazetteer collection of the place */
+  /** a request for one place and one indicator names all of placeId, placeName, indicatorId and short; one for a whole collection names only the collection (and its title) */
+  placeId?: string
+  placeName?: string
+  /** the gazetteer collection of the place, or the collection asked for */
   collection: string
-  indicatorId: string
+  /** the collection's title, for the issue title of a collection-only request */
+  collectionTitle?: string
+  indicatorId?: string
   /** the indicator's short title, for the issue title */
-  short: string
+  short?: string
 }
 
-/** the indicator-request issue form, pre-filled (GitHub reads the form's input ids, title and template from the query) */
+/**
+ * the indicator-request issue form, pre-filled (GitHub reads the form's input ids, title and template from the query).
+ * a request for a whole collection carries `collection` only: a maintainer reviews what to compute there.
+ */
 export function requestHref(r: RequestInput): string {
-  const title = `Request: ${r.short} for ${r.placeName}`
-  return `${SOURCE_HREF}/issues/new?template=indicator-request.yml&title=${enc(title)}&place=${enc(r.placeId)}&collection=${enc(r.collection)}&indicator=${enc(r.indicatorId)}`
+  const title = r.placeId
+    ? `Request: ${r.short} for ${r.placeName}`
+    : `Request: indicators for ${r.collectionTitle ?? r.collection}`
+  const fields = [
+    r.placeId ? `place=${enc(r.placeId)}` : '', `collection=${enc(r.collection)}`, r.indicatorId ? `indicator=${enc(r.indicatorId)}` : '',
+  ].filter(Boolean)
+  return `${SOURCE_HREF}/issues/new?template=indicator-request.yml&title=${enc(title)}&${fields.join('&')}`
 }
 
 /**

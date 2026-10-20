@@ -76,7 +76,7 @@
                 {/each}
               </ul>
             {:else}
-              <div class="grid">
+              <div class="grid om-cards">
                 {#each t.indicators as i (i.id)}
                   <IndicatorCard {catalog} uid="{p.id}-" ind={i} place={p} collTitle={titles(p.coll)} term={t.term} {vocab} {depth} method={methodFor(i, spec)} cov={pickRow(idx, p.id, i)}
                     opts={{ recent: recentFor(i, spec), baseline: spec.style.baseline, from: spec.time.from, to: spec.time.to }} />
@@ -89,13 +89,13 @@
   {#each places as p (p.id)}
     {@const tabs = tabsOf(p)}
     {@const active = activeOf(p, tabs)}
-    <section class="place" aria-labelledby="pl-{p.id}">
+    <section class="place om-stack" aria-labelledby="pl-{p.id}">
       <header>
         <span class="mbon-label">{titles(p.coll)}</span>
         <h3 id="pl-{p.id}"><a href={placeHref(p.id, p.coll)}>{p.name}</a></h3>
       </header>
       {#if tabs.length === 0}
-        <p class="empty">No chosen indicator has a value here.</p>
+        <p class="empty om-note">No chosen indicator has a value here.</p>
       {:else}
         {#if !all}
         <div class="tabs" role="tablist" aria-label="Categories for {p.name}">
@@ -103,7 +103,7 @@
             {@const gi = glyphOf(t.term.glyph)}
             <button type="button" role="tab" id="tab-{p.id}-{t.term.id}" aria-selected={active?.term.id === t.term.id} aria-controls="panel-{p.id}" tabindex={active?.term.id === t.term.id ? 0 : -1}
               onclick={() => (chosen[p.id] = t.term.id)} onkeydown={e => onkey(e, p, tabs)}>
-              {#if gi}<Icon name={gi} size={16} />{/if}{t.term.label} <span class="n">{t.indicators.length}</span>
+              {#if gi}<Icon name={gi} size={16} />{/if}{t.term.label} <span class="n om-count">{t.indicators.length}</span>
             </button>
           {/each}
         </div>
@@ -125,13 +125,11 @@
 
 <style>
   .cl { display: grid; gap: var(--space-6); min-width: 0; }
-  .place { display: grid; gap: var(--space-3); min-width: 0; }
   header { display: grid; gap: var(--space-1); }
   h3 { margin: 0; font: var(--fw-bold) var(--text-lg) / 1.2 var(--font-display); color: var(--text-strong); }
   h3 a { color: inherit; text-decoration: none; }
   h3 a:hover { color: var(--link); text-decoration: underline; }
   .cat { margin: var(--space-3) 0 0; font: var(--fw-semibold) var(--text-md) / 1.25 var(--font-display); color: var(--text-strong); }
-  .empty { margin: 0; font: var(--type-small); color: var(--text-body); }
   .tabs { display: flex; flex-wrap: wrap; gap: var(--space-1); border-bottom: 1px solid var(--border); }
   .tabs button {
     display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); margin-bottom: -1px;
@@ -140,8 +138,6 @@
   .tabs button:hover { color: var(--text-strong); border-bottom-color: var(--border-strong); }
   .tabs button[aria-selected='true'] { color: var(--text-strong); border-bottom-color: var(--brand); }
   .tabs :global(svg) { color: var(--label-color); }
-  .n { font: var(--type-label); letter-spacing: 0; color: var(--text-body); }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 34rem), 1fr)); gap: var(--space-4); align-items: start; min-width: 0; }
   .heads { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
   .heads li { display: flex; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); break-inside: avoid; }
   .gl { flex: none; display: inline-flex; gap: var(--space-1); min-width: 3rem; color: var(--text-strong); }

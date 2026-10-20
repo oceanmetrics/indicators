@@ -21,6 +21,17 @@ describe('the vector paint', () => {
     ])
     expect(lineColorExpr(new Map(), ['c1'], 'none')).toBe('none')
   })
+  it('a computed place with no class keeps the none outline and every other member of the collection gets the faint one', () => {
+    expect(lineColorExpr(classOf, ['c1', 'c2'], 'none', ['NMS:A', 'NMS:D', 'NMS:B'], 'faint')).toEqual([
+      'match', ['get', 'place_id'], ['NMS:A'], 'c1', ['NMS:B', 'NMS:C'], 'c2', ['NMS:D'], 'none', 'faint',
+    ])
+    expect(lineColorExpr(new Map(), ['c1'], 'none', ['W', 'V'], 'faint')).toEqual(['match', ['get', 'place_id'], ['V', 'W'], 'none', 'faint'])
+    // nothing computed has no class: every member is faint
+    expect(lineColorExpr(new Map(), ['c1'], 'none', [], 'faint')).toBe('faint')
+  })
+  it('the faint members are drawn thinnest', () => {
+    expect(lineWidthExpr(['A'], ['A', 'B'])).toEqual(['case', ['in', ['get', 'place_id'], ['literal', ['A']]], 2.5, ['in', ['get', 'place_id'], ['literal', ['A', 'B']]], 1.2, 0.8])
+  })
   it('outlines a classed place heavier than the rest', () => {
     const ids = classedIds(classOf)
     expect(ids).toEqual(['NMS:A', 'NMS:B', 'NMS:C'])

@@ -32,6 +32,8 @@ export interface TreeNode {
   children: TreeNode[]
   /** a series' other members: shown collapsed under "more in this series" */
   more: TreeNode[]
+  /** a link beside the label (the place picker's "in the gazetteer") */
+  link?: { href: string; label: string }
 }
 
 // ---- rule sets ----

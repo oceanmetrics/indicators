@@ -150,17 +150,19 @@ export const GAZETTEER_URL = 'https://oceanmetrics.io/places/'
 export interface Layer {
   title: string
   n: number | null
+  /** the geometry type of the layer's places ("MultiPolygon", "Point"); null when layers.json does not say */
+  geom: string | null
 }
 export type Layers = Record<string, Layer>
 
 /** gazetteer layers.json -> { slug: { title, n } }; anything unreadable gives {} */
 export function parseLayers(json: unknown): Layers {
   const out: Layers = {}
-  const layers = (json as { layers?: { slug?: string; collection?: string; title?: string; n?: number }[] } | null)?.layers
+  const layers = (json as { layers?: { slug?: string; collection?: string; title?: string; n?: number; geom_type?: string }[] } | null)?.layers
   if (!Array.isArray(layers)) return out
   for (const l of layers) {
     const slug = l.collection ?? l.slug
-    if (slug) out[slug] = { title: l.title ?? slug, n: typeof l.n === 'number' ? l.n : null }
+    if (slug) out[slug] = { title: l.title ?? slug, n: typeof l.n === 'number' ? l.n : null, geom: typeof l.geom_type === 'string' ? l.geom_type : null }
   }
   return out
 }

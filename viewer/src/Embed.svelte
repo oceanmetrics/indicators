@@ -89,7 +89,7 @@
   {:else if catalog && mapView}
     {#if MapView}
       <MapView {catalog} view={mapView} titles={c => collTitle(c)} onpatch={patchMap} />
-      <p class="credit"><a href={mapHome} target="_top">View in Ocean Metrics Indicators</a></p>
+      <p class="credit om-note"><a href={mapHome} target="_top">View in Ocean Metrics Indicators</a></p>
     {:else}
       <p class="status" role="status">Loading the map…</p>
     {/if}
@@ -98,7 +98,7 @@
       <IndicatorCard {catalog} {ind} {place} collTitle={collTitle(place.coll)} {term} vocab={want.vocab} depth={want.depth} method={want.method}
         cov={pickRow(idx, place.id, ind)} onsettled={drawn} still={want.still} />
     {/key}
-    <p class="credit">{credit} <a href={home} target="_top">View in Ocean Metrics Indicators</a></p>
+    <p class="credit om-note">{credit} <a href={home} target="_top">View in Ocean Metrics Indicators</a></p>
   {/if}
 </main>
 
@@ -106,5 +106,4 @@
   .embed { padding: var(--space-3); max-width: 48rem; margin: 0 auto; display: grid; gap: var(--space-3); min-width: 0; width: 100%; box-sizing: border-box; }
   .embed.wide { max-width: none; }
   .status { margin: 0; color: var(--text-body); }
-  .credit { margin: 0; font: var(--type-small); color: var(--text-body); }
 </style>

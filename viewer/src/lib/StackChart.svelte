@@ -31,7 +31,7 @@
     <line class="axis" x1={g.plot.x0} x2={g.plot.x1} y1={g.plot.y1} y2={g.plot.y1} />
     <text class="unit" x="4" y="11">share of the area</text>
   </svg>
-  <ul class="key" aria-label="Classes, largest mean share first">
+  <ul class="key om-key" aria-label="Classes, largest mean share first">
     {#each stack.classes as c, i (c.key)}
       <li><span class="sw {swatch(i)}"></span>{c.label} <span class="pct">{fmt(c.mean * 100, 0)}%</span></li>
     {/each}
@@ -47,7 +47,6 @@
   .axis, .xtick { stroke: var(--border-strong); stroke-width: 1; }
   rect { stroke: var(--bg-surface); stroke-width: 0.5; }
   .c0 { fill: var(--c0); } .c1 { fill: var(--c1); } .c2 { fill: var(--c2); } .c3 { fill: var(--c3); } .c4 { fill: var(--c4); } .c5 { fill: var(--c5); } .c-other { fill: var(--c-other); }
-  .key { list-style: none; margin: var(--space-1) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); font: var(--type-small); font-size: 0.75rem; color: var(--text-body); }
   .key li { display: inline-flex; align-items: center; gap: var(--space-2); }
   .pct { font-family: var(--font-mono); color: var(--text-body); }
   .sw { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 2px; }

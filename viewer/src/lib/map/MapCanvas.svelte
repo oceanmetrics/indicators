@@ -9,6 +9,7 @@
   import { Protocol } from 'pmtiles'
   import type { GazLayer } from './gazetteer.ts'
   import { ESRI_TILES } from './credit.ts'
+  import { geometryBounds } from './bounds.ts'
   import { classedIds, fillColorExpr, lineColorExpr, lineWidthExpr, haloWidthExpr } from './paint.ts'
   import type { Expr } from './paint.ts'
   import { infoUrl, mrgidOf, wmsTileUrl } from './wms.ts'
@@ -23,17 +24,20 @@
     /** the outline between filled places, the outline of a place with no class, and the selected place's outline */
     line: string
     none: string
+    /** the places of the collection that are computed (those without a class keep the `none` outline), and the faint outline of the others */
+    known: string[]
+    faint: string
     focus: string
     dark: boolean
     selected: string | null
     /** where a reference collection's click landed (it has no geometry to outline) */
     marker: { lng: number; lat: number } | null
-    onpick: (p: { placeId: string | null; lng: number; lat: number }) => void
+    onpick: (p: { placeId: string | null; lng: number; lat: number; name?: string | null }) => void
     /** 'done' once the map is idle with the data layer on it */
     onstate?: (s: 'loading' | 'done') => void
     label: string
   }
-  let { layer, classOf, colors, line, none, focus, dark, selected, marker, onpick, onstate, label }: Props = $props()
+  let { layer, classOf, colors, line, none, known, faint, focus, dark, selected, marker, onpick, onstate, label }: Props = $props()
 
   let box: HTMLDivElement | undefined = $state()
   let phase = $state<'loading' | 'done'>('loading')
@@ -56,8 +60,27 @@
   let poll: ReturnType<typeof setInterval> | undefined
   function settle(m: maplibregl.Map) {
     clearInterval(poll)
-    m.once('idle', () => { clearInterval(poll); setState('done') })
+    m.once('idle', () => {
+      clearInterval(poll)
+      // a place selected from a link (not by a click on the map) is framed once its tiles are in; the new view loads more tiles
+      if (frame(m)) return settle(m)
+      setState('done')
+    })
     poll = setInterval(() => { if (m.isStyleLoaded() && m.areTilesLoaded()) { clearInterval(poll); setState('done') } }, 400)
+  }
+
+  // the selection already framed, and the one the reader clicked (which stays where the reader put the camera)
+  let framed: string | null = null
+  let clicked: string | null = null
+  function frame(m: maplibregl.Map): boolean {
+    const id = selected
+    if (!id || id === framed || id === clicked || layer.kind !== 'vector' || !layer.source_layer || !m.getSource('places')) return false
+    const feats = m.querySourceFeatures('places', { sourceLayer: layer.source_layer, filter: ['==', ['get', 'place_id'], id] })
+    const b = geometryBounds(feats.map(f => f.geometry as { coordinates?: unknown }))
+    if (!b) return false
+    framed = id
+    m.fitBounds(b, { padding: 80, duration: 0, maxZoom: 9 })
+    return true
   }
 
   onMount(() => {
@@ -98,7 +121,9 @@
     if (layer.kind === 'vector') {
       const f = m.getLayer('fill') ? m.queryRenderedFeatures(e.point, { layers: ['fill'] }) : []
       const id = f[0]?.properties?.place_id
-      onpick({ placeId: id == null ? null : String(id), lng, lat })
+      const name = f[0]?.properties?.name
+      clicked = id == null ? null : String(id)
+      onpick({ placeId: id == null ? null : String(id), lng, lat, name: name == null ? null : String(name) })
       return
     }
     // a reference collection: ask Marine Regions which feature is under the click
@@ -144,7 +169,7 @@
         const sl = layer.source_layer
         m.addLayer({ id: 'fill', type: 'fill', source: 'places', 'source-layer': sl, paint: { 'fill-color': fillColorExpr(classOf, colors) as never, 'fill-opacity': 0.85 } })
         m.addLayer({ id: 'halo', type: 'line', source: 'places', 'source-layer': sl, paint: { 'line-color': none, 'line-width': haloWidthExpr(ids) as never } })
-        m.addLayer({ id: 'line', type: 'line', source: 'places', 'source-layer': sl, paint: { 'line-color': lineColorExpr(classOf, colors, none) as never, 'line-width': lineWidthExpr(ids) as never } })
+        m.addLayer({ id: 'line', type: 'line', source: 'places', 'source-layer': sl, paint: { 'line-color': lineColorExpr(classOf, colors, none, known, faint) as never, 'line-width': lineWidthExpr(ids, known) as never } })
         m.addLayer({ id: 'focus', type: 'line', source: 'places', 'source-layer': sl, filter: ['==', ['get', 'place_id'], ''], paint: { 'line-color': focus, 'line-width': 3 } })
       } else if (layer.raster) {
         const url = wmsTileUrl(layer.raster, wmsEntries(), colors, none, line)
@@ -154,6 +179,7 @@
         m.addLayer({ id: 'pick-ring', type: 'circle', source: 'pick', paint: { 'circle-radius': 9, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-width': 3, 'circle-stroke-color': focus } })
       }
       shown = layer.slug
+      framed = null
       const [w, s, e, n] = layer.bbox
       m.fitBounds([[w, s], [e, n]], { padding: 24, duration: 0, maxZoom: 8 })
       settle(m)
@@ -163,8 +189,8 @@
     if (layer.kind === 'vector') {
       if (!m.getLayer('fill')) return
       m.setPaintProperty('fill', 'fill-color', fillColorExpr(classOf, colors) as never)
-      m.setPaintProperty('line', 'line-color', lineColorExpr(classOf, colors, none) as never)
-      m.setPaintProperty('line', 'line-width', lineWidthExpr(ids) as never)
+      m.setPaintProperty('line', 'line-color', lineColorExpr(classOf, colors, none, known, faint) as never)
+      m.setPaintProperty('line', 'line-width', lineWidthExpr(ids, known) as never)
       m.setPaintProperty('halo', 'line-color', none)
       m.setPaintProperty('halo', 'line-width', haloWidthExpr(ids) as never)
       m.setPaintProperty('focus', 'line-color', focus)
@@ -182,7 +208,7 @@
 
   $effect(() => {
     // every input the drawing reads, so a change redraws; the drawing itself reads no state
-    void [layer, classOf, colors, line, none, focus, selected, marker, ready]
+    void [layer, classOf, colors, line, none, known, faint, focus, selected, marker, ready]
     if (ready) untrack(sync)
   })
 </script>

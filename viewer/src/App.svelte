@@ -4,10 +4,10 @@
   import { Icon } from '../../src/icons/index.ts'
   import { loadCatalog, loadLayers, resolveDataBase, collTitle } from './lib/data.ts'
   import type { Catalog, Indicator, Layers } from './lib/data.ts'
-  import { DEFAULT_STATE, groupHref, mapHref, matrixHref, parseHash, placeHref, reportHref, serializeHash } from './lib/hash.ts'
+  import { DEFAULT_STATE, groupHref, mapHref, mapToMatrixHref, matrixHref, matrixToMapHref, parseHash, placeHref, placeToMapHref, reportHref, serializeHash } from './lib/hash.ts'
   import { DEFAULT_SPEC } from '../../src/report/spec.ts'
   import type { ViewState } from './lib/hash.ts'
-  import { cellModel, groupColumns, groupRows, hiddenPlaces, indexCoverage, matrixStats, pickRow, shownGroups, withValues } from './lib/matrix.ts'
+  import { cellModel, groupColumns, groupRows, indexCoverage, matrixStats, pickRow, shownGroups, withValues } from './lib/matrix.ts'
   import { producerCredits } from './lib/delivery.ts'
   import { APP_NAME, TAGLINE, pageTitle } from './lib/brand/brand.ts'
   import type { Brand } from './lib/brand/brand.ts'
@@ -20,6 +20,7 @@
   import ViewNav from './lib/ViewNav.svelte'
   import { placeCoverage } from './lib/place.ts'
   import { computedGroups } from './lib/nextSteps.ts'
+  import { leadForGroup } from './lib/map/pick.ts'
   import { matrixToSpec } from './lib/report/fromMatrix.ts'
   import { SOURCE_HREF } from './lib/credits.ts'
 
@@ -49,9 +50,28 @@
     else if (view.view === 'map') lastMap = view
     else if (view.view === 'report') lastReport = view
   })
-  const navMatrix = $derived('#' + serializeHash(lastMatrix ?? { ...DEFAULT_STATE, vocab: view.vocab, depth: view.depth }))
+  // the view switch carries the context: Matrix -> Map opens the group and the indicator of the last opened cell, Map -> Matrix the
+  // Map's group (and the cell of the selected place), Place -> Map the place's group and opened indicator with the place selected
+  let lastCell = $state.raw<{ place: string; indicator: string } | null>(null)
+  $effect(() => { if (view.view === 'matrix' && view.cell) lastCell = view.cell })
+  const firstLead = (group: string) => (catalog ? leadForGroup(catalog.manifest.indicators, catalog.coverage, group)?.id ?? null : null)
+  const placeOf = (id: string) => idx?.places.find(p => p.id === id) ?? null
+  const navMatrix = $derived(
+    view.view === 'map' ? mapToMatrixHref(view, view.coll, view.ind, view.place)
+      : '#' + serializeHash(lastMatrix ?? { ...DEFAULT_STATE, vocab: view.vocab, depth: view.depth }),
+  )
   const navReport = $derived(lastReport ? '#' + serializeHash(lastReport) : reportHref(view, DEFAULT_SPEC))
-  const navMap = $derived(lastMap ? '#' + serializeHash(lastMap) : mapHref(view, view.view === 'place' ? null : view.cell?.indicator ?? null))
+  const navMap = $derived.by(() => {
+    if (view.view === 'matrix') {
+      const p = lastCell ? placeOf(lastCell.place) : null
+      return matrixToMapHref(view, groups, lastCell && p ? { indicator: lastCell.indicator, group: p.coll } : null, firstLead)
+    }
+    if (view.view === 'place') {
+      const p = view.place ? placeOf(view.place) : null
+      if (p) return placeToMapHref(view, p, view.ind, firstLead)
+    }
+    return lastMap ? '#' + serializeHash(lastMap) : mapHref(view, null)
+  })
   // when the Place view was entered (0 on a cold page), and how long its lead cards took
   let placeT0 = $state(0)
   let placeMs = $state<number | null>(null)
@@ -72,11 +92,8 @@
   const cols = $derived(idx && !view.showEmpty ? withValues(allCols, rows, idx, view.addInds) : allCols)
   const nHidden = $derived(allCols.reduce((n, g) => n + g.indicators.length, 0) - cols.reduce((n, g) => n + g.indicators.length, 0))
   const shown = $derived(new Set(cols.flatMap(g => g.indicators.map(i => i.id))))
-  const removedPlaces = $derived(idx ? hiddenPlaces(idx, view.hidePlaces) : [])
+  const displayed = $derived(rows.flatMap(g => g.places))
   const stats = $derived(idx ? matrixStats(rows, cols, idx) : null)
-  const collChips = $derived(
-    idx ? idx.colls.map(c => ({ id: c, title: title(c), computed: idx.places.filter(p => p.coll === c).length, total: total(c) })) : [],
-  )
   const credits = $derived(catalog ? producerCredits(catalog.manifest) : [])
   // "Report" in the Matrix toolbar: what the Matrix shows now, as a report spec
   const matrixReportHref = $derived(catalog && idx && view.view === 'matrix' ? reportHref(view, matrixToSpec({ ...view, colls: groups }, { idx, indicators: catalog.manifest.indicators })) : '')
@@ -191,24 +208,24 @@
       <Notice kind="error">Could not load the catalog: {error}. Use <code>?data=&lt;base URL&gt;</code> to point at another one.</Notice>
     {:else if catalog && view.view === 'place'}
       {#if PlaceView}
-        <PlaceView {catalog} {view} titles={title} {backHref} onpatch={patch} onready={ms => (placeMs = ms)} t0={placeT0} />
+        {#key view.place}<PlaceView {catalog} {view} titles={title} idxAll={idx!} {layers} {backHref} onpatch={patch} onready={ms => (placeMs = ms)} t0={placeT0} />{/key}
       {:else}
         <p class="status" role="status">Loading the place view…</p>
       {/if}
     {:else if catalog && view.view === 'map'}
       {#if MapView}
-        <MapView {catalog} {view} titles={title} onpatch={patch} />
+        <MapView {catalog} {view} titles={title} {idx} {layers} onpatch={patch} />
       {:else}
         <p class="status" role="status">Loading the map…</p>
       {/if}
     {:else if catalog && view.view === 'report'}
       {#if ReportView}
-        <ReportView {catalog} {view} titles={title} onpatch={patch} />
+        <ReportView {catalog} {view} titles={title} {layers} onpatch={patch} />
       {:else}
         <p class="status" role="status">Loading the report…</p>
       {/if}
     {:else if catalog && idx}
-      <Toolbar view={view} colls={collChips} {groups} onchange={patch} indicators={catalog.manifest.indicators} {shown} {removedPlaces} reportHref={matrixReportHref} />
+      <Toolbar {view} {idx} {layers} {groups} onchange={patch} indicators={catalog.manifest.indicators} vocabs={catalog.manifest.vocabularies} {shown} {displayed} reportHref={matrixReportHref} />
       <p class="summary" role="status" aria-live="polite">
         <Icon name="view-matrix" size={18} />
         <span>

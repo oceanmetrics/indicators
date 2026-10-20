@@ -102,7 +102,7 @@
      button, shown on focus, goes straight to the first cell -->
 <button type="button" class="skip" onclick={() => box?.querySelector<HTMLButtonElement>('button.cell')?.focus()}>Skip to the first cell</button>
 <div class="box" role="region" aria-label={indRows ? 'Indicators by places' : 'Places by indicators'} tabindex="-1" bind:this={box}>
-  <table class="matrix" class:indrows={indRows}>
+  <table class="matrix om-t" class:indrows={indRows}>
     <thead>
       <tr class="groups">
         <th class="rowh corner" scope="col" rowspan="2"><span class="mbon-label">{indRows ? 'Indicator' : 'Place'}</span></th>
@@ -184,19 +184,10 @@
     border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--control-bg);
     font: var(--type-small); color: var(--text-strong);
   }
-  table.matrix {
-    border-collapse: separate;
-    border-spacing: 0;
-    width: max-content;
-    min-width: 100%;
-    font-variant-numeric: tabular-nums;
-  }
-  th, td { padding: 0; border-bottom: 1px solid var(--divider); text-align: left; font-weight: inherit; }
   td { min-width: 9.5rem; width: 9.5rem; vertical-align: top; }
   td.empty { padding: var(--space-5); color: var(--text-body); }
 
   /* header rows: the group row, then the heads row below it */
-  thead th { position: sticky; background: var(--bg-surface); z-index: 3; }
   thead tr.groups th { top: 0; height: var(--grp-h); border-bottom: 1px solid var(--border); vertical-align: middle; }
   thead tr.heads th { top: var(--grp-h); vertical-align: bottom; border-bottom: 1px solid var(--border-strong); }
   th.group { padding: 0 var(--space-3); }
@@ -213,7 +204,6 @@
   .pn { display: block; font: var(--fw-medium) var(--text-sm) / 1.25 var(--font-sans); color: var(--text-strong); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
   .pn:hover { color: var(--link); text-decoration-color: currentColor; }
   .pid { display: block; margin-top: 2px; font: var(--fw-regular) 0.6875rem / 1.3 var(--font-mono); color: var(--text-body); overflow-wrap: anywhere; }
-  tr.band th { position: sticky; left: 0; background: var(--bg-tint); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); }
   tr.band .gh { position: sticky; left: var(--space-3); }
   /* a place group's head: its title, then "n of N computed" and the gazetteer link; wraps in a one-column group */
   .gp { display: block; width: max-content; max-width: min(100%, 24rem); white-space: normal; }

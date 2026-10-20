@@ -18,7 +18,7 @@ describe('resolveDataBase', () => {
 
 describe('collection titles', () => {
   const g = parseLayers({ layers: [
-    { slug: 'mr_eez', title: 'Marine Regions EEZ', n: 285 }, { slug: 'x', collection: 'noaa_nerrs', title: 'NOAA National Estuarine Research Reserves', n: 30 },
+    { slug: 'mr_eez', title: 'Marine Regions EEZ', n: 285 }, { slug: 'x', collection: 'noaa_nerrs', title: 'NOAA National Estuarine Research Reserves', n: 30, geom_type: 'MultiPolygon' },
     { slug: 'no_title' }, { slug: 'boem_wind_leases', title: 'BOEM offshore wind lease outlines', n: 52 },
   ] })
   it('the short group title wins, then the gazetteer title, then the slug', () => {
@@ -31,8 +31,8 @@ describe('collection titles', () => {
     expect(collTitle('mystery', g)).toBe('mystery')
   })
   it('layers.json gives the title and the number of places of each collection', () => {
-    expect(g.noaa_nerrs).toEqual({ title: 'NOAA National Estuarine Research Reserves', n: 30 })
-    expect(g.no_title).toEqual({ title: 'no_title', n: null })
+    expect(g.noaa_nerrs).toEqual({ title: 'NOAA National Estuarine Research Reserves', n: 30, geom: 'MultiPolygon' })
+    expect(g.no_title).toEqual({ title: 'no_title', n: null, geom: null })
   })
   it('unreadable layers.json gives no layers', () => {
     expect(parseLayers(null)).toEqual({})

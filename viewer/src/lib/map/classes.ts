@@ -15,8 +15,10 @@ import { defaultMethod, seriesOf } from '../place.ts'
 import type { PlaceRow } from '../valuesData.ts'
 
 export interface MapOpts {
-  /** the collection drawn; every collection of the indicator when null */
+  /** the values collection read; every collection of the indicator when null */
   coll?: string | null
+  /** the place group drawn (a place's `place_coll ?? coll`): its places from every values collection that holds them; every group when null */
+  group?: string | null
   color: MapColor | null
   /** the period shown ("2024", "2024-07"); null = each place's latest */
   t: string | null
@@ -268,7 +270,7 @@ function periodsOf(places: P[], grain: Grain): string[] {
  * loaded (null before): until then the latest period is read from the coverage rows, which the values reproduce.
  */
 export function mapModel(ind: Indicator, coverage: CoverageRow[], values: Map<string, PlaceRow[]> | null, opts: MapOpts): MapModel {
-  const mine = coverage.filter(r => r.indicator === ind.id && (!opts.coll || r.coll === opts.coll))
+  const mine = coverage.filter(r => r.indicator === ind.id && (!opts.coll || r.coll === opts.coll) && (!opts.group || (r.place_coll ?? r.coll) === opts.group))
   const grain = mapGrain(ind, mine, opts.grain ?? null)
   const byPlace = new Map<string, CoverageRow[]>()
   for (const r of mine) byPlace.set(r.place_id, [...(byPlace.get(r.place_id) ?? []), r])

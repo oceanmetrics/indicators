@@ -22,9 +22,9 @@
 </script>
 
 {#if split}
-  <p class="line" role="status">Split into sections by {split}: each section fits {LAYOUTS[layout].title}. <Button variant="quiet" size="sm" onclick={onunsplit}>Show as one</Button></p>
+  <p class="line om-note" role="status">Split into sections by {split}: each section fits {LAYOUTS[layout].title}. <Button variant="quiet" size="sm" onclick={onunsplit}>Show as one</Button></p>
 {:else if budget.ok}
-  <p class="line" role="status">{budgetLine(layout, budget)}</p>
+  <p class="line om-note" role="status">{budgetLine(layout, budget)}</p>
 {:else}
   <Notice kind="warn">
     <span class="msg">{budgetLine(layout, budget)}. Over: {budget.over.join(', ')}.</span>
@@ -41,7 +41,6 @@
 {/if}
 
 <style>
-  .line { margin: 0; font: var(--type-small); color: var(--text-body); }
   .msg { display: block; }
   .fixes { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
 </style>

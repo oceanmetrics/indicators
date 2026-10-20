@@ -116,10 +116,10 @@
   {/if}
 {/snippet}
 
-<section class="sc" aria-label={heading ?? 'Scorecard'}>
-  {#if heading}<h3 class="sh">{heading}</h3>{/if}
-  {#if pending > 0}<p class="note" role="status">Recomputing statuses for this style ({pending} of {inds.length} indicators to go)…</p>{/if}
-  {#if failed > 0}<p class="note" role="status">{failed} cells kept their default status: their values could not be read.</p>{/if}
+<section class="sc om-stack" aria-label={heading ?? 'Scorecard'}>
+  {#if heading}<h3 class="sh om-st">{heading}</h3>{/if}
+  {#if pending > 0}<p class="note om-note" role="status">Recomputing statuses for this style ({pending} of {inds.length} indicators to go)…</p>{/if}
+  {#if failed > 0}<p class="note om-note" role="status">{failed} cells kept their default status: their values could not be read.</p>{/if}
 
   {#if narrow}
     <div class="cards">
@@ -143,7 +143,7 @@
   {:else}
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div class="box" role="region" aria-label="{heading ?? 'Scorecard'}: places by indicators" tabindex="0">
-      <table class:wide={depth !== 'skim'}>
+      <table class="om-t" class:wide={depth !== 'skim'}>
         <thead>
           <tr class="groups">
             <th class="corner" scope="col" rowspan="2"><span class="mbon-label">Place</span></th>
@@ -174,21 +174,15 @@
       </table>
     </div>
   {/if}
-  <p class="note">{ex} Statuses are relative to each place's own record, not better or worse.</p>
+  <p class="note om-note">{ex} Statuses are relative to each place's own record, not better or worse.</p>
   {#if !heading}<MatrixLegend {vocab} />{/if}
 </section>
 
 <style>
-  .sc { display: grid; gap: var(--space-3); min-width: 0; }
-  .sh { margin: 0; font: var(--fw-semibold) var(--text-md) / 1.25 var(--font-display); color: var(--text-strong); }
-  .note { margin: 0; font: var(--type-small); color: var(--text-body); }
   .box { overflow: auto; max-height: min(78dvh, 60rem); background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); overscroll-behavior: contain; }
   .box:focus-visible { outline-offset: 2px; }
-  table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-variant-numeric: tabular-nums; }
-  th, td { padding: 0; border-bottom: 1px solid var(--divider); text-align: left; font-weight: inherit; }
   td { min-width: 3.25rem; width: 3.25rem; height: 2.5rem; text-align: center; vertical-align: middle; border-right: 1px solid var(--divider); }
   table.wide td { min-width: 5.25rem; width: 5.25rem; height: 3rem; }
-  thead th { position: sticky; background: var(--bg-surface); z-index: 3; }
   thead tr.groups th { top: 0; height: 2.25rem; padding: 0 var(--space-2); border-bottom: 1px solid var(--border); border-right: 1px solid var(--divider); vertical-align: middle; }
   thead tr.heads th { top: 2.25rem; vertical-align: bottom; border-bottom: 1px solid var(--border-strong); border-right: 1px solid var(--divider); padding: var(--space-2) var(--space-1); height: 9.5rem; }
   .gh { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--label-color); position: sticky; left: 12rem; white-space: nowrap; }
@@ -199,7 +193,6 @@
   th.rh { z-index: 2; font: var(--fw-medium) var(--text-sm) / 1.25 var(--font-sans); }
   th.rh a { color: var(--text-strong); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
   th.rh a:hover { color: var(--link); text-decoration-color: currentColor; }
-  tr.band th { position: sticky; left: 0; background: var(--bg-tint); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); }
   .g { display: inline-flex; align-items: center; justify-content: center; gap: 2px; flex-wrap: wrap; max-width: 100%; }
   .st { color: var(--text-strong); display: inline-flex; }
   .tr { color: var(--text-body); display: inline-flex; }

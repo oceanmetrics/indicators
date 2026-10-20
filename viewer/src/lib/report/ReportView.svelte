@@ -7,7 +7,7 @@
   import { Icon } from '../../../../src/icons/index.ts'
   import { LAYOUTS, budgetLine, specId, specJson, specParams } from '../../../../src/report/spec.ts'
   import type { Fix, ReportSpec } from '../../../../src/report/spec.ts'
-  import type { Catalog, VocabId } from '../data.ts'
+  import type { Catalog, Layers, VocabId } from '../data.ts'
   import { downloadBlob } from '../download.ts'
   import { placeHref, reportHref } from '../hash.ts'
   import type { Depth, ViewState } from '../hash.ts'
@@ -25,9 +25,10 @@
     catalog: Catalog
     view: ViewState
     titles: (coll: string) => string
+    layers?: Layers
     onpatch: (p: Partial<ViewState>) => void
   }
-  let { catalog, view, titles, onpatch }: Props = $props()
+  let { catalog, view, titles, layers = {}, onpatch }: Props = $props()
 
   const spec = $derived(view.spec)
   const idx = $derived(indexCoverage(catalog.coverage))
@@ -139,10 +140,10 @@
   <header class="bar">
     <div class="ttl">
       <span class="mbon-label">Report</span>
-      <h2 bind:this={head} tabindex="-1">{title}</h2>
-      <p class="sum" role="status">{summaryLine(spec, model.places.length, model.indicators.length)}</p>
+      <h2 class="om-h2" bind:this={head} tabindex="-1">{title}</h2>
+      <p class="sum om-note" role="status">{summaryLine(spec, model.places.length, model.indicators.length)}</p>
     </div>
-    <div class="acts">
+    <div class="acts om-row">
       <Button variant="quiet" size="sm" pressed={editing} onclick={() => (editing = !editing)}><Icon name="ui-settings" size={16} />{editing ? 'Close builder' : 'Edit'}</Button>
       <Menu label="Export" align="end">
         {#snippet children(close)}
@@ -156,7 +157,7 @@
   </header>
 
   {#if editing}
-    <Builder {catalog} {idx} {spec} {model} vocab={view.vocab} depth={view.depth} {titles} {split} onspec={setSpec} onview={setView} onfix={fix}
+    <Builder {catalog} {idx} {spec} {model} vocab={view.vocab} depth={view.depth} {titles} {layers} {split} onspec={setSpec} onview={setView} onfix={fix}
       onunsplit={() => setSpec({ ...spec, split: null })} ondone={() => { editing = false; head?.focus({ preventScroll: true }) }} />
   {:else if !model.budget.ok || split}
     <Fixes layout={spec.layout} budget={model.budget} {split} onfix={fix} onunsplit={() => setSpec({ ...spec, split: null })} />
@@ -172,9 +173,9 @@
 
   {#if showBody}
     {#each sections as s, n (n)}
-      <section class="sec" aria-label={s.title ?? 'Report'}>
+      <section class="sec om-stack" aria-label={s.title ?? 'Report'}>
         {#if spec.layout === 'cards'}
-          {#if s.title && split === 'category'}<h3 class="st">{s.title}</h3>{/if}
+          {#if s.title && split === 'category'}<h3 class="st om-st">{s.title}</h3>{/if}
           <CardsLayout {catalog} {idx} {spec} places={s.places} groups={s.groups} depth={view.depth} vocab={view.vocab} {titles} placeHref={linkToPlace} all={printing} />
         {:else}
           <ScoreCard {catalog} {idx} {spec} places={s.places} groups={s.groups} depth={view.depth} vocab={view.vocab} {titles} placeHref={linkToPlace} heading={s.title} />
@@ -196,7 +197,7 @@
   {#if view.depth === 'dive'}
     <section class="dive" aria-label="Report configuration">
       <h3 class="mbon-label">Configuration</h3>
-      <p class="id">Report id <code>{id}</code> = hash of this spec with manifest <code>{catalog.manifest.version}</code></p>
+      <p class="id om-meta">Report id <code>{id}</code> = hash of this spec with manifest <code>{catalog.manifest.version}</code></p>
       <div class="jh"><span class="mbon-label">report.json</span><CopyButton text={json} label="Copy spec" /></div>
       <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <pre class="json" tabindex="0" aria-label="report.json">{json}</pre>
@@ -213,17 +214,10 @@
   .print-head { display: none; }
   .bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: var(--space-3); }
   .ttl { display: grid; gap: var(--space-1); min-width: 0; }
-  h2 { margin: 0; font: var(--fw-bold) var(--text-xl) / 1.15 var(--font-display); color: var(--text-strong); text-wrap: balance; }
-  h2:focus, h2:focus-visible { outline: none; }
-  .sum { margin: 0; font: var(--type-small); color: var(--text-body); }
-  .acts { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
-  .sec { display: grid; gap: var(--space-3); min-width: 0; }
-  .st { margin: 0; font: var(--fw-semibold) var(--text-md) / 1.25 var(--font-display); color: var(--text-strong); }
   .small, .empties { margin: 0; font: var(--type-small); color: var(--text-body); }
   .empties { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
   .dive { display: grid; gap: var(--space-2); padding: var(--space-4); background: var(--bg-tint); border-radius: var(--radius-md); min-width: 0; }
   .dive h3 { margin: var(--space-2) 0 0; }
-  .id { margin: 0; font: var(--type-small); color: var(--text-body); overflow-wrap: anywhere; }
   .jh { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
   .json { margin: 0; max-height: 18rem; overflow: auto; padding: var(--space-3); background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font: var(--fw-regular) 0.75rem / 1.4 var(--font-mono); color: var(--text-strong); }
   .links { margin: 0; padding-left: var(--space-5); font: var(--type-small); columns: 2 18rem; }

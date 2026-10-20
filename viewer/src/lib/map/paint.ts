@@ -25,15 +25,25 @@ export function fillColorExpr(classOf: Map<string, number>, colors: string[], fa
 
 /**
  * line-color: a classed place is outlined in its class colour, so one too small to show a fill at this zoom still
- * shows its class; any other place gets the `none` outline
+ * shows its class; a place that is computed but has no class gets the `none` outline; any other member of the collection
+ * (`known` lists the computed ones) gets the faint one. with no `known` list every unclassed place gets `none`.
  */
-export function lineColorExpr(classOf: Map<string, number>, colors: string[], none: string): Expr {
-  return fillColorExpr(classOf, colors, none)
+export function lineColorExpr(classOf: Map<string, number>, colors: string[], none: string, known: string[] = [], faint: string = none): Expr {
+  const base = fillColorExpr(classOf, colors, faint)
+  const rest = known.filter(id => !classOf.has(id)).sort()
+  if (!rest.length) return base
+  if (typeof base === 'string') return ['match', ['get', 'place_id'], rest, none, faint]
+  return [...(base as Expr[]).slice(0, -1), rest, none, faint]
 }
 
-/** line-width: a classed place is outlined heavier (it carries the class when it is too small to fill), the rest thin */
-export function lineWidthExpr(ids: string[]): Expr {
-  return ids.length ? ['case', ['in', ['get', 'place_id'], ['literal', ids]], 2.5, 1.2] : 1.2
+/**
+ * line-width: a classed place is outlined heavier (it carries the class when it is too small to fill), a computed one without
+ * a class thin, and a member that is not computed (when `known` is given) thinner still
+ */
+export function lineWidthExpr(ids: string[], known: string[] = []): Expr {
+  const lit = (xs: string[]) => ['in', ['get', 'place_id'], ['literal', xs]]
+  if (known.length) return ['case', lit(ids), 2.5, lit([...new Set([...known].sort())]), 1.2, 0.8]
+  return ids.length ? ['case', lit(ids), 2.5, 1.2] : 1.2
 }
 
 /**

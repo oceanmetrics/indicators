@@ -121,13 +121,13 @@
     <p class="sentence" class:pending={!model}>{sentence || 'Loading the values…'}</p>
     {#if model}
       {#if model.kind === 'continuous' && model.method !== 'values'}
-        <ul class="marks">
+        <ul class="marks om-marks">
           {#if statusIcon}<li><Icon name={statusIcon} size={22} /><span>{model.status ? STATUS_WORDS[model.status] : 'no status'}</span></li>{/if}
           {#if model.trend}<li><Icon name={`tr-${model.trend}` as IconName} size={22} /><span>trend {TREND_WORDS[model.trend]}</span></li>{/if}
         </ul>
       {/if}
       {#if model.kind === 'empty'}
-        <p class="note">This place has no values for this indicator.</p>
+        <p class="note om-note-s">This place has no values for this indicator.</p>
       {:else if model.kind === 'categorical'}
         <StackChart {model} />
       {:else}
@@ -155,7 +155,7 @@
           <Button variant="quiet" size="sm" pressed={table} onclick={() => (table = !table)}><Icon name="ui-table" size={16} />{table ? 'Hide table' : 'Show table'}</Button>
         </div>
         {#if model.kind === 'continuous'}
-          <p class="note">
+          <p class="note om-note-s">
             {#if model.grain !== ind.status_grain}Values only: a status is given at the {ind.status_grain} grain.
             {:else}{METHOD_NOTES[model.method]}{#if model.method !== 'values'}{' '}{STATUS_NOTE}{/if}{/if}
           </p>
@@ -181,7 +181,7 @@
       <div class="actions" role="group" aria-label="Downloads for this place and indicator">
         <Button variant="quiet" size="sm" onclick={csv}><Icon name="ui-download" size={16} />CSV</Button>
         <Button variant="quiet" size="sm" onclick={parquet}><Icon name="ui-download" size={16} />Parquet</Button>
-        <span class="n">{rows.length} {rows.length === 1 ? "row" : "rows"}, all grains</span>
+        <span class="n om-role">{rows.length} {rows.length === 1 ? "row" : "rows"}, all grains</span>
       </div>
 
       <details class="four">
@@ -217,12 +217,9 @@
   .sub { margin: 2px 0 0; font: var(--fw-regular) 0.75rem / 1.3 var(--font-mono); color: var(--text-body); }
   .sentence { margin: 0; font: var(--fw-medium) var(--text-sm) / 1.45 var(--font-sans); color: var(--text-strong); text-wrap: pretty; }
   .sentence.pending { color: var(--text-body); min-height: 2.9em; }
-  .marks { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); }
-  .marks li { display: flex; align-items: center; gap: var(--space-2); color: var(--text-strong); font: var(--type-small); }
   .controls { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); align-items: center; }
   .ctl { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
   .ctl .mbon-label { margin-right: var(--space-1); }
-  .note { margin: 0; font: var(--type-small); font-size: 0.8125rem; color: var(--text-body); }
   .err { background: var(--notice-err-bg); border-radius: var(--radius-sm); padding: var(--space-3); color: var(--text-strong); }
   .err p { margin: 0 0 var(--space-2); overflow-wrap: anywhere; }
   .tbl { max-height: 14rem; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
@@ -231,7 +228,6 @@
   th[scope='row'], thead th:first-child { text-align: left; font-weight: var(--fw-medium); color: var(--text-strong); }
   thead th { position: sticky; top: 0; background: var(--bg-tint); color: var(--text-strong); font-weight: var(--fw-semibold); }
   .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-  .n { font: var(--fw-regular) 0.75rem / 1 var(--font-mono); color: var(--text-body); }
   .four > summary { cursor: pointer; padding: var(--space-1) 0; list-style: none; display: flex; align-items: center; gap: var(--space-2); }
   .four > summary::-webkit-details-marker { display: none; }
   .four > summary::before { content: '+'; font: var(--fw-bold) 1rem / 1 var(--font-mono); color: var(--label-color); width: 1rem; }
