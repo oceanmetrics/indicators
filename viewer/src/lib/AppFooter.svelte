@@ -11,13 +11,15 @@
     credits: Credit[]
     version: string
     loadMs: number | null
+    /** the Place view: ms until its lead cards had their values */
+    placeMs?: number | null
   }
-  let { brand, credits, version, loadMs }: Props = $props()
+  let { brand, credits, version, loadMs, placeMs = null }: Props = $props()
 </script>
 
 <Footer sourceHref={SOURCE_HREF} sourceLabel="source on GitHub">
   {#snippet release()}manifest {version}{/snippet}
-  {#snippet timing()}{loadMs == null ? '' : `loaded in ${loadMs} ms`}{/snippet}
+  {#snippet timing()}{loadMs == null ? '' : `catalog in ${loadMs} ms`}{placeMs == null ? '' : ` · place view ready in ${placeMs} ms`}{/snippet}
   {#snippet children()}
     <span class="credits">
       {#if brand === 'mbon'}<span class="c"><strong>Sponsored by <a href="https://marinebon.org">MBON</a></strong></span>{/if}

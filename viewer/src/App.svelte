@@ -4,11 +4,11 @@
   import { Icon } from '../../src/icons/index.ts'
   import { loadCatalog, loadLayerTitles, resolveDataBase, collTitle } from './lib/data.ts'
   import type { Catalog, Indicator } from './lib/data.ts'
-  import { DEFAULT_STATE, parseHash, serializeHash } from './lib/hash.ts'
+  import { matrixHref, parseHash, placeHref, serializeHash } from './lib/hash.ts'
   import type { ViewState } from './lib/hash.ts'
   import { cellModel, groupColumns, groupRows, indexCoverage, matrixStats, pickRow } from './lib/matrix.ts'
   import { producerCredits } from './lib/delivery.ts'
-  import { APP_NAME, TAGLINE } from './lib/brand/brand.ts'
+  import { APP_NAME, TAGLINE, pageTitle } from './lib/brand/brand.ts'
   import type { Brand } from './lib/brand/brand.ts'
   import OmHeader from './lib/brand/OmHeader.svelte'
   import AppFooter from './lib/AppFooter.svelte'
@@ -16,6 +16,7 @@
   import Matrix from './lib/Matrix.svelte'
   import MatrixLegend from './lib/MatrixLegend.svelte'
   import Drawer from './lib/Drawer.svelte'
+  import { placeCoverage } from './lib/place.ts'
   import { SOURCE_HREF } from './lib/credits.ts'
 
   let { brand }: { brand: Brand } = $props()
@@ -26,6 +27,14 @@
   let gazetteer = $state<Record<string, string>>({})
   let loadMs = $state<number | null>(null)
   let view = $state<ViewState>(parseHash(typeof location !== 'undefined' ? location.hash : ''))
+
+  // the Place view is its own chunk: the Matrix never pays for the charts, the CSV or the Parquet writer
+  let PlaceView = $state.raw<typeof import('./lib/PlaceView.svelte').default | null>(null)
+  // the Matrix state the reader left to open a place, so "Back to the matrix" can restore it; null on a cold permalink
+  let cameFrom = $state.raw<ViewState | null>(null)
+  // when the Place view was entered (0 on a cold page), and how long its lead cards took
+  let placeT0 = $state(0)
+  let placeMs = $state<number | null>(null)
 
   const title = (coll: string) => collTitle(coll, gazetteer)
   const patch = (p: Partial<ViewState>) => { view = { ...view, ...p } }
@@ -55,8 +64,30 @@
   })
   function onHashChange() {
     const next = parseHash(location.hash)
-    if (serializeHash(next) !== serializeHash(view)) view = next
+    if (serializeHash(next) === serializeHash(view)) return
+    const was = view
+    if (was.view === 'matrix' && next.view === 'place') { cameFrom = was; placeT0 = performance.now(); placeMs = null }
+    view = next
+    // back from a place: scroll to it and put focus on its row header
+    if (was.view === 'place' && next.view === 'matrix' && was.place) {
+      tick().then(() => {
+        const a = [...document.querySelectorAll<HTMLAnchorElement>('a.pn')].find(x => x.dataset.place === was.place)
+        a?.scrollIntoView({ block: 'nearest' })
+        a?.focus({ preventScroll: true })
+      })
+    } else if (next.view !== was.view || next.place !== was.place) {
+      window.scrollTo(0, 0)
+    }
   }
+
+  // ---- the page title: "<view> · Ocean Metrics Indicators" (or "· MBON") ----
+  const placeName = $derived(catalog && view.view === 'place' ? placeCoverage(catalog.coverage, view.place ?? '', view.coll).place?.name ?? view.place : null)
+  $effect(() => { document.title = pageTitle(brand, view.view === 'place' ? (placeName ?? 'Place') : 'Matrix') })
+  $effect(() => {
+    if (view.view === 'place' && !PlaceView) import('./lib/PlaceView.svelte').then(m => { PlaceView = m.default })
+  })
+  const backHref = $derived(matrixHref(cameFrom, { vocab: view.vocab, depth: view.depth, coll: catalog && view.place ? placeCoverage(catalog.coverage, view.place, view.coll).place?.coll ?? null : null }))
+  const linkToPlace = (placeId: string, coll: string) => placeHref(view, placeId, coll)
 
   // ---- the drawer ----
   const open = (place: string, indicator: string) => patch({ cell: { place, indicator } })
@@ -87,7 +118,7 @@
 
 <svelte:window onhashchange={onHashChange} />
 
-{#snippet lensWord()}matrix{/snippet}
+{#snippet lensWord()}{view.view === 'place' ? 'place' : 'matrix'}{/snippet}
 {#snippet helpItems(close: () => void)}
   <button type="button" onclick={() => { document.getElementById('legend')?.scrollIntoView({ block: 'start' }); close() }}>How to read a cell</button>
   <a href={SOURCE_HREF} target="_blank" rel="noopener">Source on GitHub</a>
@@ -104,11 +135,17 @@
 
 <main class="lens" data-state={phase} data-brand={brand}>
   <div class="wrap">
-    <h1 class="mbon-sr-only">{APP_NAME}: places by indicators</h1>
+    <h1 class="mbon-sr-only">{APP_NAME}: {view.view === 'place' ? `${placeName} (place view)` : 'places by indicators'}</h1>
     {#if phase === 'loading'}
       <p class="status" role="status">Loading the manifest and the coverage table…</p>
     {:else if phase === 'error'}
       <Notice kind="error">Could not load the catalog: {error}. Use <code>?data=&lt;base URL&gt;</code> to point at another one.</Notice>
+    {:else if catalog && view.view === 'place'}
+      {#if PlaceView}
+        <PlaceView {catalog} {view} titles={title} {backHref} onpatch={patch} onready={ms => (placeMs = ms)} t0={placeT0} />
+      {:else}
+        <p class="status" role="status">Loading the place view…</p>
+      {/if}
     {:else if catalog && idx}
       <Toolbar view={view} colls={collChips} onchange={patch} />
       <p class="summary" role="status" aria-live="polite">
@@ -118,16 +155,16 @@
           {stats?.withValue} of {stats?.cells} cells have a value · {stats?.withStatus} have a status
         </span>
       </p>
-      <Matrix {catalog} {idx} {cols} {rows} vocab={view.vocab} depth={view.depth} titles={title} open={view.cell} onopen={open} />
+      <Matrix {catalog} {idx} {cols} {rows} vocab={view.vocab} depth={view.depth} titles={title} open={view.cell} onopen={open} placeHref={linkToPlace} />
       <MatrixLegend vocab={view.vocab} />
     {/if}
   </div>
 </main>
 
-<AppFooter {brand} {credits} version={catalog?.manifest.version ?? '…'} {loadMs} />
+<AppFooter {brand} {credits} version={catalog?.manifest.version ?? '…'} {loadMs} {placeMs} />
 
-{#if opened && catalog}
-  <Drawer {catalog} ind={opened.ind} place={opened.place} model={opened.model} depth={view.depth}
+{#if opened && catalog && view.view === 'matrix'}
+  <Drawer {catalog} ind={opened.ind} place={opened.place} model={opened.model} depth={view.depth} vocab={view.vocab}
     collTitle={title(opened.place.coll)} onclose={close} />
 {/if}
 

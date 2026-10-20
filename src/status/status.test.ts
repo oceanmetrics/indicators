@@ -155,7 +155,7 @@ describe('words', () => {
       'The mean over the whole record is 2.33, and 1 SD either side spans −1.19 to 5.85. ' +
       'Values were more than 1 SD above the mean in 2017–2020. Values were never more than 1 SD below the mean. ' +
       'The last value is 9.00 °C in 2020. ' +
-      'Over the last 5 years (2016–2020) was more than 1 SD above its 2006–2020 mean, and rose by more than 1 SD.')
+      'Over the last 5 years (2016–2020) the series was more than 1 SD above its 2006–2020 mean, and rose by more than 1 SD.')
   })
   it('a short record says why there is no status', () => {
     const a = assess(yearly(2018, [1, 2, 3]), 'iea-sd', Y, ctx)
@@ -168,6 +168,15 @@ describe('words', () => {
 })
 
 describe('regressions', () => {
+  it('categorical words: sentence, alt with span, periods and classes', async () => {
+    const { categoricalAlt, categoricalSentence, noValues } = await import('./index.ts')
+    const ctx = { title: 'Bleaching alert', place: 'Florida Keys' }
+    const s = categoricalSentence(ctx, 'No Stress', 0.71, '2025')
+    expect(s).toBe('Bleaching alert in Florida Keys: No Stress over 71% of the area in 2025.')
+    expect(categoricalAlt(s, '1986-01-01', '2025-01-01', 'year', 40, ['No Stress', 'Bleaching Watch']))
+      .toBe('Bleaching alert in Florida Keys: No Stress over 71% of the area in 2025. Stacked shares of the area by class for 1986–2025, 40 years; classes: No Stress, Bleaching Watch.')
+    expect(noValues(ctx)).toBe('Bleaching alert in Florida Keys: no values.')
+  })
   it('a constant series is flat, not ecoidx round-off arrow (cciea_OC_SL3 longitude)', () => {
     const r = ieaSd(yearly(2001, Array(12).fill(117.2)), Y)
     expect([r.status, r.trend, r.ltSd, r.delta]).toEqual(['within', 'flat', 0, 0])

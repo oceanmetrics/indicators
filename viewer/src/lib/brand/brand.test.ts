@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MARK_SVG, parseBrand, themedMark, titleFor } from './brand.ts'
+import { MARK_SVG, pageTitle, parseBrand, themedMark, titleFor } from './brand.ts'
 
 describe('brand', () => {
   it('?brand= picks the instance, oceanmetrics by default', () => {
@@ -17,5 +17,10 @@ describe('brand', () => {
   it('the page title carries the instance', () => {
     expect(titleFor('mbon')).toBe('Ocean Metrics Indicators · MBON')
     expect(titleFor('oceanmetrics')).toBe('Ocean Metrics Indicators · Ocean Metrics')
+  })
+  it('a view’s title is "<view> · Ocean Metrics Indicators", or "· MBON" on the MBON instance', () => {
+    expect(pageTitle('oceanmetrics', 'Matrix')).toBe('Matrix · Ocean Metrics Indicators')
+    expect(pageTitle('oceanmetrics', 'Florida Keys National Marine Sanctuary')).toBe('Florida Keys National Marine Sanctuary · Ocean Metrics Indicators')
+    expect(pageTitle('mbon', 'Matrix')).toBe('Matrix · MBON')
   })
 })

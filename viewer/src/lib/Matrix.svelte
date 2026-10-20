@@ -20,8 +20,10 @@
     titles: (coll: string) => string
     open: { place: string; indicator: string } | null
     onopen: (placeId: string, indicator: string) => void
+    /** the href of a place's view */
+    placeHref: (placeId: string, coll: string) => string
   }
-  let { catalog, idx, cols, rows, vocab, depth, titles, open, onopen }: Props = $props()
+  let { catalog, idx, cols, rows, vocab, depth, titles, open, onopen, placeHref }: Props = $props()
 
   const flat = $derived(cols.flatMap(g => g.indicators))
   const base = import.meta.env.BASE_URL
@@ -67,7 +69,7 @@
         {#each g.places as p (p.id)}
           <tr>
             <th class="place" scope="row">
-              <span class="pn">{p.name}</span>
+              <a class="pn" href={placeHref(p.id, p.coll)} data-place={p.id} title="Open the place view of {p.name}">{p.name}</a>
               <span class="pid">{p.id}</span>
             </th>
             {#each flat as ind (ind.id)}
@@ -122,7 +124,8 @@
 
   th.place { position: sticky; left: 0; z-index: 2; background: var(--bg-surface); min-width: var(--place-w); max-width: var(--place-w); width: var(--place-w); padding: var(--space-2) var(--space-3); border-right: 1px solid var(--border); }
   thead th.place { z-index: 4; top: 0; vertical-align: bottom; }
-  .pn { display: block; font: var(--fw-medium) var(--text-sm) / 1.25 var(--font-sans); color: var(--text-strong); }
+  .pn { display: block; font: var(--fw-medium) var(--text-sm) / 1.25 var(--font-sans); color: var(--text-strong); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+  .pn:hover { color: var(--link); text-decoration-color: currentColor; }
   .pid { display: block; margin-top: 2px; font: var(--fw-regular) 0.6875rem / 1.3 var(--font-mono); color: var(--text-body); }
   tr.coll th { position: sticky; left: 0; background: var(--bg-tint); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); }
   .collname { position: sticky; left: var(--space-3); display: inline-block; }

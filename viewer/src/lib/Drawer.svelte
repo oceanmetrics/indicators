@@ -5,16 +5,17 @@
   import { onMount } from 'svelte'
   import { Icon } from '../../../src/icons/index.ts'
   import type { IconName } from '../../../src/icons/index.ts'
-  import { fmt, spanLabel } from '../../../src/status/index.ts'
-  import type { Catalog } from './data.ts'
-  import type { Indicator } from './data.ts'
-  import { configHash, configLines, datasetLink, duckdbSnippet, licenceText, badgeUrl, valuesUrl } from './delivery.ts'
+  import { spanLabel } from '../../../src/status/index.ts'
+  import type { Catalog, Indicator, VocabId } from './data.ts'
+  import { configHash, configLines, badgeUrl } from './delivery.ts'
   import { EOV_GLYPH_CREDIT, GOOS_CREDIT, STATUS_NOTE } from './credits.ts'
+  import { placeHref } from './hash.ts'
   import type { Depth } from './hash.ts'
   import { classText, STATUS_WORDS, TREND_WORDS, periodText, valueText } from './matrix.ts'
   import type { CellModel, Place } from './matrix.ts'
   import CopyButton from './CopyButton.svelte'
   import Spark from './Spark.svelte'
+  import Elements from './Elements.svelte'
 
   interface Props {
     catalog: Catalog
@@ -22,10 +23,11 @@
     place: Place
     model: CellModel
     depth: Depth
+    vocab: VocabId
     collTitle: string
     onclose: () => void
   }
-  let { catalog, ind, place, model, depth, collTitle, onclose }: Props = $props()
+  let { catalog, ind, place, model, depth, vocab, collTitle, onclose }: Props = $props()
 
   const row = $derived(model.row)
   const m = $derived(catalog.manifest)
@@ -37,21 +39,6 @@
 
   const lines = $derived(configLines(ind, place, m.version))
   const hash = $derived(configHash(lines))
-  const url = $derived(valuesUrl(catalog.base, ind, row?.coll ?? place.coll))
-  const hasStatus = $derived(!!row?.status)
-  const longTerm = $derived.by(() => {
-    if (!row) return ''
-    if (row.lt_mean == null) return ''
-    const d = ind.decimals ?? 2
-    const sd = row.lt_sd != null ? ` ± ${fmt(row.lt_sd, d)}` : ''
-    const span = row.t0 && row.t1 ? ` (${spanLabel(row.t0, row.t1, row.time_grain)})` : ''
-    return `${fmt(row.lt_mean, d)}${sd}${ind.unit_label ? ' ' + ind.unit_label : ''}${span}`
-  })
-  const recentText = $derived(
-    row?.recent_from && row.recent_to
-      ? `${spanLabel(row.recent_from, row.recent_to, row.time_grain)} (the last ${ind.recent} ${row.time_grain === 'year' ? 'years' : 'periods'})`
-      : `the last ${ind.recent} periods`,
-  )
   const headline = $derived.by(() => {
     if (row?.sentence) return row.sentence
     if (model.kind === 'live') return `${ind.short} for ${place.name} has not been computed. erddap-places can compute it in the browser from ${ind.dataset.title}; this read-only viewer does not do that yet.`
@@ -94,6 +81,11 @@
   </header>
 
   <p class="headline">{headline}</p>
+  <p class="toplace">
+    <a class="plink" href={placeHref({ vocab, depth, method: null }, place.id, place.coll, ind.id)}>
+      <Icon name="view-place" size={16} />Open in place view <span class="mbon-sr-only">: {place.name}, {ind.short}</span>
+    </a>
+  </p>
 
   {#if model.kind === 'value' && row}
     <div class="read">
@@ -115,57 +107,7 @@
     </div>
   {/if}
 
-  <section class="els" aria-label="The four elements">
-    <article class="el dataset">
-      <h3 class="k"><Icon name="el-dataset" size={18} />Dataset</h3>
-      <p class="main">{ind.dataset.title}</p>
-      <ul class="plain">
-        {#each ind.dataset.providers.filter(p => !/^(na|n\/a)$/i.test(p.name.trim())) as p (p.name)}
-          <li>{#if p.url}<a href={p.url} target="_blank" rel="noopener">{p.name}</a>{:else}{p.name}{/if} <span class="role">{p.roles.join(', ')}</span></li>
-        {/each}
-      </ul>
-      <p class="small">Licence: {licenceText(ind)}</p>
-      {#if datasetLink(ind)}<p class="small"><a href={datasetLink(ind)} target="_blank" rel="noopener">Dataset page <Icon name="ui-external" size={14} /></a></p>{/if}
-    </article>
-
-    <article class="el place">
-      <h3 class="k"><Icon name="el-place" size={18} />Place</h3>
-      <p class="main">{place.name}</p>
-      <p class="small"><code>{place.id}</code></p>
-      <p class="small">Collection: {collTitle} (<code>{place.coll}</code>)</p>
-    </article>
-
-    <article class="el method">
-      <h3 class="k"><Icon name="el-method" size={18} />Method</h3>
-      <p class="main">{ind.status_method} <span class="role">status at the {ind.status_grain} grain</span></p>
-      {#if hasStatus && row}
-        <p class="small">Recent window: {recentText}; mean {fmt(row.recent_mean, ind.decimals ?? 2)}{ind.unit_label ? ' ' + ind.unit_label : ''}.</p>
-        <p class="small">Long-term mean ± SD: {longTerm}.</p>
-      {:else if row && row.status_method}
-        <p class="small">No status: {row.why ?? 'none computed'}.</p>
-      {:else}
-        <p class="small">No status at this grain.</p>
-      {/if}
-      <p class="small">{ind.method.summary}</p>
-      {#if ind.method.code}<p class="small"><a href={ind.method.code} target="_blank" rel="noopener">Code <Icon name="ui-external" size={14} /></a></p>{/if}
-    </article>
-
-    <article class="el delivery">
-      <h3 class="k"><Icon name="el-delivery" size={18} />Delivery</h3>
-      <ul class="plain links">
-        {#if url}<li><a href={url} target="_blank" rel="noopener">Values (Parquet) <Icon name="ui-external" size={14} /></a></li>{/if}
-        <li><a href={catalog.base + 'indicators.json'} target="_blank" rel="noopener">indicators.json <Icon name="ui-external" size={14} /></a></li>
-        <li><a href={catalog.base + 'coverage.parquet'} target="_blank" rel="noopener">coverage.parquet <Icon name="ui-external" size={14} /></a></li>
-        {#if ind.producer.url}<li><a href={ind.producer.url} target="_blank" rel="noopener">Producer: {ind.producer.name} <Icon name="ui-external" size={14} /></a></li>{/if}
-      </ul>
-      {#if depth === 'dive' && url}
-        <pre class="code">{duckdbSnippet(url, place.id)}</pre>
-        <CopyButton text={duckdbSnippet(url, place.id)} label="Copy query" />
-      {:else if !url}
-        <p class="small">No values file for this place's collection.</p>
-      {/if}
-    </article>
-  </section>
+  <Elements {catalog} {ind} {place} {collTitle} {row} {depth} />
 
   <section class="config" aria-label="Configuration">
     <h3 class="k"><Icon name="el-config" size={18} />Configuration <code>{hash}</code></h3>
@@ -230,21 +172,14 @@
   .chart { max-width: 22rem; }
   .cap { margin: 0; font: var(--type-small); color: var(--text-body); }
 
-  .els { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
-  .el, .config, .cite, .goos { background: var(--bg-tint); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); min-width: 0; }
-  .config, .cite, .goos { background: var(--bg-tint); }
+  .config, .cite, .goos { background: var(--bg-tint); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); min-width: 0; }
+  .toplace { margin: 0; }
+  .plink { display: inline-flex; align-items: center; gap: var(--space-2); font: var(--fw-semibold) var(--text-sm) / 1.2 var(--font-sans); }
   .k { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-2); font: var(--type-label); text-transform: uppercase; letter-spacing: var(--ls-label); }
-  .dataset .k { color: var(--pipe-dataset-ink); }
-  .place .k { color: var(--pipe-place-ink); }
-  .method .k { color: var(--pipe-method-ink); }
-  .delivery .k { color: var(--pipe-delivery-ink); }
   .config .k, .cite .k { color: var(--text-body); }
   .main { margin: 0 0 var(--space-1); font: var(--fw-semibold) var(--text-sm) / 1.35 var(--font-sans); color: var(--text-strong); overflow-wrap: anywhere; }
   .small { margin: 0 0 var(--space-1); font: var(--type-small); font-size: 0.8125rem; line-height: 1.45; color: var(--text-body); overflow-wrap: anywhere; }
   .small code, .k code { font-size: 0.75rem; }
-  .role { font: var(--fw-regular) 0.75rem / 1 var(--font-mono); color: var(--text-body); }
-  ul.plain { list-style: none; margin: 0 0 var(--space-2); padding: 0; display: grid; gap: var(--space-1); font: var(--type-small); font-size: 0.8125rem; }
-  ul.links li { overflow-wrap: anywhere; }
   .code { margin: var(--space-2) 0; padding: var(--space-2) var(--space-3); background: var(--bg-page); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow-x: auto; font: var(--fw-regular) 0.75rem / 1.5 var(--font-mono); color: var(--text-strong); white-space: pre-wrap; overflow-wrap: anywhere; }
   .citation { margin: 0 0 var(--space-2); font: var(--type-small); font-size: 0.8125rem; line-height: 1.5; color: var(--text-body); overflow-wrap: anywhere; }
   .goos { display: flex; gap: var(--space-4); align-items: center; }
@@ -258,6 +193,5 @@
       border-radius: var(--radius-lg) var(--radius-lg) 0 0;
       padding: var(--space-4) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
     }
-    .els { grid-template-columns: minmax(0, 1fr); }
   }
 </style>

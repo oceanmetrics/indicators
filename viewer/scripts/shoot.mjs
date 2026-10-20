@@ -1,4 +1,5 @@
-// screenshots of the Matrix with the real catalog: docs/shots/matrix_<brand>_<theme>[_390].png and the drawer.
+// screenshots of the Matrix and the Place view with the real catalog: docs/shots/matrix_<brand>_<theme>[_390].png,
+// the drawer, and place_<place>_<brand>_<theme>[_390].png.
 // headless Chrome through puppeteer-core, against the dev server (started here when nothing answers on the port).
 //   node viewer/scripts/shoot.mjs [--url http://localhost:5181/] [--only matrix_mbon_dark]
 import { spawn } from 'node:child_process'
@@ -17,6 +18,10 @@ const ONLY = arg('--only', '')
 const DESKTOP = { width: 1440, height: 900, deviceScaleFactor: 2 }
 const TALL = { width: 1440, height: 1500, deviceScaleFactor: 2 }
 const PHONE = { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
+// the Place view is long: shoot its top (the header, the controls and the first cards), not the whole page
+const PLACE = { width: 1440, height: 1800, deviceScaleFactor: 2 }
+const PLACE_PHONE = { width: 390, height: 2000, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
+const FKNMS = 'view=place&place=NMS:FKNMS'
 const FKNMS_SST = 'cell=NMS:FKNMS|erddap:dhw_5km:CRW_SST:mean'
 
 const SHOTS = [
@@ -30,6 +35,13 @@ const SHOTS = [
   ['drawer_oceanmetrics_dark_dive', 'oceanmetrics', 'dark', TALL, FKNMS_SST + '&depth=dive&vocab=eov'],
   ['drawer_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PHONE, FKNMS_SST],
   ['matrix_oceanmetrics_light_eov_dive', 'oceanmetrics', 'light', DESKTOP, 'vocab=eov&depth=dive'],
+  ['place_FKNMS_oceanmetrics_light', 'oceanmetrics', 'light', PLACE, FKNMS],
+  ['place_FKNMS_oceanmetrics_dark', 'oceanmetrics', 'dark', PLACE, FKNMS],
+  ['place_CINMS_mbon_light', 'mbon', 'light', PLACE, 'view=place&place=NMS:CINMS'],
+  ['place_FKNMS_oceanmetrics_light_390', 'oceanmetrics', 'light', PLACE_PHONE, FKNMS],
+  ['place_FKNMS_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PLACE_PHONE, FKNMS],
+  ['place_eez_oceanmetrics_light', 'oceanmetrics', 'light', PLACE, 'view=place&place=MRGID:8371'],
+  ['place_FKNMS_oceanmetrics_light_eov', 'oceanmetrics', 'light', PLACE, FKNMS + '&vocab=eov'],
 ]
 
 async function alive(url) { try { return (await fetch(url)).ok } catch { return false } }
@@ -52,9 +64,11 @@ try {
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
     await page.goto(`${URL_BASE}?brand=${brand}&theme=${theme}${hash ? '#' + hash : ''}`, { waitUntil: 'networkidle0' })
     await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
+    // a Place view is ready when it has cards and none is still loading
+    if (hash.includes('view=place')) await page.waitForFunction(() => document.querySelector('article.card') && !document.querySelector('article.card[aria-busy="true"]'), { timeout: 30000 })
     await page.evaluate(() => document.fonts.ready)
     await new Promise(r => setTimeout(r, 400))
-    await page.screenshot({ path: resolve(OUT, name + '.png'), fullPage: !hash.includes('cell=') })
+    await page.screenshot({ path: resolve(OUT, name + '.png'), fullPage: !hash.includes('cell=') && !hash.includes('view=place') })
     // a page-level sideways scroll is a layout bug at any width
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     console.log(name, overflow > 0 ? `PAGE OVERFLOW ${overflow}px` : 'ok', errors.length ? errors : '')

@@ -29,6 +29,11 @@ export function titleFor(brand: Brand): string {
   return brand === 'mbon' ? `${APP_NAME} · MBON` : `${APP_NAME} · Ocean Metrics`
 }
 
+/** the page title of a view: "Matrix · Ocean Metrics Indicators", or "Matrix · MBON" for the MBON instance (brand/favicons/mbon/head.html) */
+export function pageTitle(brand: Brand, view: string): string {
+  return brand === 'mbon' ? `${view} · MBON` : `${view} · ${APP_NAME}`
+}
+
 /** the Fraunces subset the "Ocean" wordmark needs (Google Fonts, only the five letters) */
 export const WORDMARK_FONT_URL = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@60,600&display=swap&text=Ocean'
 

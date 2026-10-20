@@ -74,7 +74,7 @@ export function sentence(r: StatusResult, ctx: TextContext, grain: Grain, recent
 export function altText(r: StatusResult, series: Point[], ctx: TextContext, grain: Grain,
                         next: (t: string) => string, recent = 5, baseline?: [number, number] | null): string {
   const vals = series.filter(p => p.v != null)
-  if (vals.length === 0) return `${ctx.title} in ${ctx.place}: no values.`
+  if (vals.length === 0) return noValues(ctx)
   const d = ctx.decimals
   const unit = ctx.unit ? ` (${ctx.unit})` : ''
   const parts = [`Time series of ${ctx.title}${unit} in ${ctx.place}, ${spanLabel(vals[0].t, vals[vals.length - 1].t, grain)}, ${vals.length} ${grainNoun(grain, vals.length)} with values.`]
@@ -92,7 +92,12 @@ export function altText(r: StatusResult, series: Point[], ctx: TextContext, grai
   }
   const last = vals[vals.length - 1]
   parts.push(`The last value is ${withUnit(fmt(last.v, d), ctx.unit)} in ${periodLabel(last.t, grain)}.`)
-  if (r.status != null) parts.push(sentence(r, ctx, grain, recent, baseline).replace(`${ctx.title} in ${ctx.place} over`, 'Over'))
+  if (r.status != null) {
+    // the status in words, with the series as its subject (the sentence's subject is the indicator in the place)
+    const span = spanLabel(r.recentFrom as string, r.recentTo as string, grain)
+    const status = STATUS_WORDS[`${r.method}:${r.status}`](r, reference(r, grain, baseline))
+    parts.push(`Over the last ${recent} ${grainNoun(grain, recent)} (${span}) the series ${status}${r.trend ? `, ${TREND_WORDS[r.trend]}` : ''}.`)
+  }
   else if (r.method !== 'values' && r.why) parts.push(`No status: ${r.why}.`)
   return parts.join(' ')
 }
@@ -104,4 +109,15 @@ export const yearsSpan = (t0: string, t1: string) => (yearOf(t0) === yearOf(t1) 
  * area in 2025." (no status: categorical indicators are shown as class shares) */
 export function categoricalSentence(ctx: TextContext, classLabel: string, share: number, period: string): string {
   return `${ctx.title} in ${ctx.place}: ${classLabel} over ${Math.round(share * 100)}% of the area in ${period}.`
+}
+
+/** a place with no values for an indicator, in words */
+export function noValues(ctx: TextContext): string {
+  return `${ctx.title} in ${ctx.place}: no values.`
+}
+
+/** the alt text of a categorical chart (stacked class shares): the sentence, the span and the classes */
+export function categoricalAlt(sentenceText: string, t0: string, t1: string, grain: Grain, periods: number,
+                               classLabels: string[]): string {
+  return `${sentenceText} Stacked shares of the area by class for ${spanLabel(t0, t1, grain)}, ${periods} ${grainNoun(grain, periods)}; classes: ${classLabels.join(', ')}.`
 }
