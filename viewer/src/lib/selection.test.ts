@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupSelection, includeIndicator, includePlace, leadsOnly, migrateSelectionKeys, namedIndicators, selectionOf, setLeadsOnly, withSelection } from './selection.ts'
+import { groupSelection, includeIndicator, includePlace, leadsOnly, migrateSelectionKeys, namedIndicators, selectionOf, selectionSpec, setLeadsOnly, withSelection } from './selection.ts'
 import { DEFAULT_SPEC } from '../../../src/report/spec.ts'
 
 const kv = (s: string) => new Map(s.split('&').filter(Boolean).map(p => { const i = p.indexOf('='); return [p.slice(0, i), p.slice(i + 1)] as [string, string] }))
@@ -8,7 +8,7 @@ const obj = (m: Map<string, string>) => Object.fromEntries(m)
 describe('the selection of a state', () => {
   it('is the spec\'s places and indicators; withSelection changes them and keeps the Report\'s own keys', () => {
     const s = { spec: { ...DEFAULT_SPEC, layout: 'scorecard' as const } }
-    expect(selectionOf(s)).toEqual({ places: DEFAULT_SPEC.places, indicators: DEFAULT_SPEC.indicators })
+    expect(selectionOf(s)).toEqual({ places: DEFAULT_SPEC.places, indicators: DEFAULT_SPEC.indicators, order: DEFAULT_SPEC.order })
     const t = withSelection(s, { indicators: { include: ['all'], exclude: [] } })
     expect(t.spec.layout).toBe('scorecard')
     expect(t.spec.indicators.include).toEqual(['all'])
@@ -19,9 +19,24 @@ describe('the selection of a state', () => {
     expect(DEFAULT_SPEC.indicators).toEqual({ include: ['*'], exclude: [] })
   })
   it('groupSelection is one group or set, the indicators kept', () => {
-    const sel = { places: DEFAULT_SPEC.places, indicators: { include: ['all'], exclude: ['x:y'] } }
-    expect(groupSelection(sel, 'mr_eez')).toEqual({ places: { include: ['coll:mr_eez'], exclude: [], context: false }, indicators: sel.indicators })
+    const sel = { places: DEFAULT_SPEC.places, indicators: { include: ['all'], exclude: ['x:y'] }, order: DEFAULT_SPEC.order }
+    expect(groupSelection(sel, 'mr_eez')).toEqual({ places: { include: ['coll:mr_eez'], exclude: [], context: false }, indicators: sel.indicators, order: sel.order })
     expect(groupSelection(sel, 'set:political').places.include).toEqual(['set:political'])
+  })
+})
+
+describe('the order is part of the selection', () => {
+  const custom = { places: { sort: 'ns' as const, group: false, custom: [] }, indicators: { sort: 'vocab' as const, group: true, custom: [] } }
+  it('withSelection changes it and keeps the rest; selectionSpec holds the selection and its order only', () => {
+    const s = { spec: { ...DEFAULT_SPEC, layout: 'scorecard' as const, title: 'T' } }
+    const t = withSelection(s, { order: custom })
+    expect([t.spec.order, t.spec.layout, t.spec.places]).toEqual([custom, 'scorecard', DEFAULT_SPEC.places])
+    expect(selectionOf(t).order).toEqual(custom)
+    const only = selectionSpec(t.spec)
+    expect([only.order, only.layout, only.title]).toEqual([custom, 'cards', null])
+  })
+  it('groupSelection keeps it', () => {
+    expect(groupSelection({ ...selectionOf({ spec: DEFAULT_SPEC }), order: custom }, 'mr_eez').order).toEqual(custom)
   })
 })
 
