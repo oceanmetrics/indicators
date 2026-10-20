@@ -10,12 +10,13 @@
   import 'maplibre-gl/dist/maplibre-gl.css'
   import { Protocol } from 'pmtiles'
   import { ESRI_TILES } from './credit.ts'
-  import { geometryBounds } from './bounds.ts'
+  import { crossesAntimeridian, crossingMinZoom, geometryBounds, unionBoxes, worldCopies } from './bounds.ts'
+  import type { Box4 } from './bounds.ts'
   import { DOT_IMAGE, classedIds, fillColorExpr, focusFilter, haloWidthExpr, lineColorExpr, lineWidthExpr, memberDotsLayer, onlyFilter } from './paint.ts'
   import { featureOf, partsKey, placeOf } from './parts.ts'
   import type { MapPart } from './parts.ts'
   import { infoUrl, mrgidOf, wmsTileUrl } from './wms.ts'
-  import { projectionSpec } from './frame.ts'
+  import { boxCentre, globeZoom, isWorldScale, projectionSpec } from './frame.ts'
   import type { Proj } from './frame.ts'
   import type { WmsEntry } from './wms.ts'
 
@@ -94,17 +95,43 @@
     const key = partsKey(parts) + '|' + ids.join(',')
     if (key !== fitted) { fitted = key; fitTries = 0 }
     else if (fitTries < 0) return false
-    const geoms: { coordinates?: unknown }[] = []
+    const boxes: Box4[] = []
     for (const [i, part] of parts.entries()) {
       if (part.kind !== 'vector' || !part.layer.source_layer || !m.getSource(sid(i))) continue
       const want = ids.map(id => featureOf(part, id))
-      for (const f of m.querySourceFeatures(sid(i), { sourceLayer: part.layer.source_layer, filter: ['in', ['get', 'place_id'], ['literal', want]] as never })) geoms.push(f.geometry as { coordinates?: unknown })
+      for (const f of m.querySourceFeatures(sid(i), { sourceLayer: part.layer.source_layer, filter: ['in', ['get', 'place_id'], ['literal', want]] as never })) {
+        // a place over the antimeridian is two features, one each side of 180: each is a box, and the union takes the short way round
+        const g = geometryBounds([f.geometry as { coordinates?: unknown }])
+        if (g) boxes.push([g[0][0], g[0][1], g[1][0], g[1][1]])
+      }
     }
-    const b = geometryBounds(geoms)
+    const b = unionBoxes(boxes)
     if (!b) { fitTries = fitTries < 2 ? fitTries + 1 : -1; return false }
     fitTries = -1
-    m.fitBounds(b, { padding: 28, duration: 0, maxZoom: 9 })
+    fitTo(m, b, { padding: 28, duration: 0, maxZoom: 9 })
     return true
+  }
+
+  // a camera for a box: on the globe a world-scale box shows the whole sphere in the frame (centred on the box), as the sphere is
+  // what the reader came for; anything else is MapLibre's own fit. the box may run east past 180 (the short way round the world)
+  function fitTo(m: maplibregl.Map, b: Box4, opts: { padding: number; duration: 0; maxZoom: number }) {
+    if (untrack(() => proj) === 'globe' && isWorldScale(b) && box) {
+      m.jumpTo({ center: boxCentre(b), zoom: globeZoom(box.clientWidth, box.clientHeight) })
+      return
+    }
+    crossing = crossesAntimeridian(b)
+    m.fitBounds([[b[0], b[1]], [b[2], b[3]]], opts)
+  }
+  // the last fit ran over the antimeridian (Pacific places, the high seas): its world copies stay and one world fills the frame
+  let crossing = false
+
+  // one world only: when the frame is wider than the world is at this zoom (a world-wide map in a wide frame) the world is not drawn
+  // twice. zoomed in, copies stay on, which is what lets a place over the antimeridian (Hawaii, Samoa, the high seas) be drawn whole
+  function copies(m: maplibregl.Map) {
+    if (untrack(() => proj) === 'globe' || !box) return
+    const want = worldCopies(m.getZoom(), box.clientWidth, crossing)
+    if (m.getRenderWorldCopies() !== want) m.setRenderWorldCopies(want)
+    m.setMinZoom(crossing ? crossingMinZoom(box.clientWidth) : 0)
   }
 
   /** the map as a PNG data URL, read in the frame it is drawn (the buffer is not kept), for a print that cannot hold a live map */
@@ -185,7 +212,9 @@
     // the stylesheet and the layout can arrive after the map is made: follow the box, not only the window
     const ro = new ResizeObserver(() => m.resize())
     ro.observe(box as HTMLDivElement)
-    m.on('load', () => { m.resize(); map = m; ready = true })
+    m.on('load', () => { m.resize(); copies(m); map = m; ready = true })
+    m.on('moveend', () => copies(m))
+    m.on('resize', () => copies(m))
     m.on('click', e => void click(m, e))
     m.on('mousemove', e => {
       const hit = parts.some((p, i) => (p.kind === 'raster' ? true : !!m.getLayer(`${sid(i)}:fill`) && m.queryRenderedFeatures(e.point, { layers: hitLayers(m, i) }).length > 0))
@@ -247,6 +276,7 @@
     const want = projectionSpec(proj)
     if (!ready || !map) return
     if (map.getProjection()?.type !== want.type) map.setProjection(want)
+    copies(map)
   })
 
   // ---- the data layers ----
@@ -292,8 +322,8 @@
       shown = key
       framed = null
       fitted = null
-      const [w, s, e, n] = bbox
-      m.fitBounds([[w, s], [e, n]], { padding: 24, duration: 0, maxZoom: 8 })
+      fitTo(m, bbox, { padding: 24, duration: 0, maxZoom: 8 })
+      copies(m)
       settle(m)
       return
     }

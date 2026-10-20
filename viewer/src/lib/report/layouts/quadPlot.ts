@@ -51,31 +51,66 @@ export function quadTicks(ext: number, max = 9): number[] {
 }
 
 export interface LabelIn { id: string; x: number; y: number; text: string }
-export interface LabelOut { id: string; x: number; y: number; anchor: 'start' | 'end' | 'middle'; text: string }
+export interface Box { x0: number; y0: number; x1: number; y1: number }
+export interface LabelOut {
+  id: string
+  /** where the text is drawn (its baseline) and how it hangs from there */
+  x: number
+  y: number
+  anchor: 'start' | 'end' | 'middle'
+  text: string
+  /** the box the text takes (padded): no other label or glyph box meets it */
+  box: Box
+  /** a line from the point to its label, when the label had to stand off */
+  leader: { x1: number; y1: number; x2: number; y2: number } | null
+  /** false when no free spot was left in the plot: the label is not drawn, the table under the plot carries it */
+  placed: boolean
+}
 
-const CHAR = 6.4
-const H = 12
+const CHAR = 6.6
+const H = 14
+/** the glyph's box around its point: the marker and its halo */
+export const GLYPH = 10
+/** how far from the point a label may stand: close in, then further with a leader line */
+const RINGS = [10, 16, 24, 36, 54, 80]
+/** the directions tried at each distance, in order of preference: right, left, above, below, then the diagonals */
+const ANGLES = [0, 180, 270, 90, 315, 45, 225, 135, 337.5, 22.5, 202.5, 157.5, 292.5, 247.5, 67.5, 112.5]
+/** a leader line is drawn from this distance on */
+const LEADER_FROM = 24
+
+const meets = (a: Box, b: Box) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0
+
+/** the box of a glyph at a point */
+export const glyphBox = (x: number, y: number): Box => ({ x0: x - GLYPH, y0: y - GLYPH, x1: x + GLYPH, y1: y + GLYPH })
 
 /**
- * a position for every label next to its point: to the right, else to the left, above, below, taking the first that
- * overlaps no label placed before it and stays inside the plot. when none is free the right-hand one is kept (the
- * table under the plot carries every label either way). the order of the points is the order of priority.
+ * a spot for every label: the nearest of 16 directions around its point (right, left, above, below, the diagonals, in that
+ * order) at growing distances that meets no glyph (its own included) and no label placed before it, and stays inside the
+ * plot. a label that stands off from its glyph gets a leader line. when no spot is free the label is left off the plot
+ * (`placed: false`); a placed label never overlaps a glyph or another label. the order of the points is the order of priority.
  */
-export function placeLabels(points: LabelIn[], plot: { x0: number; y0: number; x1: number; y1: number }, gap = 9): LabelOut[] {
-  type Box = { x0: number; x1: number; y0: number; y1: number }
-  const placed: Box[] = []
-  const hits = (a: Box, b: Box) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0
+export function placeLabels(points: LabelIn[], plot: { x0: number; y0: number; x1: number; y1: number }): LabelOut[] {
+  const glyphs = points.map(p => glyphBox(p.x, p.y))
+  const taken: Box[] = []
+  const inside = (b: Box) => b.x0 >= plot.x0 && b.x1 <= plot.x1 && b.y0 >= plot.y0 && b.y1 <= plot.y1
   return points.map(p => {
-    const w = p.text.length * CHAR
-    const cands: { anchor: LabelOut['anchor']; x: number; y: number; box: Box }[] = [
-      { anchor: 'start', x: p.x + gap, y: p.y + 4, box: { x0: p.x + gap, x1: p.x + gap + w, y0: p.y - H / 2, y1: p.y + H / 2 } },
-      { anchor: 'end', x: p.x - gap, y: p.y + 4, box: { x0: p.x - gap - w, x1: p.x - gap, y0: p.y - H / 2, y1: p.y + H / 2 } },
-      { anchor: 'middle', x: p.x, y: p.y - gap, box: { x0: p.x - w / 2, x1: p.x + w / 2, y0: p.y - gap - H + 3, y1: p.y - gap + 3 } },
-      { anchor: 'middle', x: p.x, y: p.y + gap + 8, box: { x0: p.x - w / 2, x1: p.x + w / 2, y0: p.y + gap, y1: p.y + gap + H } },
-    ]
-    const inside = (b: Box) => b.x0 >= plot.x0 && b.x1 <= plot.x1 && b.y0 >= plot.y0 && b.y1 <= plot.y1
-    const pick = cands.find(c => inside(c.box) && !placed.some(q => hits(c.box, q))) ?? cands[0]
-    placed.push(pick.box)
-    return { id: p.id, x: pick.x, y: pick.y, anchor: pick.anchor, text: p.text }
+    const w = p.text.length * CHAR + 2
+    for (const r of RINGS) {
+      for (const deg of ANGLES) {
+        const dx = Math.cos((deg * Math.PI) / 180), dy = Math.sin((deg * Math.PI) / 180)
+        const cx = p.x + dx * r + dx * (w / 2), cy = p.y + dy * r + dy * (H / 2)
+        const box: Box = { x0: cx - w / 2, y0: cy - H / 2, x1: cx + w / 2, y1: cy + H / 2 }
+        if (!inside(box) || glyphs.some(g => meets(box, g)) || taken.some(t => meets(box, t))) continue
+        taken.push(box)
+        // the text hangs from the side of the box nearest the point: its left edge for a label on the right, and so on
+        const anchor = dx > 0.5 ? 'start' : dx < -0.5 ? 'end' : 'middle'
+        const x = anchor === 'start' ? box.x0 + 1 : anchor === 'end' ? box.x1 - 1 : (box.x0 + box.x1) / 2
+        const leader = r >= LEADER_FROM
+          ? { x1: p.x, y1: p.y, x2: Math.min(Math.max(p.x, box.x0), box.x1), y2: Math.min(Math.max(p.y, box.y0), box.y1) }
+          : null
+        return { id: p.id, x, y: box.y1 - 3, anchor, text: p.text, box, leader, placed: true }
+      }
+    }
+    return { id: p.id, x: p.x, y: p.y, anchor: 'start' as const, text: p.text, box: glyphs[points.indexOf(p)], leader: null, placed: false }
   })
 }

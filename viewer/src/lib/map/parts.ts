@@ -4,6 +4,7 @@
 // drawn, coloured by the value of their place, and a click on one selects the place, not the FAO area. plain functions, so the
 // rules are tested without a map.
 import type { Place } from '../matrix.ts'
+import { unionBoxes } from './bounds.ts'
 import type { MapItem } from './classes.ts'
 import type { GazLayer } from './gazetteer.ts'
 
@@ -100,7 +101,6 @@ export const placeOf = (part: Pick<MapPart, 'toPlace' | 'derived'>, featureId: s
  */
 export function partsBbox(parts: readonly Pick<MapPart, 'home'>[]): [number, number, number, number] {
   const M = 85
-  const bs = parts.map(p => p.home.bbox)
-  const w = Math.min(...bs.map(b => b[0])), e = Math.max(...bs.map(b => b[2]))
-  return [w, Math.max(-M, Math.min(...bs.map(b => b[1]))), e, Math.min(M, Math.max(...bs.map(b => b[3])))]
+  const u = unionBoxes(parts.map(p => p.home.bbox)) ?? [-180, -M, 180, M]
+  return [u[0], Math.max(-M, u[1]), u[2], Math.min(M, u[3])]
 }

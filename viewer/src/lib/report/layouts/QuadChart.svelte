@@ -46,6 +46,7 @@
   const ticks = $derived(quadTicks(ext))
   const labs = $derived(placeLabels(drawn.map(e => ({ id: e.it.key, x: sx(e.pt.x), y: sy(e.pt.y), text: e.it.label })), plot))
   const labOf = (key: string) => labs.find(l => l.id === key)
+  const unlabelled = $derived(labs.filter(l => !l.placed).map(l => l.text))
   const alt = $derived(quadAlt(entries.map(e => ({ label: e.it.label, point: e.pt, why: e.why })), `Quad plot of ${title}`))
 
   let hover = $state<string | null>(null)
@@ -78,6 +79,9 @@
       <text class="quad" x={plot.x0 + 5} y={plot.y1 - 6} text-anchor="start">{corner['below-falling']}</text>
       <text class="axtitle" x={(plot.x0 + plot.x1) / 2} y={h - 6} text-anchor="middle">Recent trend, in SD (change over the recent window)</text>
       <text class="axtitle" transform="translate(11 {(plot.y0 + plot.y1) / 2}) rotate(-90)" text-anchor="middle">Recent mean minus long-term mean, in SD</text>
+      {#each labs.filter(l => l.leader) as l (l.id)}
+        <line class="leader" x1={l.leader!.x1} y1={l.leader!.y1} x2={l.leader!.x2} y2={l.leader!.y2} />
+      {/each}
       {#each drawn as e (e.it.key)}
         {@const l = labOf(e.it.key)}
         <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -85,7 +89,7 @@
           onpointerenter={() => (hover = e.it.key)} onpointerleave={() => (hover = null)} onfocus={() => (hover = e.it.key)} onblur={() => (hover = null)}>
           <circle class="halo" cx={sx(e.pt.x)} cy={sy(e.pt.y)} r="10" />
           <g transform="translate({sx(e.pt.x) - 8} {sy(e.pt.y) - 8}) scale({16 / 24})"><path d={glyph(statusIcon(e.m?.status))} fill="currentColor" /></g>
-          {#if l}<text class="lab" x={l.x} y={l.y} text-anchor={l.anchor}>{l.text}</text>{/if}
+          {#if l?.placed}<text class="lab" x={l.x} y={l.y} text-anchor={l.anchor}>{l.text}</text>{/if}
         </g>
       {/each}
       {#if drawn.length === 0}<text class="tick" x={(plot.x0 + plot.x1) / 2} y={(plot.y0 + plot.y1) / 2} text-anchor="middle">No point to draw</text>{/if}
@@ -98,6 +102,9 @@
     {/if}
   </div>
 
+  {#if unlabelled.length}
+    <p class="left om-note">Not labelled on the plot, there is no room (see the table): {unlabelled.join(', ')}.</p>
+  {/if}
   {#if left.length}
     <p class="left om-note">
       Not placed: {#each left as e, n (e.it.key)}<span>{n ? '; ' : ''}<strong>{e.it.label}</strong> ({e.why})</span>{/each}.
@@ -143,6 +150,7 @@
   .pt { color: var(--text-strong); cursor: default; outline: none; }
   .pt .halo { fill: var(--bg-surface); stroke: var(--border-strong); stroke-width: 1; }
   .pt.on .halo, .pt:focus-visible .halo { stroke: var(--link); stroke-width: 2; }
+  .leader { stroke: var(--text-body); stroke-width: 1; opacity: 0.7; }
   .lab { font-size: 11px; fill: var(--text-strong); paint-order: stroke; stroke: var(--bg-surface); stroke-width: 3px; stroke-linejoin: round; }
   .tip { position: absolute; transform: translateX(-50%); display: grid; gap: 2px; width: max-content; max-width: min(18rem, 90%); padding: var(--space-2) var(--space-3); background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font: var(--type-small); color: var(--text-body); pointer-events: none; z-index: 2; }
   .tip strong { color: var(--text-strong); }

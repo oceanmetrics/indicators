@@ -107,4 +107,9 @@ describe('part order, key and extent', () => {
     expect(partsBbox(buildParts(['mr_eez'], all, items, places).parts)).toEqual([-180, -62, 180, 85])
     expect(partsBbox(buildParts(['noaa_nerrs'], all, [], []).parts)).toEqual([-158, 18, -66, 60])
   })
+  it('groups either side of the antimeridian are one short extent, not the world', () => {
+    const near = (slug: string, bbox: number[]) => ({ slug, collection: slug, kind: 'vector', pmtiles: `https://x/${slug}.pmtiles`, source_layer: slug, bbox })
+    const two = parseLayers({ layers: [near('west', [177.8, -15.4, 190, 30]), near('east', [-160, 18, -154, 23])] })
+    expect(partsBbox(buildParts(['west', 'east'], two, [], []).parts)).toEqual([177.8, -15.4, 206, 30])
+  })
 })
