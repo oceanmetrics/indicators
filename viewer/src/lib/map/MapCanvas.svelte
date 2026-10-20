@@ -15,6 +15,8 @@
   import { featureOf, partsKey, placeOf } from './parts.ts'
   import type { MapPart } from './parts.ts'
   import { infoUrl, mrgidOf, wmsTileUrl } from './wms.ts'
+  import { projectionSpec } from './frame.ts'
+  import type { Proj } from './frame.ts'
   import type { WmsEntry } from './wms.ts'
 
   interface Props {
@@ -31,6 +33,8 @@
     focus: string
     dark: boolean
     selected: string | null
+    /** the projection: the globe, or null for the flat map */
+    proj?: Proj
     /** where a reference group's click landed (it has no geometry to outline) */
     marker: { lng: number; lat: number } | null
     onpick: (p: { placeId: string | null; lng: number; lat: number; name?: string | null; group?: string | null }) => void
@@ -38,7 +42,7 @@
     onstate?: (s: 'loading' | 'done') => void
     label: string
   }
-  let { parts, bbox, colors, line, none, nofill, faint, focus, dark, selected, marker, onpick, onstate, label }: Props = $props()
+  let { parts, bbox, colors, line, none, nofill, faint, focus, dark, selected, proj = null, marker, onpick, onstate, label }: Props = $props()
 
   let box: HTMLDivElement | undefined = $state()
   let phase = $state<'loading' | 'done'>('loading')
@@ -53,6 +57,9 @@
     G.__omPmtiles = new Protocol()
     maplibregl.addProtocol('pmtiles', G.__omPmtiles.tile)
   }
+
+  // the colour under the basemap (the Arctic cap its tiles do not reach, seen on the globe), from the theme in force
+  const oceanColor = () => getComputedStyle(document.documentElement).getPropertyValue('--map-sea').trim() || 'transparent'
 
   const setState = (s: 'loading' | 'done') => { phase = s; onstate?.(s) }
   const sid = (i: number) => `p${i}`
@@ -116,11 +123,13 @@
       container: box as HTMLDivElement,
       style: {
         version: 8,
+        projection: projectionSpec(untrack(() => proj)),
         sources: {
           'base-light': { type: 'raster', tiles: [ESRI_TILES.light], tileSize: 256, maxzoom: 16 },
           'base-dark': { type: 'raster', tiles: [ESRI_TILES.dark], tileSize: 256, maxzoom: 16 },
         },
         layers: [
+          { id: 'base-bg', type: 'background', paint: { 'background-color': oceanColor() } },
           { id: 'base-light', type: 'raster', source: 'base-light', layout: { visibility: 'visible' } },
           { id: 'base-dark', type: 'raster', source: 'base-dark', layout: { visibility: 'none' } },
         ],
@@ -177,8 +186,16 @@
   $effect(() => {
     const d = dark
     if (!ready || !map) return
+    map.setPaintProperty('base-bg', 'background-color', oceanColor())
     map.setLayoutProperty('base-light', 'visibility', d ? 'none' : 'visible')
     map.setLayoutProperty('base-dark', 'visibility', d ? 'visible' : 'none')
+  })
+
+  // ---- the projection: flat (mercator) or the globe; the layers stay as they are, MapLibre redraws them ----
+  $effect(() => {
+    const want = projectionSpec(proj)
+    if (!ready || !map) return
+    if (map.getProjection()?.type !== want.type) map.setProjection(want)
   })
 
   // ---- the data layers ----

@@ -96,7 +96,7 @@ indicators.json + coverage.parquet ──► viewer/ (imports src/status/, src/i
   Observing System (GOOS)", never in the Ocean Metrics sprite, never with the GOOS logo.
 - **Themes:** `brand/themes/mbon.css` (the kit's tokens as they are) and `oceanmetrics.css` (DESIGN.md mapped onto
   the kit's semantic tokens: teal brand, one sun action with dark ink). Hex values live only in theme and token
-  files; components use semantic tokens (`@marinebon/ui` rules). Check both themes and 390 px.
+  files; components use semantic tokens (`@marinebon/ui` rules). Check both themes and 390 px. Floating panels (pickers, drawer, kit Menu, the full-screen side column) use `--overlay-bg|border|shadow`, never `--bg-surface`+`--border`, so they stand off the page in dark mode; the Map's globe and full-screen rules are in `viewer/src/lib/map/frame.ts` (the full-screen wrapper holds the map AND its legend; the element API where it exists, a fixed expanded box where not). New theme tokens go in the theme files (inlined in the JS), not `app.css`: the entry CSS is at its budget.
 
 ## Conventions
 
