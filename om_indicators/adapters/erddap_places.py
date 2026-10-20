@@ -293,10 +293,11 @@ class Fetcher:
       return list(ex.map(fn, items))
 
 
-def resolve_places(index_path: Path, place_ids: Iterable[str], coll: str = COLL) -> set[str]:
-  """the places of `coll` that the gazetteer index no longer lists: retired places, whose stale items are skipped (e.g.
-  MRGID:8439 and PSGID:939, which left erddap-places' `places` collection in 2.0.0, 2026-10-20, while the stats
-  collection still linked their items until its next run). a place listed more than once in `coll` raises, naming it."""
+def resolve_places(index_path: Path, place_ids: Iterable[str], coll: str = COLL, retire: bool = False) -> set[str]:
+  """every place must be exactly one row with collection `coll` in the gazetteer index, else raise naming it. with
+  `retire` (the erddap-places stats, whose collection can still link the items of a place the gazetteer has dropped,
+  e.g. MRGID:8439 and PSGID:939 after places 2.0.0, 2026-10-20, until the next stats run), a place with no row is
+  returned as retired instead, for its items to be skipped; a place listed more than once still raises."""
   t = pq.read_table(index_path, columns=["place_id", "collection"]).to_pylist()
   count: dict[str, int] = defaultdict(int)
   for r in t:
@@ -304,7 +305,7 @@ def resolve_places(index_path: Path, place_ids: Iterable[str], coll: str = COLL)
       count[r["place_id"]] += 1
   retired: set[str] = set()
   for pid in sorted(set(place_ids)):
-    if count[pid] == 0:
+    if count[pid] == 0 and retire:
       retired.add(pid)
     elif count[pid] != 1:
       raise ValueError(f"place_id {pid!r} resolves to {count[pid]} rows with collection {coll!r} in the gazetteer index, "
@@ -379,7 +380,7 @@ def run(out: Path, base: str = DEFAULT_BASE, cache: Path = Path("cache/erddap-pl
   by_coll: dict[str, list[str]] = defaultdict(list)
   for _, it in items:
     by_coll[item_coll(it)].append(it["properties"]["erddap-places:place_id"])
-  retired = {(c, pid) for c, pids in sorted(by_coll.items()) for pid in resolve_places(index_path, pids, c)}
+  retired = {(c, pid) for c, pids in sorted(by_coll.items()) for pid in resolve_places(index_path, pids, c, retire=True)}
   items = [(loc, it) for loc, it in items if (item_coll(it), it["properties"]["erddap-places:place_id"]) not in retired]
   if not items:
     raise ValueError(f"every item in {base} is of a place the gazetteer index no longer lists")
