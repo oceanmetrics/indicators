@@ -6,6 +6,11 @@ becomes a label and a comment, and a small known job runs by itself on the macmi
   STAC grid. `auto` = an erddap-places indicator of the manifest, one place of a public vector collection, and under
   50 M grid values (the bbox slab the precompute fetches × the time steps of the whole record); `already` = the place
   has values for it now; anything else `needs-review`, with the reason in words.
+- **approvable:** a `needs-review` request that a maintainer can accept with the `run` label because a producer exists
+  for it: a Copernicus Marine (`cmems:`) indicator of the manifest at a place whose polygon can be fetched at run time
+  (a vector collection, or a reference collection with a feature service) and a job under 10 M grid values. It is never
+  run by itself (the producer uses a maintainer's own Copernicus Marine login); the sanctuaries (`places`) are
+  noaa-onms/eco-indicators' and stay with a maintainer.
 - **never trust the issue:** every value that reaches a command is checked against a strict pattern and against the
   published lists here, again in the job, and passed as data (environment, JSON), never spliced into a shell line.
   The requester's email never goes into the issue: the form says so, and nothing here reads one.
@@ -22,11 +27,17 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from om_indicators.producers import geometry_kind
+
 GAZETTEER = "https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer/"
 CATALOG = "https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/"
 VIEWER = "https://oceanmetrics.io/indicators/"
 # the mockup's rule for a job that may run without a maintainer (Ben, 2026-10-19)
 MAX_AUTO_VALUES = 50_000_000
+# the Copernicus Marine place producer, run by a maintainer: the grid values (buffered bbox cells × time steps) it accepts.
+# a 40° × 40° box of the ¼° global products is 10 M; Albania's EEZ is 44 thousand
+MAX_CMEMS_VALUES = 10_000_000
+CMEMS_PRODUCER = "noaa-onms/eco-indicators"
 
 PLACE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*:[A-Za-z0-9_.\-]+$")
 SLUG_RE = re.compile(r"^[a-z0-9_]+$")
@@ -61,6 +72,7 @@ class Triage:
   job: dict[str, str] | None = None
   estimate: int | None = None
   links: dict[str, str] = field(default_factory=dict)
+  approvable: bool = False        # needs-review, but a maintainer can accept it with the `run` label
 
 
 def _first_token(s: str) -> str:
@@ -104,6 +116,59 @@ def estimate_values(bbox: dict[str, float], dims: dict[str, Any], today: dt.date
   return grid_cells(bbox, abs(float(lon["step"])), abs(float(lat["step"]))) * time_steps(tim.get("step", "P1D"), start, end)
 
 
+def cmems_grid_step(dataset_id: str) -> float:
+  """the grid step in degrees of a Copernicus Marine dataset, from its id (`…_0.25deg_…`, `…-4km_…`); the producer reads
+  the real step from the catalogue at run time, this is the triage's estimate"""
+  m = re.search(r"_(\d+(?:\.\d+)?)deg_", dataset_id)
+  if m:
+    return float(m.group(1))
+  m = re.search(r"[-_](\d+(?:\.\d+)?)km_", dataset_id)
+  if m:
+    return float(m.group(1)) / 111.32
+  raise ValueError(f"the grid step of {dataset_id} is not in its id")
+
+
+def estimate_cmems_values(bbox: dict[str, float], dataset_id: str, time_range: list | None) -> int:
+  """grid values the place producer fetches: the cells of the bbox buffered by one cell × the time steps of the record
+  (the step from the dataset id: `…_P1M-m` is monthly; the record from the manifest's time_range)"""
+  step = cmems_grid_step(dataset_id)
+  m = re.search(r"_(P\d+[DMY])(?:[-_]|$)", dataset_id)
+  if not m or not time_range or not time_range[0] or not time_range[1]:
+    raise ValueError("the dataset's time step or record is unknown")
+  grown = {"xmin": bbox["xmin"] - step, "xmax": bbox["xmax"] + step, "ymin": bbox["ymin"] - step, "ymax": bbox["ymax"] + step}
+  steps = time_steps(m.group(1), dt.date.fromisoformat(str(time_range[0])[:10]), dt.date.fromisoformat(str(time_range[1])[:10]))
+  return grid_cells(grown, step, step) * steps
+
+
+def _classify_cmems(ind: dict, ind_id: str, place: str, coll: str, row: dict, layers: dict, reasons: list[str],
+                    links: dict[str, str]) -> Triage:
+  """a Copernicus Marine indicator: never automatic (the producer uses a maintainer's login), approvable when the
+  producer can do it"""
+  parts = ind_id.split(":")
+  if len(parts) != 4 or parts[3] != "mean":
+    return Triage("needs-review", reasons + [f"{ind_id} is not a cmems:dataset:variable:mean id"], links=links)
+  why = (f"{ind['short']} is a Copernicus Marine dataset: its run uses a personal Copernicus Marine login, so it is not "
+         "started automatically")
+  if coll == "places":
+    return Triage("needs-review", reasons + [why, f"the sanctuaries' Copernicus Marine values come from {CMEMS_PRODUCER}, "
+                                                  "which a maintainer reruns"], links=links)
+  layer = next((l for l in layers.get("layers", []) if (l.get("collection") or l.get("slug")) == coll), None)
+  if geometry_kind(layer) is None:
+    return Triage("needs-review", reasons + [why, f"the geometry of {coll} is neither published nor served one place at a time, "
+                                                  "so a maintainer has to run it by hand"], links=links)
+  try:
+    est = estimate_cmems_values(row["bbox"], parts[1], ind.get("time_range"))
+  except (ValueError, KeyError, TypeError) as e:
+    return Triage("needs-review", reasons + [why, f"the job size could not be estimated ({e})"], links=links)
+  if est > MAX_CMEMS_VALUES:
+    return Triage("needs-review", reasons + [why, f"about {est / 1e6:,.0f} M grid values, over the {MAX_CMEMS_VALUES // 1_000_000} M limit "
+                                                  "for the place producer"], estimate=est, links=links)
+  size = f"about {est / 1e6:,.1f} M" if est >= 100_000 else f"{est:,}"
+  job = {"dataset": parts[1], "variable": parts[2], "indicator": ind_id, "coll": coll, "place": place}
+  return Triage("needs-review", reasons + [why, f"{size} grid values (the place's box and the whole record): small enough for the "
+                                                "place producer"], job=job, estimate=est, links=links, approvable=True)
+
+
 def classify(form: dict[str, str], manifest: dict, layers: dict, place_row: Callable[[str], dict | None],
              dims: Callable[[str], dict], coverage_has: Callable[[str, str, str], bool], today: dt.date) -> Triage:
   """the label and reasons for a parsed request. `place_row(place_id)` → the gazetteer index row (place_id, name,
@@ -130,13 +195,14 @@ def classify(form: dict[str, str], manifest: dict, layers: dict, place_row: Call
   links = {"place": f"{VIEWER}#view=place&place={place}&coll={coll}&ind={ind_id}"}
   if coverage_has(place, coll, ind_id):
     return Triage("already", reasons + [f"{place} already has values for {ind['short']}"], links=links)
+  if ind_id.startswith("cmems:") and ind["producer"]["name"] == CMEMS_PRODUCER:
+    return _classify_cmems(ind, ind_id, place, coll, row, layers, reasons, links)
   if ind["producer"]["name"] != "erddap-places":
     return Triage("needs-review", reasons + [f"{ind['short']} comes from {ind['producer']['name']}, which runs only by hand (whole collections, snapshot runs)"], links=links)
   layer = next((l for l in layers.get("layers", []) if (l.get("collection") or l.get("slug")) == coll), None)
   # erddap-places reads a place's polygon from our published parquet (vector) or, for a reference collection such as
   # the Marine Regions EEZs, one feature at a time from the publisher's own service (`raster.feature_url`)
-  served = layer is not None and (layer.get("kind") == "vector" or (layer.get("kind") == "raster" and (layer.get("raster") or {}).get("feature_url")))
-  if not served:
+  if geometry_kind(layer) is None:
     return Triage("needs-review", reasons + [f"the geometry of {coll} is neither published nor served one place at a time, so the run needs a maintainer"], links=links)
   parts = ind_id.split(":")
   if len(parts) != 4 or not SLUG_RE.match(parts[1].lower()):
@@ -155,10 +221,19 @@ def classify(form: dict[str, str], manifest: dict, layers: dict, place_row: Call
 def check_job(job: dict[str, str]) -> dict[str, str]:
   """the job again, field by field, before it reaches a command (the run job calls this, not the triage's word)"""
   ok = (PLACE_RE.match(job.get("place", "")) and SLUG_RE.match(job.get("coll", "")) and INDICATOR_RE.match(job.get("indicator", ""))
-        and re.fullmatch(r"[A-Za-z0-9_\-]+", job.get("dataset", "")) and re.fullmatch(r"[A-Za-z0-9_\-]+", job.get("variable", "")))
+        and re.fullmatch(r"[A-Za-z0-9_.\-]+", job.get("dataset", "")) and re.fullmatch(r"[A-Za-z0-9_\-]+", job.get("variable", "")))
   if not ok:
     raise ValueError(f"refusing a malformed job: {job!r}")
   return {k: job[k] for k in ("dataset", "variable", "indicator", "coll", "place")}
+
+
+def job_family(job: dict[str, str]) -> str:
+  """which producer runs a job, from its indicator id (checked), never from the triage's word: `cmems` = the Copernicus
+  Marine place producer (a maintainer-approved request), `erddap` = erddap-places"""
+  fam = check_job(job)["indicator"].split(":", 1)[0]
+  if fam not in ("cmems", "erddap"):
+    raise ValueError(f"no producer runs a {fam!r} job")
+  return fam
 
 
 def item_href(job: dict[str, str]) -> str:
@@ -183,10 +258,13 @@ def comment(t: Triage, form: dict[str, str], autorun: bool = True) -> str:
           "This request is small and uses a catalogued dataset, so it is ready to run on the Ocean Metrics runner. "
           "A maintainer starts it by adding the `run` label; this issue then gets a comment with the link when the "
           "values are published.")
+  review = ("This request needs a maintainer, who will reply here. A maintainer can accept it by adding the `run` label; it runs "
+            "on Copernicus Marine with the maintainer's account, and this issue then gets a comment with the link when the "
+            "values are published.") if t.approvable else "This request needs a maintainer, who will reply here."
   head = {
     "auto": auto,
     "already": "These values exist already.",
-    "needs-review": "This request needs a maintainer, who will reply here.",
+    "needs-review": review,
   }[t.label]
   lines = [head, ""] + [f"- {r}" for r in t.reasons]
   if t.links.get("place"):
@@ -249,9 +327,11 @@ def main(argv: list[str] | None = None) -> int:
     a.comment.write_text(comment(tri, form, autorun=a.autorun == "on"))
     print(tri.label)
     return 0
-  job = check_job(json.loads(a.job.read_text()))
+  raw = json.loads(a.job.read_text())
+  job = check_job(raw)
   for k, v in job.items():
     print(f"REQ_{k.upper()}={v}")
+  print(f"REQ_FAMILY={job_family(raw)}")
   return 0
 
 

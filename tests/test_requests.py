@@ -5,7 +5,8 @@ import datetime as dt
 import pytest
 
 from om_indicators.requests import (
-  MAX_AUTO_VALUES, add_item, check_job, item_href, classify, comment, estimate_values, grid_cells, parse_issue_form, time_steps,
+  MAX_AUTO_VALUES, MAX_CMEMS_VALUES, add_item, check_job, classify, cmems_grid_step, comment, estimate_cmems_values,
+  estimate_values, grid_cells, item_href, job_family, parse_issue_form, time_steps,
 )
 
 BODY = """### Place
@@ -29,14 +30,21 @@ _No response_
 A condition report.
 """
 
+NO3 = "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:no3:mean"
+CHL = "cmems:cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M:CHL:mean"
 MANIFEST = {"indicators": [
   {"id": "erddap:dhw_5km:CRW_SST:mean", "short": "SST", "producer": {"name": "erddap-places"},
    "dataset": {"stac": "stac:dhw_5km"}},
   {"id": "sdg:ER_MRN_MPA", "short": "MPA coverage", "producer": {"name": "places/proto/eez_indicators"},
    "dataset": {"stac": None}},
+  {"id": NO3, "short": "Nitrate", "producer": {"name": "noaa-onms/eco-indicators"}, "dataset": {"stac": None},
+   "time_range": ["1993-01-01", "2026-08-01"]},
+  {"id": CHL, "short": "Chlorophyll", "producer": {"name": "noaa-onms/eco-indicators"}, "dataset": {"stac": None},
+   "time_range": ["1997-09-01", "2026-08-01"]},
 ]}
 LAYERS = {"layers": [{"slug": "places", "kind": "vector"}, {"slug": "noaa_nerrs", "kind": "vector"},
                      {"slug": "mr_eez", "kind": "raster", "raster": {"feature_url": "https://geo.example/wfs?mrgid={source_id}"}},
+                     {"slug": "fao_high_seas", "kind": "derived", "display": {"via": "fao_major_areas", "id_from": "fao_id"}},
                      {"slug": "ref_tiles_only", "kind": "raster", "raster": {"tiles": ["https://geo.example/{z}/{x}/{y}"]}}]}
 ROWS = {
   "NMS:CINMS": {"place_id": "NMS:CINMS", "name": "Channel Islands", "collection": "places",
@@ -47,6 +55,8 @@ ROWS = {
                  "bbox": {"xmin": -129.2, "ymin": 23.8, "xmax": -65.7, "ymax": 49.0}},
   "MRGID:5670": {"place_id": "MRGID:5670", "name": "Albanian EEZ", "collection": "mr_eez",
                  "bbox": {"xmin": 18.9, "ymin": 39.6, "xmax": 20.0, "ymax": 42.0}},
+  "FAO:21": {"place_id": "FAO:21", "name": "High seas, FAO area 21", "collection": "fao_high_seas",
+             "bbox": {"xmin": -70.0, "ymin": 35.0, "xmax": -42.0, "ymax": 60.0}},
   "REF:1": {"place_id": "REF:1", "name": "A reference place", "collection": "ref_tiles_only",
             "bbox": {"xmin": 18.9, "ymin": 39.6, "xmax": 20.0, "ymax": 42.0}},
   "BIG:1": {"place_id": "BIG:1", "name": "A big box", "collection": "noaa_nerrs",
@@ -175,6 +185,104 @@ def test_add_item_keeps_one_of_each_and_refuses_anything_else():
   assert add_item(["items/a.json"], "items/a.json") == ["items/a.json"]
   with pytest.raises(ValueError):
     add_item([], "../items/a.json")
+
+
+# ---- Copernicus Marine requests: needs-review, but a maintainer can accept them with the `run` label ----
+
+def test_cmems_grid_step_comes_from_the_dataset_id():
+  assert cmems_grid_step("cmems_mod_glo_bgc_my_0.25deg_P1M-m") == 0.25
+  assert cmems_grid_step("cmems_mod_glo_phy_my_0.083deg_P1M-m") == 0.083
+  assert cmems_grid_step("cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M") == pytest.approx(4 / 111.32)
+  with pytest.raises(ValueError, match="not in its id"):
+    cmems_grid_step("cmems_mystery_P1M")
+
+
+def test_cmems_estimate_is_the_buffered_box_times_the_months_of_the_record():
+  # Albanian EEZ box grown by one 0.25 deg cell each side: 1.6 x 2.9 deg = 7 x 12 cells; 1993-01 .. 2026-08 = 404 months
+  assert estimate_cmems_values(ROWS["MRGID:5670"]["bbox"], "cmems_mod_glo_bgc_my_0.25deg_P1M-m", ["1993-01-01", "2026-08-01"]) == 7 * 12 * 404
+  with pytest.raises(ValueError, match="time step or record is unknown"):
+    estimate_cmems_values(ROWS["MRGID:5670"]["bbox"], "cmems_mod_glo_bgc_my_0.25deg_P1M-m", None)
+
+
+def test_a_cmems_request_for_a_reference_place_is_approvable():
+  t = run({"place": "MRGID:5670", "collection": "mr_eez", "indicator": NO3})
+  assert t.label == "needs-review" and t.approvable
+  assert t.job == {"dataset": "cmems_mod_glo_bgc_my_0.25deg_P1M-m", "variable": "no3", "indicator": NO3, "coll": "mr_eez", "place": "MRGID:5670"}
+  assert t.estimate == 7 * 12 * 404
+  assert t.reasons[0] == ("Nitrate is a Copernicus Marine dataset: its run uses a personal Copernicus Marine login, so it is "
+                          "not started automatically")
+  assert t.reasons[-1] == "33,936 grid values (the place's box and the whole record): small enough for the place producer"
+
+
+def test_a_cmems_request_for_a_vector_place_is_approvable():
+  t = run({"place": "NERR:ELK", "indicator": NO3})
+  assert t.label == "needs-review" and t.approvable and t.job["coll"] == "noaa_nerrs"
+
+
+def test_a_cmems_job_is_checked_like_any_other():
+  t = run({"place": "MRGID:5670", "indicator": NO3})
+  assert check_job(t.job)["dataset"] == "cmems_mod_glo_bgc_my_0.25deg_P1M-m"
+  assert job_family(t.job) == "cmems"
+  assert job_family({**t.job, "indicator": "erddap:dhw_5km:CRW_SST:mean"}) == "erddap"
+  with pytest.raises(ValueError, match="no producer runs"):
+    job_family({**t.job, "indicator": "sdg:ER_MRN_MPA"})
+  with pytest.raises(ValueError):
+    check_job({**t.job, "dataset": "cmems_x;ls"})
+
+
+def test_a_cmems_request_for_a_derived_collection_is_not_approvable():
+  t = run({"place": "FAO:21", "indicator": NO3})
+  assert t.label == "needs-review" and not t.approvable and t.job is None
+  assert "neither published nor served one place at a time" in t.reasons[-1]
+
+
+def test_a_cmems_request_for_a_reference_collection_with_tiles_only_is_not_approvable():
+  t = run({"place": "REF:1", "indicator": NO3})
+  assert t.label == "needs-review" and not t.approvable
+  assert "neither published nor served" in t.reasons[-1]
+
+
+def test_a_cmems_request_for_a_sanctuary_stays_with_eco_indicators():
+  t = run({"place": "NMS:CINMS", "indicator": NO3})
+  assert t.label == "needs-review" and not t.approvable
+  assert "come from noaa-onms/eco-indicators" in t.reasons[-1]
+
+
+def test_a_cmems_request_over_the_size_limit_is_not_approvable():
+  t = run({"place": "BIG:1", "indicator": NO3})
+  assert t.label == "needs-review" and not t.approvable and t.estimate > MAX_CMEMS_VALUES
+  assert t.reasons[-1] == "about 14 M grid values, over the 10 M limit for the place producer"
+
+
+def test_a_cmems_request_whose_grid_is_unknown_is_not_approvable():
+  t = classify({"place": "MRGID:5670", "indicator": "cmems:cmems_mystery_P1M:x:mean"},
+               {"indicators": [{"id": "cmems:cmems_mystery_P1M:x:mean", "short": "X", "producer": {"name": "noaa-onms/eco-indicators"},
+                                "dataset": {"stac": None}, "time_range": ["2000-01-01", "2001-01-01"]}]},
+               LAYERS, ROWS.get, lambda url: DIMS, lambda p, c, i: False, TODAY)
+  assert t.label == "needs-review" and not t.approvable and "could not be estimated" in t.reasons[-1]
+
+
+def test_a_cmems_request_for_values_that_exist_is_already():
+  assert run({"place": "MRGID:5670", "indicator": NO3}, has=True).label == "already"
+
+
+def test_the_comment_tells_a_maintainer_how_to_accept_an_approvable_request():
+  c = comment(run({"place": "MRGID:5670", "collection": "mr_eez", "indicator": NO3}), {})
+  assert c.startswith("This request needs a maintainer, who will reply here. A maintainer can accept it by adding the `run` label; "
+                      "it runs on Copernicus Marine with the maintainer's account,")
+  assert "- Nitrate is a Copernicus Marine dataset: its run uses a personal Copernicus Marine login" in c
+  assert "Place view: https://oceanmetrics.io/indicators/#view=place&place=MRGID:5670&coll=mr_eez&ind=" in c
+
+
+def test_the_comment_of_a_request_nobody_can_accept_does_not_offer_the_label():
+  c = comment(run({"place": "FAO:21", "indicator": NO3}), {})
+  assert c.startswith("This request needs a maintainer, who will reply here.\n") and "`run` label" not in c
+
+
+def test_non_cmems_needs_review_requests_are_unchanged_and_not_approvable():
+  t = run({"place": "NMS:CINMS", "indicator": "sdg:ER_MRN_MPA"})
+  assert t.label == "needs-review" and not t.approvable and "runs only by hand" in t.reasons[-1]
+  assert not run(parse_issue_form(BODY)).approvable
 
 
 def test_a_tiny_job_says_its_count_in_full():
