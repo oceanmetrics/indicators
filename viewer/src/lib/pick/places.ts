@@ -76,7 +76,7 @@ export interface MatrixPlaces {
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 
 /**
- * what the multi picker's button says: "Sanctuaries and Tortugas reserve · 19 places", a place's short name, "2 groups · 21 places";
+ * what the multi picker's button says: "National Marine Sanctuaries · 19 places", a place's short name, "2 groups · 21 places";
  * a place set whose every place is chosen, and nothing else, by its title ("Ocean by jurisdiction · 299 places")
  */
 export function multiLabel(groups: GroupInfo[], chosen: ReadonlySet<string>, sets: readonly SetInfo[] = []): string {

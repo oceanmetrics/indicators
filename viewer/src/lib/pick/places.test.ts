@@ -33,7 +33,7 @@ describe('the groups the place picker lists', () => {
   const groups = placeGroups(idx, layers)
   it('every group with computed places, in the Matrix order, with "n of N" and its places by name', () => {
     expect(groups.map(g => [g.coll, g.title, g.computed, g.total])).toEqual([
-      ['places', 'Sanctuaries and Tortugas reserve', 2, 20], ['noaa_nerrs', 'National Estuarine Research Reserves', 1, 30], ['mr_eez', 'Exclusive Economic Zones', 1, 285],
+      ['places', 'National Marine Sanctuaries', 2, 20], ['noaa_nerrs', 'National Estuarine Research Reserves', 1, 30], ['mr_eez', 'Exclusive Economic Zones', 1, 285],
     ])
     expect(groups[0].places.map(p => p.id)).toEqual(['NMS:A', 'NMS:B'])
   })
@@ -109,12 +109,12 @@ describe('the collections nothing is computed for yet', () => {
 describe('what the picker buttons say', () => {
   const groups = placeGroups(idx, layers)
   it('multi: a group whole, part of a group, one place, several groups, nothing', () => {
-    expect(multiLabel(groups, new Set(['NMS:A', 'NMS:B']))).toBe('Sanctuaries and Tortugas reserve · 2 places')
+    expect(multiLabel(groups, new Set(['NMS:A', 'NMS:B']))).toBe('National Marine Sanctuaries · 2 places')
     expect(multiLabel(groups, new Set(['NMS:A']))).toBe('Alpha')
     expect(multiLabel(groups, new Set(['NMS:A', 'NERRS:WEL']))).toBe('2 groups · 2 places')
     expect(multiLabel(groups, new Set())).toBe('No places')
     const big = indexCoverage([row({}), row({ place_id: 'NMS:B' }), row({ place_id: 'NMS:C' })])
-    expect(multiLabel(placeGroups(big, layers), new Set(['NMS:A', 'NMS:B']))).toBe('Sanctuaries and Tortugas reserve · 2 of 3 places')
+    expect(multiLabel(placeGroups(big, layers), new Set(['NMS:A', 'NMS:B']))).toBe('National Marine Sanctuaries · 2 of 3 places')
   })
   it('group and place', () => {
     expect(groupLabel(groups[2])).toBe('Exclusive Economic Zones · 1 place')

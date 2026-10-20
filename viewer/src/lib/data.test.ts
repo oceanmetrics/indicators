@@ -26,7 +26,7 @@ describe('collection titles', () => {
     expect(collTitle('mr_high_seas')).toBe('High seas')
     expect(collTitle('noaa_nerrs', g)).toBe('National Estuarine Research Reserves')
     expect(collTitle('noaa_sanctuaries')).toBe('National Marine Sanctuaries')
-    expect(collTitle('places')).toBe('Sanctuaries and Tortugas reserve')
+    expect(collTitle('places')).toBe('National Marine Sanctuaries')
     expect(collTitle('boem_wind_leases', g)).toBe('BOEM offshore wind lease outlines')
     expect(collTitle('mystery', g)).toBe('mystery')
   })

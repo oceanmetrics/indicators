@@ -134,7 +134,7 @@ export function groupsWithValues(coverage: { indicator: string; place_id: string
   return new Map([...seen].map(([ind, byGroup]) => [ind, new Map([...byGroup].map(([g, ids]) => [g, ids.size]))]))
 }
 
-/** "Sanctuaries and Tortugas reserve, Exclusive Economic Zones", or "3 groups" past two; "" when none */
+/** "National Marine Sanctuaries, Exclusive Economic Zones", or "3 groups" past two; "" when none */
 export function groupsHint(counts: Map<string, number> | undefined, titles: (coll: string) => string, order: string[] = []): string {
   if (!counts || counts.size === 0) return ''
   const rank = new Map(order.map((c, n) => [c, n]))

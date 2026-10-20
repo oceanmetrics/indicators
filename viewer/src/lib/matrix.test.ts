@@ -287,7 +287,7 @@ describe('shownGroups: the sanctuaries by default', () => {
   const avail = ['places', 'noaa_nerrs', 'mr_eez']
   it('none asked: the default groups that have places', () => {
     expect(shownGroups(avail, [], '')).toEqual(['places'])
-    expect(shownGroups(['noaa_sanctuaries', 'places', 'mr_eez'], [], '')).toEqual(['noaa_sanctuaries', 'places'])
+    expect(shownGroups(['noaa_sanctuaries', 'places', 'mr_eez'], [], '')).toEqual(['places'])   // noaa_sanctuaries (ONMS ids) has no computed places
   })
   it('none asked and no default group in the catalog: every group', () => {
     expect(shownGroups(['noaa_nerrs', 'mr_eez'], [], '')).toEqual(['noaa_nerrs', 'mr_eez'])

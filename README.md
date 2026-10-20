@@ -105,7 +105,7 @@ the old `axes=t` reads as the default), `empty=1` (show the indicators without v
 
 **The two pickers** (`viewer/src/lib/pick/`, one component each for every view; their rules are in `places.ts` / `placesTree.ts` and
 `indicators.ts` / `indicatorsTree.ts`, tested; the panels load on the first open). Each is a button that says what is selected
-("Sanctuaries and Tortugas reserve · 19 places", "11 indicators · ONMS sections · leads only") and opens a popover (a full-width sheet
+("National Marine Sanctuaries · 19 places", "11 indicators · ONMS sections · leads only") and opens a popover (a full-width sheet
 at 600 px and below; Esc closes it and focus returns to the button, Tab stays inside, arrow keys move through the list).
 - **Places** (`multi` in the Matrix and the Report builder, `group` in the Map, `place` in the Place view): a search over the computed
   places (name and id), every group with computed places as a tick tree (groups, then places) with "n of N" computed of the gazetteer's

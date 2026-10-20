@@ -135,13 +135,12 @@ export async function loadCatalog(base: string, fetchFn: typeof fetch = fetch): 
 
 /**
  * short titles for the gazetteer collections places are grouped by (a place's `place_coll`); the gazetteer's own layer
- * titles are long ("... (200 NM)") and fill in the rest. `places` is the gazetteer's collection of the 20 places
- * erddap-places precomputes (18 sanctuaries, the Tortugas Ecological Reserve and Pitcairn's EEZ, which the index also
- * lists under mr_eez and the grouping takes from there).
+ * titles are long ("... (200 NM)") and fill in the rest. `places` is the gazetteer's collection of the places
+ * erddap-places precomputes: the 18 `NMS:*` sanctuaries (`noaa_sanctuaries` holds the ONMS section ids, a different id space).
  */
 export const GROUP_TITLES: Record<string, string> = {
   noaa_sanctuaries: 'National Marine Sanctuaries',
-  places: 'Sanctuaries and Tortugas reserve',
+  places: 'National Marine Sanctuaries',
   noaa_nerrs: 'National Estuarine Research Reserves',
   noaa_marine_monuments: 'Marine National Monuments',
   mr_eez: 'Exclusive Economic Zones',
@@ -154,7 +153,7 @@ export const GROUP_TITLES: Record<string, string> = {
 /** the groups in the order the Matrix lists them: sanctuaries first, then the other protected areas, then the Marine Regions ones */
 export const GROUP_ORDER = ['noaa_sanctuaries', 'places', 'noaa_nerrs', 'noaa_marine_monuments', 'mpa_inventory', 'protectedseas_mpa', 'mr_eez', 'fao_high_seas', 'mr_high_seas']
 /** the groups the Matrix opens with (those that have computed places): the sanctuaries */
-export const DEFAULT_GROUPS = ['noaa_sanctuaries', 'places']
+export const DEFAULT_GROUPS = ['places']
 
 export const LAYERS_URL = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer/index/layers.json'
 export const GAZETTEER_URL = 'https://oceanmetrics.io/places/'
