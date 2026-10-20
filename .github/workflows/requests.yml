@@ -97,11 +97,17 @@ jobs:
           export PATH="/opt/homebrew/bin:$PATH"
           (cd erddap-places/app && npm ci --no-audit --no-fund)
           cd erddap-places/precompute && npm ci --no-audit --no-fund
-          npx tsx src/precompute.ts --gazetteer "$REQ_COLL" --place "$REQ_PLACE" --dataset "$REQ_DATASET" --publish
+          # PRECOMPUTE_PUBLISH: erddap-places uploads the parquet, provenance and item of each unit it finishes
+          PRECOMPUTE_PUBLISH=s3://oceanmetrics.io-public/gazetteer \
+            npx tsx src/precompute.ts --gazetteer "$REQ_COLL" --place "$REQ_PLACE" --dataset "$REQ_DATASET" --variable "$REQ_VARIABLE"
       - name: rebuild and publish the catalog
         if: steps.cap.outputs.over != '1'
         run: |
           export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+          # the item goes on the requested-items list, which the build reads and the publish keeps
+          uv run python -m om_indicators.requests add-item job.json --out requested_items.json
+          aws s3 cp requested_items.json s3://oceanmetrics.io-public/indicators/requests/items.json \
+            --content-type application/json --cache-control "public, max-age=300" --only-show-errors
           npm ci --no-audit --no-fund
           scripts/build_catalog.sh
           scripts/publish_catalog.sh

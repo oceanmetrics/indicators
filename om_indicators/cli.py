@@ -48,9 +48,12 @@ def _add_erddap_places(sub: argparse._SubParsersAction) -> None:
   p.add_argument("--cache", type=Path, default=Path("cache/erddap-places"))
   p.add_argument("--out", type=Path, default=Path("catalog"))
   p.add_argument("--only", nargs="+", metavar="dataset/variable", help="limit to these variables")
+  p.add_argument("--extra-items", metavar="JSON", help="a JSON list of item hrefs (items/<id>.json) computed on request, "
+                 "which the stats collection does not link (a path or URL; a missing URL is an empty list)")
 
   def func(a: argparse.Namespace) -> int:
-    print_summary(erddap_places.run(a.out, base=a.base, cache=a.cache, only=a.only))
+    extra = erddap_places.read_extra_items(a.extra_items) if a.extra_items else []
+    print_summary(erddap_places.run(a.out, base=a.base, cache=a.cache, only=a.only, extra_items=extra))
     return 0
   p.set_defaults(func=func)
 

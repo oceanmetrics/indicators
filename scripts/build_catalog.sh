@@ -12,7 +12,9 @@ OUT="${1:-catalog}"
 rm -rf "$OUT/values" "$OUT/indicators.json" "$OUT/coverage.parquet"
 mkdir -p "$OUT"
 
-uv run om-ind erddap-places --out "$OUT"
+# the places computed on request (any public gazetteer collection) are not linked by the stats collection: their items
+# are listed by the requests workflow in the published indicators/requests/items.json (REQUESTED_ITEMS overrides)
+uv run om-ind erddap-places --out "$OUT" --extra-items "${REQUESTED_ITEMS:-https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/requests/items.json}"
 uv run om-ind eco-indicators --out "$OUT" ${ECO_REF:+--ref "$ECO_REF"}
 uv run om-ind obis --out "$OUT" ${OBIS_RELEASE:+--release "$OBIS_RELEASE"}
 if [ -n "${SDG_VALUES:-}" ]; then

@@ -33,9 +33,11 @@ import datetime as dt
 import json
 import math
 import os
+import re
 import statistics
 import subprocess
 import time as _time
+import urllib.error
 import urllib.parse
 import urllib.request
 from collections import defaultdict
@@ -160,35 +162,61 @@ def class_year_rows(months: Iterable[dict]) -> list[dict]:
 
 
 # contract rows (pure) ----
-def continuous_rows(place_id: str, indicator: str, unit: str, series: Iterable[tuple[dt.date, float | None]]) -> list[dict]:
+def continuous_rows(place_id: str, indicator: str, unit: str, series: Iterable[tuple[dt.date, float | None]],
+                    coll: str = COLL) -> list[dict]:
   """month and year contract rows of one place's continuous series."""
   months = month_rows(series)
   out = []
   for grain, rs in (("month", months), ("year", year_rows(months))):
-    out += [{"place_id": place_id, "coll": COLL, "indicator": indicator, "time_grain": grain, "time": r["time"],
+    out += [{"place_id": place_id, "coll": coll, "indicator": indicator, "time_grain": grain, "time": r["time"],
              "class": None, "value": r["value"], "n": r["n"], "unit": unit} for r in rs]
   return out
 
 
 def categorical_rows(place_id: str, indicator: str, rows: Iterable[tuple[dt.date, str, float | None]],
-                     steps: Iterable[dt.date] | None = None) -> list[dict]:
+                     steps: Iterable[dt.date] | None = None, coll: str = COLL) -> list[dict]:
   """month and year contract rows of one place's categorical series (unit '1')."""
   months = class_month_rows(rows, steps)
   out = []
   for grain, rs in (("month", months), ("year", class_year_rows(months))):
-    out += [{"place_id": place_id, "coll": COLL, "indicator": indicator, "time_grain": grain, "time": r["time"],
+    out += [{"place_id": place_id, "coll": coll, "indicator": indicator, "time_grain": grain, "time": r["time"],
              "class": r["class"], "value": r["value"], "n": r["n"], "unit": "1"} for r in rs]
   return out
 
 
-def table_rows(table: Any, place_id: str, indicator: str, unit: str, categorical: bool) -> list[dict]:
+def table_rows(table: Any, place_id: str, indicator: str, unit: str, categorical: bool, coll: str = COLL) -> list[dict]:
   """contract rows of one stats parquet (arrow table with the published columns)."""
   if categorical:
     recs = table.select(["date", "class", "frac_area"]).to_pylist()
     steps = [r["date"] for r in recs]
-    return categorical_rows(place_id, indicator, [(r["date"], str(int(r["class"])), r["frac_area"]) for r in recs], steps)
+    return categorical_rows(place_id, indicator, [(r["date"], str(int(r["class"])), r["frac_area"]) for r in recs], steps, coll)
   recs = table.select(["date", "mean_wt"]).to_pylist()
-  return continuous_rows(place_id, indicator, unit, [(r["date"], r["mean_wt"]) for r in recs])
+  return continuous_rows(place_id, indicator, unit, [(r["date"], r["mean_wt"]) for r in recs], coll)
+
+
+def read_extra_items(loc: str) -> list[str]:
+  """the requested items list (a JSON list of hrefs); a URL that is not there yet is an empty list"""
+  if _is_url(loc) and not loc.startswith("file://"):
+    try:
+      with urllib.request.urlopen(loc, timeout=60) as r:
+        data = json.loads(r.read())
+    except urllib.error.HTTPError as e:
+      if e.code in (403, 404):     # S3 answers 403 for a key that does not exist
+        return []
+      raise
+  else:
+    data = json.loads(Path(loc.removeprefix("file://")).read_text())
+  if not isinstance(data, list) or not all(isinstance(x, str) for x in data):
+    raise ValueError(f"{loc}: expected a JSON list of item hrefs")
+  return data
+
+
+def item_coll(item: dict) -> str:
+  """the gazetteer collection of an item's place: `gazetteer:collection` (erddap-places, 2026-10-20), else 'places'"""
+  c = item.get("properties", {}).get("gazetteer:collection") or COLL
+  if not re.fullmatch(r"[a-z0-9_]+", c):
+    raise ValueError(f"item {item.get('id')!r} names a malformed collection {c!r}")
+  return c
 
 
 # i/o ----
@@ -305,9 +333,11 @@ def data_location(item_loc: str, item: dict, stats_dir: str) -> str:
 
 
 def run(out: Path, base: str = DEFAULT_BASE, cache: Path = Path("cache/erddap-places"),
-        only: list[str] | None = None) -> dict:
+        only: list[str] | None = None, extra_items: list[str] | None = None) -> dict:
   """read the published stats and write month and year values files under `out`. `base` is the stats collection.json
-  (URL or path); `only` limits the run to ["dataset/variable", ...]. returns a summary."""
+  (URL or path); `only` limits the run to ["dataset/variable", ...]; `extra_items` are item hrefs relative to the stats
+  folder (`items/<id>.json`) that the collection does not link: the places computed on request, for any public
+  gazetteer collection (the indicators request workflow keeps the list). returns a summary."""
   t0 = _time.time()
   base = str(base)
   f = Fetcher(Path(cache))
@@ -315,7 +345,10 @@ def run(out: Path, base: str = DEFAULT_BASE, cache: Path = Path("cache/erddap-pl
   gazetteer = _join(base, "../")
   collection = f.read_json(base)
   links = [lk for lk in collection.get("links", []) if lk.get("rel") == "item"]
-  item_locs = sorted(_join(base, lk["href"]) for lk in links)
+  for h in extra_items or []:
+    if not re.fullmatch(r"items/[A-Za-z0-9_.\-]+\.json", h):
+      raise ValueError(f"an extra item must be items/<id>.json under the stats folder, got {h!r}")
+  item_locs = sorted({_join(base, lk["href"]) for lk in links} | {_child(stats_dir, h) for h in extra_items or []})
   link_status = {_join(base, lk["href"]): lk.get("erddap-places:status") for lk in links}
   if only:
     for s in only:
@@ -334,9 +367,13 @@ def run(out: Path, base: str = DEFAULT_BASE, cache: Path = Path("cache/erddap-pl
   if not items:
     raise ValueError(f"no items in {base}")
 
-  # places must resolve before anything is fetched or written
+  # places must resolve, each in its own collection, before anything is fetched or written
   index_path = f.cached(_child(gazetteer, "index/places_index.parquet"), "places_index", None)
-  resolve_places(index_path, (it["properties"]["erddap-places:place_id"] for _, it in items))
+  by_coll: dict[str, list[str]] = defaultdict(list)
+  for _, it in items:
+    by_coll[item_coll(it)].append(it["properties"]["erddap-places:place_id"])
+  for c, pids in sorted(by_coll.items()):
+    resolve_places(index_path, pids, c)
 
   datasets = {d: f.read_json(_child(gazetteer, f"erddap/{d}/collection.json"))
               for d in sorted({it["properties"]["erddap-places:dataset_id"] for _, it in items})}
@@ -347,17 +384,17 @@ def run(out: Path, base: str = DEFAULT_BASE, cache: Path = Path("cache/erddap-pl
     ds, var, pid = p["erddap-places:dataset_id"], p["erddap-places:variable"], p["erddap-places:place_id"]
     asset = it.get("assets", {}).get("data", {})
     path = f.cached(data_location(loc, it, stats_dir), f"{ds}/{var}/{pid.replace(':', '_')}", asset.get("file:checksum"))
-    return {"loc": loc, "item": it, "dataset": ds, "variable": var, "place_id": pid, "path": path,
+    return {"loc": loc, "item": it, "dataset": ds, "variable": var, "place_id": pid, "coll": item_coll(it), "path": path,
             "table": pq.read_table(path)}
 
   loaded = f.map(load, items)
-  groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
+  groups: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
   for e in loaded:
-    groups[(e["dataset"], e["variable"])].append(e)
+    groups[(e["dataset"], e["variable"], e["coll"])].append(e)
 
   summary: dict = {"files": [], "empty": [], "partial": [], "items": len(loaded), "unknown_classes": []}
   places_seen: set[str] = set()
-  for (ds, var), es in sorted(groups.items()):
+  for (ds, var, coll), es in sorted(groups.items()):
     meta = datasets[ds].get("cube:variables", {}).get(var)
     if meta is None:
       raise ValueError(f"variable {var!r} is not in cube:variables of dataset {ds!r}")
@@ -372,7 +409,7 @@ def run(out: Path, base: str = DEFAULT_BASE, cache: Path = Path("cache/erddap-pl
     for e in sorted(es, key=lambda e: e["loc"]):
       p = e["item"]["properties"]
       tag = f"{ds}/{var}/{e['place_id']}"
-      got = table_rows(e["table"], e["place_id"], ind, unit, cat)
+      got = table_rows(e["table"], e["place_id"], ind, unit, cat, coll)
       if not got:
         summary["empty"].append(tag)
       else:
@@ -395,7 +432,7 @@ def run(out: Path, base: str = DEFAULT_BASE, cache: Path = Path("cache/erddap-pl
             "code": {"name": "om-indicators", "version": __version__, "commit": _commit(), "adapter": ADAPTER},
             "license": LICENSE, "created": contract.utc_now()}
     path = contract.write_values(rows, out, prov)
-    summary["files"].append({"indicator": ind, "coll": COLL, "path": str(path), "rows": len(rows),
+    summary["files"].append({"indicator": ind, "coll": coll, "path": str(path), "rows": len(rows),
                              "places": len({r["place_id"] for r in rows})})
   summary["places"] = sorted(places_seen)
   summary["seconds"] = round(_time.time() - t0, 1)

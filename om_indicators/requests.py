@@ -157,6 +157,20 @@ def check_job(job: dict[str, str]) -> dict[str, str]:
   return {k: job[k] for k in ("dataset", "variable", "indicator", "coll", "place")}
 
 
+def item_href(job: dict[str, str]) -> str:
+  """the stats item erddap-places writes for a job, relative to the stats folder (its id: dataset_variable_place, the
+  place's ':' as '-')"""
+  j = check_job(job)
+  return f"items/{j['dataset']}_{j['variable']}_{j['place'].replace(':', '-')}.json"
+
+
+def add_item(items: list[str], href: str) -> list[str]:
+  """the requested-items list with `href` in it once, sorted"""
+  if not re.fullmatch(r"items/[A-Za-z0-9_.\-]+\.json", href):
+    raise ValueError(f"not a stats item href: {href!r}")
+  return sorted(set(items) | {href})
+
+
 def comment(t: Triage, form: dict[str, str]) -> str:
   """the bot's comment: what will happen, in words, and why"""
   head = {
@@ -207,7 +221,17 @@ def main(argv: list[str] | None = None) -> int:
   t.add_argument("--catalog", default=CATALOG)
   c = sub.add_parser("check-job", help="re-check a job JSON; prints KEY=value lines for $GITHUB_ENV")
   c.add_argument("job", type=Path)
+  ai = sub.add_parser("add-item", help="add a job's stats item to the requested-items list (read from --list, a path or URL)")
+  ai.add_argument("job", type=Path)
+  ai.add_argument("--list", default=CATALOG + "requests/items.json")
+  ai.add_argument("--out", type=Path, required=True)
   a = ap.parse_args(argv)
+  if a.cmd == "add-item":
+    from om_indicators.adapters.erddap_places import read_extra_items
+    items = add_item(read_extra_items(a.list), item_href(json.loads(a.job.read_text())))
+    a.out.write_text(json.dumps(items, indent=1) + "\n")
+    print(f"{len(items)} requested items")
+    return 0
   if a.cmd == "triage":
     form = parse_issue_form(a.body.read_text())
     tri = classify(form, *_load_network(a.catalog), today=dt.date.today())

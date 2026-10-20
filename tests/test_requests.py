@@ -5,7 +5,7 @@ import datetime as dt
 import pytest
 
 from om_indicators.requests import (
-  MAX_AUTO_VALUES, check_job, classify, comment, estimate_values, grid_cells, parse_issue_form, time_steps,
+  MAX_AUTO_VALUES, add_item, check_job, item_href, classify, comment, estimate_values, grid_cells, parse_issue_form, time_steps,
 )
 
 BODY = """### Place
@@ -140,3 +140,15 @@ def test_comment_states_the_outcome_and_the_reasons():
   assert c.startswith("This request is small and uses a catalogued dataset, so it will run by itself")
   assert "- about 9.0 M grid values: small enough to run by itself" in c  # 35 x 17 x 15,178
   assert "Place view: https://oceanmetrics.io/indicators/#view=place&place=NMS:CINMS&coll=places&ind=erddap:dhw_5km:CRW_SST:mean" in c
+
+
+def test_item_href_is_the_erddap_places_item_id():
+  job = {"dataset": "dhw_5km", "variable": "CRW_SST", "indicator": "erddap:dhw_5km:CRW_SST:mean", "coll": "noaa_nerrs", "place": "NERRS:WEL"}
+  assert item_href(job) == "items/dhw_5km_CRW_SST_NERRS-WEL.json"
+
+
+def test_add_item_keeps_one_of_each_and_refuses_anything_else():
+  assert add_item(["items/b.json"], "items/a.json") == ["items/a.json", "items/b.json"]
+  assert add_item(["items/a.json"], "items/a.json") == ["items/a.json"]
+  with pytest.raises(ValueError):
+    add_item([], "../items/a.json")

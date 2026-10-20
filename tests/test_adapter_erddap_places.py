@@ -332,3 +332,46 @@ def test_published_cinms_sst_has_complete_years_1986_to_2025(tmp_path):
   assert all(sum(1 for t in months if t.year == y) == 12 for y in range(1986, 2026))
   assert all(10 < r["value"] < 20 for r in years)             # annual means; monthly peaks reach ~21.5 in late summer
   assert all(10 < r["value"] < 25 for r in rows) and {r["unit"] for r in rows} == {"Celsius"}
+
+
+# ---- places computed on request (gazetteer:collection, extra items) ----
+import json  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+import pyarrow.parquet as pq  # noqa: E402
+
+def test_requested_item_of_another_collection_writes_its_own_values_file(tmp_path):
+  """an item computed on request for a place of another gazetteer collection (not linked by the stats collection)
+  is read from the extra items list and written under coll=<its collection>, beside the places file"""
+  days = daterange(dt.date(2020, 1, 1), dt.date(2020, 12, 31))
+  t = continuous_table([(d, 10.0) for d in days])
+  base = make_tree(tmp_path / "src", [entry("ds", "sst", "NMS:A", t)], index={"NMS:A": ["places"], "NERRS:WEL": ["noaa_nerrs"]})
+  stats = Path(base).parent
+  item = json.loads((stats / "items" / "ds_sst_NMS-A.json").read_text())
+  # the requested place: same dataset, written by erddap-places with its collection, and not linked
+  (stats / "ds" / "sst").mkdir(parents=True, exist_ok=True)
+  pq.write_table(t, stats / "ds" / "sst" / "NERRS:WEL.parquet")
+  req = {**item, "id": "ds_sst_NERRS-WEL",
+         "properties": {**item["properties"], "erddap-places:place_id": "NERRS:WEL", "gazetteer:collection": "noaa_nerrs"},
+         "assets": {"data": {"href": "../ds/sst/NERRS:WEL.parquet"}}}
+  (stats / "items" / "ds_sst_NERRS-WEL.json").write_text(json.dumps(req))
+  s = ep.run(tmp_path / "out", base=base, cache=tmp_path / "cache", extra_items=["items/ds_sst_NERRS-WEL.json"])
+  assert sorted((f["coll"], f["places"]) for f in s["files"]) == [("noaa_nerrs", 1), ("places", 1)]
+  rows = c.read_values(next(Path(f["path"]) for f in s["files"] if f["coll"] == "noaa_nerrs"))[0].to_pylist()
+  assert {r["coll"] for r in rows} == {"noaa_nerrs"} and {r["place_id"] for r in rows} == {"NERRS:WEL"}
+
+
+def test_extra_items_must_be_item_paths_under_the_stats_folder(tmp_path):
+  base = make_tree(tmp_path / "src", [entry("ds", "sst", "NMS:A", continuous_table([(dt.date(2020, 1, 1), 1.0)]))])
+  for bad in ["../../secret.json", "items/../x.json", "https://evil.example/x.json", "items/a b.json"]:
+    with pytest.raises(ValueError, match="extra item"):
+      ep.run(tmp_path / "out", base=base, cache=tmp_path / "cache", extra_items=[bad])
+
+
+def test_read_extra_items_from_a_file(tmp_path):
+  p = tmp_path / "items.json"
+  p.write_text(json.dumps(["items/ds_sst_NERRS-WEL.json"]))
+  assert ep.read_extra_items(str(p)) == ["items/ds_sst_NERRS-WEL.json"]
+  p.write_text(json.dumps({"not": "a list"}))
+  with pytest.raises(ValueError):
+    ep.read_extra_items(str(p))
