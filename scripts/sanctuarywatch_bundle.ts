@@ -14,8 +14,9 @@ import { assess } from '../src/status/index.ts'
 import type { MethodId, Point } from '../src/status/index.ts'
 import { readValues } from '../src/coverage/cli.ts'
 import type { ManifestIndicator } from '../src/coverage/build.ts'
-import { swCaptions, swDataJson, swFiguresCsv, swFolder, swSettings, swSettingsMd, swStagingRow } from '../src/report/sanctuarywatch.ts'
+import { swFolder } from '../src/report/sanctuarywatch.ts'
 import type { SwFigure } from '../src/report/sanctuarywatch.ts'
+import { swBundleFiles } from '../src/report/swBundle.ts'
 import { configHash, configLines } from '../viewer/src/lib/delivery.ts'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -78,20 +79,13 @@ for (const ind of manifest.indicators as Ind[]) {
 if (!figures.length) throw new Error(`no continuous lead indicator has year values for ${PLACE}`)
 
 // ---- files ----
+// the text files are src/report/swBundle.ts's, the same ones the viewer's Export menu zips
 mkdirSync(OUT, { recursive: true })
-const staging: string[][] = []
-figures.forEach((f, k) => {
-  const dir = join(OUT, swFolder(PLACE, f.indicator.id))
-  mkdirSync(dir, { recursive: true })
-  const pairs = swSettings(f, COLORS)
-  writeFileSync(join(dir, 'data.json'), JSON.stringify(swDataJson(f), null, 1) + '\n')
-  writeFileSync(join(dir, 'settings.json'), JSON.stringify(pairs) + '\n')
-  writeFileSync(join(dir, 'settings.md'), swSettingsMd(f, pairs))
-  writeFileSync(join(dir, 'captions.md'), swCaptions(f).md)
-  writeFileSync(join(dir, 'alt.txt'), f.alt + '\n')
-  staging.push(swStagingRow(f, k + 1, 'External'))
-})
-writeFileSync(join(OUT, 'figures.csv'), swFiguresCsv(staging))
+for (const f of swBundleFiles(figures, COLORS, 'External')) {
+  const file = join(OUT, f.path)
+  mkdirSync(dirname(file), { recursive: true })
+  writeFileSync(file, f.text)
+}
 
 // ---- figure.png and figure.svg from the embed route ----
 if (args.includes('--png')) {
