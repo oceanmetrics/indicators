@@ -43,6 +43,12 @@ export interface CoverageRow {
    * coverage table built before 2026-10-20; readers use `place_coll ?? coll`.
    */
   place_coll?: string | null
+  /**
+   * a place whose home collection is a `derived` layer (the high seas by FAO area) is drawn as a feature of another
+   * layer: this is the id of that feature (the place's index `source_id`, `FAO:21`); null for any other place. absent in a
+   * coverage table built before 2026-10-20.
+   */
+  display_id?: string | null
   indicator: string
   time_grain: Grain
   t0: string | null
@@ -87,6 +93,8 @@ const IMPLEMENTED = new Set<string>(['iea-sd', 'names-pct', 'values'])
 export interface IndexEntry {
   place_id: string
   collection: string
+  /** the id of the place in its source; for a place of a derived layer, the id of the feature that draws it */
+  source_id?: string | null
 }
 
 /**
@@ -105,11 +113,24 @@ export function placeHomes(entries: IndexEntry[], order: string[]): Map<string, 
   return homes
 }
 
+/**
+ * the display id of every place whose home collection is a derived layer (`derived`: its slugs): its index `source_id`
+ * in that collection, the `place_id` of the feature of the layer that draws it. a place of any other collection, or
+ * without a `source_id`, has none.
+ */
+export function displayIds(entries: IndexEntry[], homes: Map<string, string>, derived: ReadonlySet<string>): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const e of entries) {
+    if (e.source_id && derived.has(e.collection) && homes.get(e.place_id) === e.collection) out.set(e.place_id, e.source_id)
+  }
+  return out
+}
+
 /** the home collection of a place; the values collection when the index does not list the place (or there is no index) */
 export const homeColl = (placeId: string, valuesColl: string, homes?: Map<string, string> | null): string => homes?.get(placeId) ?? valuesColl
 
 const empty = (r: ValueRow, placeName = r.place_id, placeColl = r.coll): CoverageRow => ({
-  place_id: r.place_id, place_name: placeName, coll: r.coll, place_coll: placeColl, indicator: r.indicator, time_grain: r.time_grain,
+  place_id: r.place_id, place_name: placeName, coll: r.coll, place_coll: placeColl, display_id: null, indicator: r.indicator, time_grain: r.time_grain,
   t0: null, t1: null, n_periods: 0, last_time: null, last_value: null, last_class: null,
   status_method: null, status: null, trend: null, recent_mean: null, recent_from: null, recent_to: null,
   lt_mean: null, lt_sd: null, why: null, sentence: null, spark: '[]',
@@ -178,7 +199,9 @@ export function shownGrainOrder(statusGrain: Grain): Grain[] {
   return [...new Set<Grain>([statusGrain, 'year', 'month', 'decade', 'day', 'all'])]
 }
 
-export function coverageOf(rows: ValueRow[], ind: ManifestIndicator, names: Map<string, string>, homes?: Map<string, string> | null): CoverageRow[] {
+export function coverageOf(
+  rows: ValueRow[], ind: ManifestIndicator, names: Map<string, string>, homes?: Map<string, string> | null, display?: Map<string, string> | null,
+): CoverageRow[] {
   const groups = new Map<string, ValueRow[]>()
   for (const r of rows) {
     const k = `${r.place_id}\u0000${r.time_grain}`
@@ -188,7 +211,9 @@ export function coverageOf(rows: ValueRow[], ind: ManifestIndicator, names: Map<
   for (const g of groups.values()) {
     const name = names.get(g[0].place_id) ?? g[0].place_id
     const home = homeColl(g[0].place_id, g[0].coll, homes)
-    out.push(ind.kind === 'categorical' ? categoricalRow(g, ind, name, home) : continuousRow(g, ind, name, home))
+    const row = ind.kind === 'categorical' ? categoricalRow(g, ind, name, home) : continuousRow(g, ind, name, home)
+    row.display_id = display?.get(g[0].place_id) ?? null
+    out.push(row)
   }
   // a sparkline only on the row a cell shows: the others would be bytes nobody draws (OBIS decades, months beside years)
   const order = shownGrainOrder(ind.status_grain)

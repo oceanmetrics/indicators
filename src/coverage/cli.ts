@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { dirname, join } from 'node:path'
 import { asyncBufferFromFile, parquetReadObjects } from 'hyparquet'
 import { parquetWriteBuffer } from 'hyparquet-writer'
-import { coverageOf, placeHomes } from './build.ts'
+import { coverageOf, displayIds, placeHomes } from './build.ts'
 import type { CoverageRow, IndexEntry, ManifestIndicator, ValueRow } from './build.ts'
 
 const INDEX_URL = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer/index/places_index.parquet'
@@ -46,6 +46,8 @@ export interface Gazetteer {
   names: Map<string, string>
   /** place_id -> home collection; null without an index */
   homes: Map<string, string> | null
+  /** place_id -> the id of the feature that draws it, for the places of a derived layer */
+  display: Map<string, string> | null
 }
 
 /** the collections in layers.json order (`collection`, else `slug`) */
@@ -54,17 +56,24 @@ export function layerOrder(json: unknown): string[] {
   return Array.isArray(layers) ? layers.map(l => l.collection ?? l.slug ?? '').filter(Boolean) : []
 }
 
+/** the collections that are `derived` layers (drawn by another layer's geometry): `kind: "derived"` in layers.json */
+export function derivedLayers(json: unknown): Set<string> {
+  const layers = (json as { layers?: { slug?: string; collection?: string; kind?: string }[] } | null)?.layers
+  return new Set(Array.isArray(layers) ? layers.filter(l => l.kind === 'derived').map(l => l.collection ?? l.slug ?? '').filter(Boolean) : [])
+}
+
 export async function readGazetteer(index: string, layers: string): Promise<Gazetteer> {
   const path = await localCopy(index, 'places_index.parquet')
-  if (!path) return { names: new Map(), homes: null }
-  const rows = (await parquetReadObjects({ file: await asyncBufferFromFile(path), columns: ['place_id', 'name', 'collection'] })) as (IndexEntry & { name: string })[]
+  if (!path) return { names: new Map(), homes: null, display: null }
+  const rows = (await parquetReadObjects({ file: await asyncBufferFromFile(path), columns: ['place_id', 'name', 'collection', 'source_id'] })) as (IndexEntry & { name: string })[]
   const lpath = await localCopy(layers, 'layers.json')
-  const order = lpath ? layerOrder(JSON.parse(readFileSync(lpath, 'utf8'))) : []
-  return { names: new Map(rows.map(r => [r.place_id, r.name])), homes: placeHomes(rows, order) }
+  const json = lpath ? JSON.parse(readFileSync(lpath, 'utf8')) : null
+  const homes = placeHomes(rows, layerOrder(json))
+  return { names: new Map(rows.map(r => [r.place_id, r.name])), homes, display: displayIds(rows, homes, derivedLayers(json)) }
 }
 
 const COLUMNS: [keyof CoverageRow, 'STRING' | 'DOUBLE' | 'INT32' | 'JSON'][] = [
-  ['place_id', 'STRING'], ['place_name', 'STRING'], ['coll', 'STRING'], ['place_coll', 'STRING'], ['indicator', 'STRING'], ['time_grain', 'STRING'],
+  ['place_id', 'STRING'], ['place_name', 'STRING'], ['coll', 'STRING'], ['place_coll', 'STRING'], ['display_id', 'STRING'], ['indicator', 'STRING'], ['time_grain', 'STRING'],
   ['t0', 'STRING'], ['t1', 'STRING'], ['n_periods', 'INT32'], ['last_time', 'STRING'], ['last_value', 'DOUBLE'],
   ['last_class', 'STRING'], ['status_method', 'STRING'], ['status', 'STRING'], ['trend', 'STRING'],
   ['recent_mean', 'DOUBLE'], ['recent_from', 'STRING'], ['recent_to', 'STRING'], ['lt_mean', 'DOUBLE'],
@@ -85,10 +94,10 @@ async function main() {
   const layers = flag('--layers', LAYERS_URL)
   const catalog = args.find((a, i) => !a.startsWith('--') && !args[i - 1]?.startsWith('--')) ?? 'catalog'
   const manifest = JSON.parse(readFileSync(join(catalog, 'indicators.json'), 'utf8'))
-  const { names, homes } = await readGazetteer(index, layers)
+  const { names, homes, display } = await readGazetteer(index, layers)
   const all: CoverageRow[] = []
   for (const ind of manifest.indicators as ManifestIndicator[]) {
-    for (const c of ind.collections) all.push(...coverageOf(await readValues(join(catalog, c.path)), ind, names, homes))
+    for (const c of ind.collections) all.push(...coverageOf(await readValues(join(catalog, c.path)), ind, names, homes, display))
   }
   const buf = coverageParquet(all, { 'om:manifest_version': manifest.version, 'om:created': new Date().toISOString().slice(0, 19) + 'Z' })
   writeFileSync(join(catalog, 'coverage.parquet'), Buffer.from(buf))

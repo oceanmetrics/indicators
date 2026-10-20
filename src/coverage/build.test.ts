@@ -1,8 +1,8 @@
 // the coverage builder: exact rows from small synthetic values, one test per rule.
 import { describe, expect, it } from 'vitest'
-import { coverageOf, encodeSpark, homeColl, placeHomes, SPARK_PERIODS } from './build.ts'
+import { coverageOf, displayIds, encodeSpark, homeColl, placeHomes, SPARK_PERIODS } from './build.ts'
 import type { ManifestIndicator, ValueRow } from './build.ts'
-import { coverageParquet, layerOrder } from './cli.ts'
+import { coverageParquet, derivedLayers, layerOrder } from './cli.ts'
 import { parquetReadObjects } from 'hyparquet'
 
 const SST: ManifestIndicator = {
@@ -138,6 +138,45 @@ describe('place_coll: the home gazetteer collection', () => {
   it('layerOrder reads collection, else slug, in file order; anything unreadable is empty', () => {
     expect(layerOrder({ layers: [{ slug: 'a', collection: 'b' }, { slug: 'c' }, {}] })).toEqual(['b', 'c'])
     expect(layerOrder(null)).toEqual([])
+  })
+})
+
+describe('display_id: the feature that draws a place of a derived layer', () => {
+  // two pieces of the high seas (derived: drawn as FAO major areas), an EEZ and a sanctuary; one FAO piece is also listed under another collection
+  const index = [
+    { place_id: 'FAOHS:21', collection: 'fao_high_seas', source_id: 'FAO:21' },
+    { place_id: 'FAOHS:87', collection: 'fao_high_seas', source_id: 'FAO:87' },
+    { place_id: 'FAOHS:34', collection: 'fao_high_seas', source_id: null },
+    { place_id: 'MRGID:8456', collection: 'mr_eez', source_id: '8456' },
+    { place_id: 'NMS:A', collection: 'places', source_id: 'A' },
+    { place_id: 'FAOHS:88', collection: 'fao_high_seas', source_id: 'FAO:88' },
+    { place_id: 'FAOHS:88', collection: 'aa_other', source_id: 'zz' },
+  ]
+  const order = ['aa_other', 'fao_high_seas', 'mr_eez', 'places']
+  const derived = new Set(['fao_high_seas'])
+
+  it('is the index source_id of a place whose home collection is a derived layer, and nothing else', () => {
+    const homes = placeHomes(index, order)
+    expect(Object.fromEntries(displayIds(index, homes, derived))).toEqual({ 'FAOHS:21': 'FAO:21', 'FAOHS:87': 'FAO:87' })
+  })
+  it('a place whose home is another collection has none, even when it is listed in a derived one', () => {
+    const homes = placeHomes(index, order)
+    expect(homes.get('FAOHS:88')).toBe('aa_other')
+    expect(displayIds(index, homes, derived).has('FAOHS:88')).toBe(false)
+  })
+  it('no derived layer: no display ids', () => {
+    expect(displayIds(index, placeHomes(index, order), new Set()).size).toBe(0)
+  })
+  it('derivedLayers reads kind derived from layers.json (collection, else slug); anything unreadable is empty', () => {
+    expect([...derivedLayers({ layers: [{ collection: 'fao_high_seas', kind: 'derived' }, { slug: 'x', kind: 'derived' }, { collection: 'mr_eez', kind: 'raster' }, { collection: 'places', kind: 'vector' }] })]).toEqual(['fao_high_seas', 'x'])
+    expect(derivedLayers(null).size).toBe(0)
+  })
+  it('coverageOf writes it on every row of the place, null for the others', () => {
+    const homes = placeHomes(index, order)
+    const display = displayIds(index, homes, derived)
+    const rows = coverageOf([...years(2020, [1, 2], { place_id: 'FAOHS:21', coll: 'fao_high_seas' }), row({ place_id: 'NMS:A' })], SST, new Map(), homes, display)
+    expect(rows.map(r => [r.place_id, r.place_coll, r.display_id])).toEqual([['FAOHS:21', 'fao_high_seas', 'FAO:21'], ['NMS:A', 'places', null]])
+    expect(coverageOf(years(2020, [1]), SST, names)[0].display_id).toBeNull()
   })
 })
 
