@@ -71,12 +71,23 @@ export interface Indicator {
   collections: { coll: string; places: number; rows: number; path: string; time_range?: [string, string] }[]
 }
 
+/** a named list of place groups (gazetteer collections) offered as one choice (config/place_sets.yml; `set:<id>` in a link) */
+export interface PlaceSet {
+  id: string
+  title: string
+  /** the gazetteer collections, in the order the pickers list them */
+  groups: string[]
+  note?: string
+}
+
 export interface Manifest {
   version: string
   contract?: string
   created?: string
   vocabularies: Record<VocabId, Vocab>
   indicators: Indicator[]
+  /** absent in a manifest built before 2026-10-20 */
+  place_sets?: PlaceSet[]
 }
 
 export interface Catalog {
@@ -134,12 +145,14 @@ export const GROUP_TITLES: Record<string, string> = {
   noaa_nerrs: 'National Estuarine Research Reserves',
   noaa_marine_monuments: 'Marine National Monuments',
   mr_eez: 'Exclusive Economic Zones',
+  fao_high_seas: 'High seas by FAO area',
+  fao_major_areas: 'FAO major fishing areas',
   mr_high_seas: 'High seas',
   mpa_inventory: 'Marine protected areas (NOAA inventory)',
   protectedseas_mpa: 'Marine protected areas (ProtectedSeas)',
 }
 /** the groups in the order the Matrix lists them: sanctuaries first, then the other protected areas, then the Marine Regions ones */
-export const GROUP_ORDER = ['noaa_sanctuaries', 'places', 'noaa_nerrs', 'noaa_marine_monuments', 'mpa_inventory', 'protectedseas_mpa', 'mr_eez', 'mr_high_seas']
+export const GROUP_ORDER = ['noaa_sanctuaries', 'places', 'noaa_nerrs', 'noaa_marine_monuments', 'mpa_inventory', 'protectedseas_mpa', 'mr_eez', 'fao_high_seas', 'mr_high_seas']
 /** the groups the Matrix opens with (those that have computed places): the sanctuaries */
 export const DEFAULT_GROUPS = ['noaa_sanctuaries', 'places']
 
@@ -167,9 +180,9 @@ export function parseLayers(json: unknown): Layers {
   return out
 }
 
-/** a group's short title, else the gazetteer's title, else the slug */
-export function collTitle(coll: string, layers: Layers = {}): string {
-  return GROUP_TITLES[coll] ?? layers[coll]?.title ?? coll
+/** a group's short title, else the gazetteer's title, else the slug; a place set (`set:<id>`) has its own title */
+export function collTitle(coll: string, layers: Layers = {}, sets: readonly PlaceSet[] = []): string {
+  return sets.find(s => `set:${s.id}` === coll)?.title ?? GROUP_TITLES[coll] ?? layers[coll]?.title ?? coll
 }
 
 /** a collection in the gazetteer's places browser */

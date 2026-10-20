@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { CoverageRow } from '../../../../src/coverage/build.ts'
 import type { Layers } from '../data.ts'
 import { indexCoverage } from '../matrix.ts'
-import { groupLabel, matrixChosen, multiLabel, placeGroups, placeLabel } from './places.ts'
+import { groupLabel, matrixChosen, multiLabel, placeGroups, placeLabel, placeSetInfos } from './places.ts'
 import { groupPickNodes, placePickTree, toggleMatrixPlaces, uncomputedCollections } from './placesTree.ts'
 
 // a small synthetic coverage: two sanctuaries, Wells (a NERRS reserve), Pitcairn's EEZ (values in places and mr_eez)
@@ -137,5 +137,66 @@ describe('the Map\u2019s group list', () => {
   })
   it('keeps the groups\u2019 order when no note is given', () => {
     expect(groupPickNodes(groups, null, () => null).map(n => [n.key, n.hint])).toEqual([['places', '2 of 20 computed'], ['noaa_nerrs', '1 of 30 computed'], ['mr_eez', '1 of 285 computed']])
+  })
+})
+
+describe('place sets in the pickers', () => {
+  // the political set: EEZs and the high seas by FAO area; a second set with no computed group is not offered
+  const sets = [
+    { id: 'political', title: 'Ocean by jurisdiction', groups: ['mr_eez', 'fao_high_seas'], note: 'together they cover the ocean' },
+    { id: 'ecological', title: 'Ocean by ecoregion', groups: ['meow'] },
+  ]
+  const idx2 = indexCoverage([
+    row({}),
+    row({ place_id: 'MRGID:8439', place_name: 'British Exclusive Economic Zone (Pitcairn)', coll: 'mr_eez', place_coll: 'mr_eez' }),
+    row({ place_id: 'MRGID:5668', place_name: 'Dutch Exclusive Economic Zone', coll: 'mr_eez', place_coll: 'mr_eez' }),
+    row({ place_id: 'FAOHS:21', place_name: 'High seas, Atlantic, Northwest (FAO 21)', coll: 'fao_high_seas', place_coll: 'fao_high_seas', display_id: 'FAO:21' }),
+  ])
+  const layers2: Layers = { ...layers, mr_eez: { title: 'x', n: 285, geom: 'MultiPolygon' }, fao_high_seas: { title: 'y', n: 18, geom: 'MultiPolygon' } }
+  const groups = placeGroups(idx2, layers2)
+  const infos = placeSetInfos(sets, groups, layers2)
+
+  it('a set with a computed group is listed with its groups, its computed places and the gazetteer total; one with none is not', () => {
+    expect(infos.map(i => [i.ref, i.title, i.groups.map(g => g.coll), i.computed, i.total, i.note])).toEqual([['set:political', 'Ocean by jurisdiction', ['mr_eez', 'fao_high_seas'], 3, 303, 'together they cover the ocean']])
+  })
+  it('the total is null while layers.json has not loaded', () => {
+    expect(placeSetInfos(sets, placeGroups(idx2), {})[0].total).toBeNull()
+  })
+  it('multi: the set is a tick above the groups, ticked when all its places are, mixed when some are; a search lists none', () => {
+    const all = new Set(['MRGID:8439', 'MRGID:5668', 'FAOHS:21'])
+    const t = placePickTree(groups, all, '', infos)
+    expect(t.map(n => [n.kind, n.key, n.state, n.hint])).toEqual([
+      ['collection', 'set:political', 'checked', '3 of 303 \u00b7 2 groups'], ['collection', 'places', 'unchecked', '1 of 20'],
+      ['collection', 'mr_eez', 'checked', '2 of 285'], ['collection', 'fao_high_seas', 'checked', '1 of 18'],
+    ])
+    expect(t[0].children).toEqual([])
+    expect(placePickTree(groups, new Set(['FAOHS:21']), '', infos)[0].state).toBe('mixed')
+    expect(placePickTree(groups, new Set(), '', infos)[0].state).toBe('unchecked')
+    expect(placePickTree(groups, all, 'dutch', infos).map(n => n.key)).toEqual(['mr_eez'])
+  })
+  it('ticking a set ticks all its groups (the removed places of them come back); unticking removes the groups, the last stays', () => {
+    const state = { colls: ['places'], hidePlaces: ['MRGID:5668'] }
+    expect(toggleMatrixPlaces(idx2, state, { kind: 'collection', key: 'set:political' }, true, sets)).toEqual({ colls: ['places', 'mr_eez', 'fao_high_seas'], hidePlaces: [] })
+    expect(toggleMatrixPlaces(idx2, { colls: ['places', 'mr_eez', 'fao_high_seas'], hidePlaces: [] }, { kind: 'collection', key: 'set:political' }, false, sets)).toEqual({ colls: ['places'], hidePlaces: [] })
+    const only = { colls: ['mr_eez', 'fao_high_seas'], hidePlaces: [] }
+    expect(toggleMatrixPlaces(idx2, only, { kind: 'collection', key: 'set:political' }, false, sets).colls).toEqual(['fao_high_seas'])
+  })
+  it('an unknown set changes nothing', () => {
+    const state = { colls: ['places'], hidePlaces: [] }
+    expect(toggleMatrixPlaces(idx2, state, { kind: 'collection', key: 'set:nope' }, true, sets)).toEqual(state)
+  })
+  it('group: a set is one choice above the groups, its key is the reference, its hint names the groups', () => {
+    const note = (c: string) => (c === 'places' ? { text: 'no values for SST', has: false } : { text: '1 with SST', has: true })
+    const t = groupPickNodes(groups, 'set:political', note, infos)
+    expect(t.map(n => [n.kind, n.key, n.state])).toEqual([['place', 'set:political', 'checked'], ['place', 'mr_eez', 'unchecked'], ['place', 'fao_high_seas', 'unchecked'], ['place', 'places', 'unchecked']])
+    expect(t[0].hint).toBe('3 of 303 computed \u00b7 Exclusive Economic Zones + High seas by FAO area \u00b7 1 with SST')
+    expect(t[0].title).toBe('together they cover the ocean')
+  })
+  it('the button names a set that is chosen whole, a group otherwise', () => {
+    const all = new Set(['MRGID:8439', 'MRGID:5668', 'FAOHS:21'])
+    expect(multiLabel(groups, all, infos)).toBe('Ocean by jurisdiction \u00b7 3 places')
+    expect(multiLabel(groups, new Set(['MRGID:8439', 'FAOHS:21']), infos)).toBe('2 groups \u00b7 2 places')
+    expect(multiLabel(groups, all)).toBe('2 groups \u00b7 3 places')
+    expect(groupLabel({ title: infos[0].title, computed: infos[0].computed })).toBe('Ocean by jurisdiction \u00b7 3 places')
   })
 })

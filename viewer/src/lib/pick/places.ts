@@ -2,7 +2,8 @@
 // places, the places the Matrix shows and the words on the picker's button. the panel's own rules (search, tree, ticks,
 // the collections nothing is computed for) are in placesTree.ts, loaded with the panel.
 import { collTitle } from '../data.ts'
-import type { Layers } from '../data.ts'
+import type { Layers, PlaceSet } from '../data.ts'
+import { availableSets, setRef } from '../sets.ts'
 import { shortPlaceName } from '../matrix.ts'
 import type { CoverageIndex, Place } from '../matrix.ts'
 
@@ -24,6 +25,28 @@ export function placeGroups(idx: CoverageIndex, layers: Layers = {}): GroupInfo[
   return idx.colls.map(coll => {
     const places = idx.places.filter(p => p.coll === coll).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
     return { coll, title: collTitle(coll, layers), computed: places.length, total: layers[coll]?.n ?? null, places }
+  })
+}
+
+export interface SetInfo {
+  /** `set:political`: what a link and the pickers call it */
+  ref: string
+  title: string
+  note: string | null
+  /** the set's groups that have computed places, in the set's order */
+  groups: GroupInfo[]
+  /** the computed places of those groups */
+  computed: number
+  /** the gazetteer's places in all of the set's groups; null until layers.json has loaded, or when it lacks one of them */
+  total: number | null
+}
+
+/** the place sets with a computed group, each with its groups, "n of N" and note: what the pickers list above the groups */
+export function placeSetInfos(sets: readonly PlaceSet[], groups: GroupInfo[], layers: Layers = {}): SetInfo[] {
+  return availableSets(sets, groups.map(g => g.coll)).map(s => {
+    const mine = s.groups.map(c => groups.find(g => g.coll === c)).filter((g): g is GroupInfo => !!g)
+    const ns = s.groups.map(c => layers[c]?.n ?? null)
+    return { ref: setRef(s), title: s.title, note: s.note ?? null, groups: mine, computed: mine.reduce((n, g) => n + g.computed, 0), total: ns.every(n => n != null) ? ns.reduce((a, n) => a + (n as number), 0) : null }
   })
 }
 
@@ -52,11 +75,16 @@ export interface MatrixPlaces {
 
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 
-/** what the multi picker's button says: "Sanctuaries and Tortugas reserve · 19 places", a place's short name, "2 groups · 21 places" */
-export function multiLabel(groups: GroupInfo[], chosen: ReadonlySet<string>): string {
+/**
+ * what the multi picker's button says: "Sanctuaries and Tortugas reserve · 19 places", a place's short name, "2 groups · 21 places";
+ * a place set whose every place is chosen, and nothing else, by its title ("Ocean by jurisdiction · 299 places")
+ */
+export function multiLabel(groups: GroupInfo[], chosen: ReadonlySet<string>, sets: readonly SetInfo[] = []): string {
   const withChosen = groups.map(g => ({ g, on: g.places.filter(p => chosen.has(p.id)) })).filter(x => x.on.length)
   const n = withChosen.reduce((s, x) => s + x.on.length, 0)
   if (n === 0) return 'No places'
+  const whole = sets.find(s => s.groups.length > 1 && s.groups.length === withChosen.length && s.groups.every(g => withChosen.some(x => x.g.coll === g.coll && x.on.length === x.g.places.length)))
+  if (whole) return `${whole.title} \u00b7 ${plural(n, 'place')}`
   if (n === 1) return shortPlaceName(withChosen[0].on[0].name)
   if (withChosen.length === 1) {
     const { g, on } = withChosen[0]

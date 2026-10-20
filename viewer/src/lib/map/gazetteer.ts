@@ -15,10 +15,20 @@ export interface RasterRef {
   link?: string
 }
 
+/** a derived layer (the high seas by FAO area) has no tiles of its own: each place is the feature of another layer */
+export interface DerivedDisplay {
+  /** the slug of the vector layer that draws it (`fao_major_areas`) */
+  via: string
+  /** the place column holding the id of the feature (`fao_id`); the coverage's `display_id` carries it */
+  id_from: string
+}
+
 export interface GazLayer {
   slug: string
   title: string
-  kind: 'vector' | 'raster'
+  kind: 'vector' | 'raster' | 'derived'
+  /** a derived layer only */
+  display: DerivedDisplay | null
   pmtiles: string | null
   source_layer: string | null
   geom_type?: string
@@ -51,7 +61,8 @@ export function parseLayers(json: unknown): Record<string, GazLayer> {
     const slug = l.collection ?? l.slug
     if (!slug || !l.bbox) continue
     out[slug] = {
-      slug, title: l.title ?? slug, kind: l.kind === 'raster' ? 'raster' : 'vector',
+      slug, title: l.title ?? slug, kind: l.kind === 'raster' ? 'raster' : l.kind === 'derived' ? 'derived' : 'vector',
+      display: l.kind === 'derived' && l.display?.via ? { via: l.display.via, id_from: l.display.id_from ?? '' } : null,
       pmtiles: l.pmtiles ? directUrl(l.pmtiles, j.base, j.base_direct) : null,
       source_layer: l.source_layer ?? null, geom_type: l.geom_type, authority: l.authority ?? null, bbox: l.bbox as GazLayer['bbox'],
       attribution: l.attribution ?? '', source_link: l.source_link ?? null, raster: (l.raster as RasterRef | null) ?? null,

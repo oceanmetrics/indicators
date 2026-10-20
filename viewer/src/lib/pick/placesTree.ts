@@ -6,7 +6,9 @@ import { computedOf } from '../matrix.ts'
 import type { CoverageIndex } from '../matrix.ts'
 import { requestHref } from '../nextSteps.ts'
 import type { Check, TreeNode } from '../report/tree.ts'
-import type { GroupInfo, GroupNote, MatrixPlaces } from './places.ts'
+import type { GroupInfo, GroupNote, MatrixPlaces, SetInfo } from './places.ts'
+import type { PlaceSet } from '../data.ts'
+import { findSet, isSetRef } from '../sets.ts'
 
 // ---- the multi tree (Matrix, Report) ----
 
@@ -17,9 +19,17 @@ const check = (on: number, of: number): Check => (on === 0 ? 'unchecked' : on ==
  * gazetteer's total and it links to the collection in the gazetteer; a place's hint is its id. a search narrows the places
  * listed, never the state of a group.
  */
-export function placePickTree(groups: GroupInfo[], chosen: ReadonlySet<string>, query = ''): TreeNode[] {
+export function placePickTree(groups: GroupInfo[], chosen: ReadonlySet<string>, query = '', sets: readonly SetInfo[] = []): TreeNode[] {
   const needle = query.trim().toLowerCase()
-  const out: TreeNode[] = []
+  // the place sets come first, as ticks of their own (a search narrows places, so it lists none); a set is ticked when all its
+  // places are, mixed when some are
+  const out: TreeNode[] = needle ? [] : sets.map(s => {
+    const ids = s.groups.flatMap(g => g.places.map(p => p.id))
+    return {
+      kind: 'collection' as const, key: s.ref, label: s.title, title: s.note ?? undefined, state: check(ids.filter(id => chosen.has(id)).length, ids.length),
+      hint: `${computedOf(s.computed, s.total)} \u00b7 ${s.groups.length} ${s.groups.length === 1 ? 'group' : 'groups'}`, children: [], more: [],
+    }
+  })
   for (const g of groups) {
     const shown = needle ? g.places.filter(p => p.name.toLowerCase().includes(needle) || p.id.toLowerCase().includes(needle)) : g.places
     if (!shown.length) continue
@@ -39,7 +49,7 @@ export function placePickTree(groups: GroupInfo[], chosen: ReadonlySet<string>, 
  * those with values for the indicator shown first (the others keep their order after them); the current group is checked.
  * a leaf is kind `place` so the tree draws it as a button; its key is the group's collection.
  */
-export function groupPickNodes(groups: GroupInfo[], current: string | null, noteOf: (coll: string) => GroupNote | null): TreeNode[] {
+export function groupPickNodes(groups: GroupInfo[], current: string | null, noteOf: (coll: string) => GroupNote | null, sets: readonly SetInfo[] = []): TreeNode[] {
   const nodes = groups.map(g => {
     const note = noteOf(g.coll)
     const node: TreeNode = {
@@ -49,7 +59,16 @@ export function groupPickNodes(groups: GroupInfo[], current: string | null, note
     }
     return { node, has: note?.has ?? true }
   })
-  return [...nodes.filter(x => x.has), ...nodes.filter(x => !x.has)].map(x => x.node)
+  // the place sets are one choice each, above the groups (those with values for the indicator shown first); their key is `set:<id>`
+  const setNodes = sets.map(s => {
+    const note = noteOf(s.ref)
+    const node: TreeNode = {
+      kind: 'place', key: s.ref, label: s.title, title: s.note ?? undefined, state: s.ref === current ? 'checked' : 'unchecked',
+      hint: `${computedOf(s.computed, s.total)} computed \u00b7 ${s.groups.map(g => g.title).join(' + ')}${note ? ` \u00b7 ${note.text}` : ''}`, children: [], more: [],
+    }
+    return { node, has: note?.has ?? true }
+  })
+  return [...setNodes.filter(x => x.has), ...setNodes.filter(x => !x.has), ...nodes.filter(x => x.has), ...nodes.filter(x => !x.has)].map(x => x.node)
 }
 
 /**
@@ -57,7 +76,14 @@ export function groupPickNodes(groups: GroupInfo[], current: string | null, note
  * cannot be switched off); a place off is removed (`xp`); a place on in a group that is not shown shows the group with
  * every other place of it removed, so only that place appears.
  */
-export function toggleMatrixPlaces(idx: CoverageIndex, state: MatrixPlaces, node: { kind: 'collection' | 'place'; key: string }, on: boolean): MatrixPlaces {
+export function toggleMatrixPlaces(
+  idx: CoverageIndex, state: MatrixPlaces, node: { kind: 'collection' | 'place'; key: string }, on: boolean, sets: readonly PlaceSet[] = [],
+): MatrixPlaces {
+  // a place set is its groups ticked together (off: each in turn, so the last group stays)
+  if (node.kind === 'collection' && isSetRef(node.key)) {
+    const members = (findSet(node.key, sets)?.groups ?? []).filter(g => idx.colls.includes(g))
+    return members.reduce((st, key) => toggleMatrixPlaces(idx, st, { kind: 'collection', key }, on), state)
+  }
   const { colls, hidePlaces } = state
   const idsOf = (coll: string) => idx.places.filter(p => p.coll === coll).map(p => p.id)
   if (node.kind === 'collection') {

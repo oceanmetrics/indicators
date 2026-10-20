@@ -6,7 +6,8 @@ import type { Grain, Status, Trend } from '../../../src/status/index.ts'
 import { shownGrainOrder } from '../../../src/coverage/build.ts'
 import type { CoverageRow } from '../../../src/coverage/build.ts'
 import { DEFAULT_GROUPS, GROUP_ORDER } from './data.ts'
-import type { Indicator, Term, VocabId, Vocab } from './data.ts'
+import type { Indicator, PlaceSet, Term, VocabId, Vocab } from './data.ts'
+import { expandGroups } from './sets.ts'
 
 /**
  * a place. `coll` is its group: its home gazetteer collection (coverage `place_coll`, else the values collection).
@@ -18,6 +19,8 @@ export interface Place {
   name: string
   coll: string
   valuesColls?: string[]
+  /** a place of a derived layer: the id of the feature of another layer that draws it (coverage `display_id`) */
+  displayId?: string | null
 }
 
 /** the values collections that hold rows of a place */
@@ -47,7 +50,7 @@ export function indexCoverage(rows: CoverageRow[]): CoverageIndex {
     if (!byKey.has(k)) byKey.set(k, new Map())
     byKey.get(k)!.set(r.time_grain, r)
     const have = places.get(r.place_id)
-    if (!have) places.set(r.place_id, { id: r.place_id, name: r.place_name || r.place_id, coll: r.place_coll || r.coll, valuesColls: [r.coll] })
+    if (!have) places.set(r.place_id, { id: r.place_id, name: r.place_name || r.place_id, coll: r.place_coll || r.coll, valuesColls: [r.coll], ...(r.display_id ? { displayId: r.display_id } : {}) })
     else if (!have.valuesColls!.includes(r.coll)) have.valuesColls!.push(r.coll)
   }
   const list = [...places.values()]
@@ -56,11 +59,13 @@ export function indexCoverage(rows: CoverageRow[]): CoverageIndex {
 }
 
 /**
- * the groups the Matrix shows: the ones asked for (`colls`); none asked and a search typed = every group (a search
- * finds a place wherever it is); none asked = the default groups that have places (the sanctuaries), else every group.
+ * the groups the Matrix shows: the ones asked for (`colls`, where `set:<id>` stands for the groups of the place set, those
+ * of them with computed places); none asked, or only an unknown set, and a search typed = every group (a search finds a
+ * place wherever it is); none asked = the default groups that have places (the sanctuaries), else every group.
  */
-export function shownGroups(available: string[], colls: string[], q: string): string[] {
-  if (colls.length) return colls
+export function shownGroups(available: string[], colls: string[], q: string, sets: readonly PlaceSet[] = []): string[] {
+  const asked = expandGroups(colls, sets).filter(g => colls.includes(g) || available.includes(g))
+  if (asked.length) return asked
   if (q.trim()) return available
   const dflt = available.filter(c => DEFAULT_GROUPS.includes(c))
   return dflt.length ? dflt : available

@@ -201,3 +201,25 @@ describe('the context a view switch carries', () => {
     expect(parseHash('#view=map&ind=sdg:x&coll=mr_eez').place).toBeNull()
   })
 })
+
+
+describe('a place set in a link (set:<id>)', () => {
+  it('the Map keeps coll=set:political readable and round-trips it', () => {
+    const s: ViewState = { ...DEFAULT_STATE, view: 'map', ind: 'obis:species', coll: 'set:political', grain: 'decade' }
+    expect(serializeHash(s)).toBe('view=map&ind=obis:species&coll=set:political&grain=decade')
+    expect(parseHash('#view=map&ind=obis:species&coll=set:political&grain=decade')).toEqual(s)
+    expect(mapHref({ vocab: 'onms', depth: 'swim', method: null }, 'obis:species', 'set:political')).toBe('#view=map&ind=obis:species&coll=set:political')
+  })
+  it('the Matrix colls takes it beside groups and round-trips it', () => {
+    const s: ViewState = { ...DEFAULT_STATE, colls: ['set:political', 'places'] }
+    expect(serializeHash(s)).toBe('colls=set:political,places')
+    expect(parseHash('#colls=set:political,places')).toEqual(s)
+    expect(groupHref({ vocab: 'onms', depth: 'swim' }, 'set:political')).toBe('#colls=set:political')
+  })
+  it('regression: an old Map or Matrix link (a group by name) parses and writes back unchanged', () => {
+    const map = 'view=map&ind=obis:species&coll=mr_eez&grain=decade'
+    expect(serializeHash(parseHash('#' + map))).toBe(map)
+    const matrix = 'colls=places,mr_eez&vocab=eov'
+    expect(serializeHash(parseHash('#' + matrix))).toBe(matrix)
+  })
+})

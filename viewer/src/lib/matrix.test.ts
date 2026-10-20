@@ -299,6 +299,18 @@ describe('shownGroups: the sanctuaries by default', () => {
   it('the groups asked for win', () => {
     expect(shownGroups(avail, ['mr_eez', 'places'], 'wel')).toEqual(['mr_eez', 'places'])
   })
+  it('a place set stands for its groups that have computed places; a group asked for by name stays even without any', () => {
+    const sets = [{ id: 'political', title: 'Ocean by jurisdiction', groups: ['mr_eez', 'fao_high_seas'] }]
+    expect(shownGroups(['places', 'mr_eez', 'fao_high_seas'], ['set:political'], '', sets)).toEqual(['mr_eez', 'fao_high_seas'])
+    expect(shownGroups(['places', 'mr_eez'], ['set:political'], '', sets)).toEqual(['mr_eez'])
+    expect(shownGroups(['places', 'mr_eez'], ['set:political', 'noaa_nerrs'], '', sets)).toEqual(['mr_eez', 'noaa_nerrs'])
+  })
+  it('an unknown set (or a set with no computed group) asks for nothing: the default groups', () => {
+    const sets = [{ id: 'political', title: 'Ocean by jurisdiction', groups: ['mr_eez', 'fao_high_seas'] }]
+    expect(shownGroups(avail, ['set:nope'], '', sets)).toEqual(['places'])
+    expect(shownGroups(['places'], ['set:political'], '', sets)).toEqual(['places'])
+    expect(shownGroups(avail, ['set:political'], '')).toEqual(['places'])
+  })
 })
 
 describe('withValues: an indicator with no value for any place on display is hidden', () => {

@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CoverageRow } from '../../../../src/coverage/build.ts'
 import type { Indicator } from '../data.ts'
-import { DEFAULT_MAP_INDICATOR, groupOf, leadForGroup, mapColls, mapGroups, mappable, pickMap, resolveGroup, switchNotice, valuesCollsOfGroup } from './pick.ts'
+import { DEFAULT_MAP_INDICATOR, drawnGroups, groupOf, leadForGroup, mapColls, mapGroups, mappable, pickMap, resolveGroup, switchNotice, valuesCollsOfGroup } from './pick.ts'
 import { directUrl, parseLayers } from './gazetteer.ts'
 
 const ind = (id: string, colls: string[], lead = false): Indicator => ({ id, lead, collections: colls.map(coll => ({ coll })) }) as unknown as Indicator
@@ -86,6 +86,40 @@ describe('place groups on the Map', () => {
       .toBe('SST is not computed for Exclusive Economic Zones; showing OBIS species richness, all taxa.')
     expect(switchNotice({ short: 'SST' }, { title: 'Precipitation' }, 'National Estuarine Research Reserves'))
       .toBe('SST is not computed for National Estuarine Research Reserves; showing Precipitation.')
+  })
+})
+
+describe('place sets on the Map', () => {
+  const sets = [{ id: 'political', title: 'Ocean by jurisdiction', groups: ['mr_eez', 'fao_high_seas'] }]
+  const obis = ind('obis:species', ['mr_eez', 'fao_high_seas'], true)
+  const sst = ind(DEFAULT_MAP_INDICATOR, ['places'], true)
+  const rows = [
+    cov('obis:species', 'mr_eez', 5, 'mr_eez', 'MRGID:1'), cov('obis:species', 'fao_high_seas', 5, 'fao_high_seas', 'FAOHS:21'),
+    cov(DEFAULT_MAP_INDICATOR, 'places', 1, 'places', 'NMS:A'),
+  ]
+  it('set:<id> stands when the indicator has values in a group of the set, else the first group of the indicator', () => {
+    expect(resolveGroup(obis, rows, 'set:political', sets)).toBe('set:political')
+    expect(resolveGroup(sst, rows, 'set:political', sets)).toBe('places')
+    expect(resolveGroup(obis, rows, 'set:nope', sets)).toBe('mr_eez')
+    expect(resolveGroup(obis, rows, 'set:political')).toBe('mr_eez')
+  })
+  it('pickMap keeps the set the hash names', () => {
+    const p = pickMap([sst, obis], rows, { ind: 'obis:species', coll: 'set:political' }, sets)
+    expect([p.ind?.id, p.coll, p.colls]).toEqual(['obis:species', 'set:political', ['mr_eez', 'fao_high_seas']])
+  })
+  it('a set draws its groups that have values, in the set order; a group draws itself', () => {
+    expect(drawnGroups('set:political', obis, rows, sets)).toEqual(['mr_eez', 'fao_high_seas'])
+    expect(drawnGroups('set:political', obis, rows.slice(0, 1), sets)).toEqual(['mr_eez'])
+    expect(drawnGroups('set:political', sst, rows, sets)).toEqual([])
+    expect(drawnGroups('mr_eez', obis, rows, sets)).toEqual(['mr_eez'])
+  })
+  it('the values files are those of every group of the set', () => {
+    expect(valuesCollsOfGroup(obis, rows, ['mr_eez', 'fao_high_seas'])).toEqual(['mr_eez', 'fao_high_seas'])
+    expect(valuesCollsOfGroup(obis, rows, ['fao_high_seas'])).toEqual(['fao_high_seas'])
+  })
+  it('a set with no value for the indicator shown leads with its own lead; none when nothing is computed there', () => {
+    expect(leadForGroup([obis, sst], rows, ['mr_eez', 'fao_high_seas'])?.id).toBe('obis:species')
+    expect(leadForGroup([sst], rows, ['mr_eez', 'fao_high_seas'])).toBeNull()
   })
 })
 

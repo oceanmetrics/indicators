@@ -410,3 +410,31 @@ describe('the Map of a place group', () => {
     expect(mapModel(ind, old, null, opts({ group: 'c2' })).items.map(i => i.placeId)).toEqual(['E'])
   })
 })
+
+describe('the Map of a place set: one scale across its groups', () => {
+  const ind = cont()
+  const withColl = (rows: CoverageRow[], coll: string, place_coll: string, display_id: string | null = null) => rows.map(r => ({ ...r, coll, place_coll, display_id }))
+  // two EEZs and two high-seas pieces, one value each (a flat series): 1, 2 (EEZ) and 3, 4 (high seas)
+  const flat = (id: string, v: number) => covOf(years(id, 2000, 2019, () => v), ind, { [id]: id })
+  const cov = [
+    ...withColl(flat('E1', 1), 'c', 'mr_eez'), ...withColl(flat('E2', 2), 'c', 'mr_eez'),
+    ...withColl(flat('H1', 3), 'c2', 'fao_high_seas', 'FAO:21'), ...withColl(flat('H2', 4), 'c2', 'fao_high_seas', 'FAO:87'),
+    ...withColl(flat('X', 9), 'c', 'places'),
+  ]
+  it('the items of every group of the set, and none of another group; each carries its group and its feature id', () => {
+    const m = mapModel(ind, cov, null, opts({ groups: ['mr_eez', 'fao_high_seas'], color: 'value' }))
+    expect(m.items.map(i => [i.placeId, i.group, i.displayId])).toEqual([['E1', 'mr_eez', null], ['E2', 'mr_eez', null], ['H1', 'fao_high_seas', 'FAO:21'], ['H2', 'fao_high_seas', 'FAO:87']])
+  })
+  it('one legend and one colour scale across the groups: the quantile classes run over all four values', () => {
+    const m = mapModel(ind, cov, null, opts({ groups: ['mr_eez', 'fao_high_seas'], color: 'value' }))
+    expect(m.items.map(i => i.k)).toEqual([0, 1, 2, 3])
+    expect(m.legend.map(l => [l.label, l.count])).toEqual([['1.0 °C', 1], ['2.0 °C', 1], ['3.0 °C', 1], ['4.0 °C', 1]])
+    // a group alone has its own scale, so the same value gets another class: the set is not the sum of its groups' maps
+    expect(mapModel(ind, cov, null, opts({ group: 'fao_high_seas', color: 'value' })).items.map(i => i.k)).toEqual([0, 1])
+  })
+  it('groups wins over group, and a coverage table without display_id gives every item none', () => {
+    expect(mapModel(ind, cov, null, opts({ group: 'places', groups: ['fao_high_seas'] })).items.map(i => i.placeId)).toEqual(['H1', 'H2'])
+    const old = cov.map(r => { const { display_id: _d, ...rest } = r; return rest as CoverageRow })
+    expect(mapModel(ind, old, null, opts({ groups: ['fao_high_seas'] })).items.map(i => i.displayId)).toEqual([null, null])
+  })
+})

@@ -19,6 +19,8 @@ export interface MapOpts {
   coll?: string | null
   /** the place group drawn (a place's `place_coll ?? coll`): its places from every values collection that holds them; every group when null */
   group?: string | null
+  /** several place groups (the groups of a place set): the colour scale and the legend run across all of them; wins over `group` */
+  groups?: readonly string[] | null
   color: MapColor | null
   /** the period shown ("2024", "2024-07"); null = each place's latest */
   t: string | null
@@ -44,6 +46,10 @@ export interface LegendEntry {
 export interface MapItem {
   placeId: string
   name: string
+  /** the place's group (`place_coll ?? coll`) */
+  group: string
+  /** the id of the feature of another layer that draws the place (a place of a derived layer), else null */
+  displayId: string | null
   value: number | null
   /** the value with its unit, or null */
   valueText: string | null
@@ -174,6 +180,8 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 interface P {
   id: string
   name: string
+  group: string
+  displayId: string | null
   /** the coverage row at the status grain */
   cov: CoverageRow | null
   /** the place's rows from the values file, once loaded */
@@ -270,13 +278,14 @@ function periodsOf(places: P[], grain: Grain): string[] {
  * loaded (null before): until then the latest period is read from the coverage rows, which the values reproduce.
  */
 export function mapModel(ind: Indicator, coverage: CoverageRow[], values: Map<string, PlaceRow[]> | null, opts: MapOpts): MapModel {
-  const mine = coverage.filter(r => r.indicator === ind.id && (!opts.coll || r.coll === opts.coll) && (!opts.group || (r.place_coll ?? r.coll) === opts.group))
+  const inGroup = (r: CoverageRow) => (opts.groups ? opts.groups.includes(r.place_coll ?? r.coll) : !opts.group || (r.place_coll ?? r.coll) === opts.group)
+  const mine = coverage.filter(r => r.indicator === ind.id && (!opts.coll || r.coll === opts.coll) && inGroup(r))
   const grain = mapGrain(ind, mine, opts.grain ?? null)
   const byPlace = new Map<string, CoverageRow[]>()
   for (const r of mine) byPlace.set(r.place_id, [...(byPlace.get(r.place_id) ?? []), r])
   const places: P[] = [...byPlace.entries()].map(([id, rs]) => {
     const cov = rs.find(r => r.time_grain === grain) ?? null
-    return { id, name: rs[0].place_name || id, cov, rows: values ? values.get(id) ?? [] : null }
+    return { id, name: rs[0].place_name || id, group: rs[0].place_coll ?? rs[0].coll, displayId: rs[0].display_id ?? null, cov, rows: values ? values.get(id) ?? [] : null }
   }).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
 
   const { modes, default: dflt } = mapModes(ind, mine, grain)
@@ -293,7 +302,7 @@ export function mapModel(ind: Indicator, coverage: CoverageRow[], values: Map<st
   const legend: LegendEntry[] = []
   const noneLabel = 'No value'
   const base = (p: P, cell: { value: number | null; period: string | null }): MapItem => ({
-    placeId: p.id, name: p.name, value: cell.value, valueText: unitText(ind, cell.value), period: cell.period,
+    placeId: p.id, name: p.name, group: p.group, displayId: p.displayId, value: cell.value, valueText: unitText(ind, cell.value), period: cell.period,
     periodText: periodText(cell.period), k: null, label: noneLabel, status: null, trend: null,
   })
   const set = (it: MapItem, k: number | null, why: string | null) => {
