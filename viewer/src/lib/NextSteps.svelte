@@ -7,7 +7,7 @@
   import { Icon } from '../../../src/icons/index.ts'
   import type { Indicator } from './data.ts'
   import type { CellKind, Place } from './matrix.ts'
-  import { computeHref, datasetCoverage, MAINTAINER_NOTE, REQUEST_NOTE, requestHref } from './nextSteps.ts'
+  import { COMPUTE_NOTE, computeHref, datasetCoverage, MAINTAINER_NOTE, REQUEST_NOTE, requestHref } from './nextSteps.ts'
   import type { GroupCount } from './nextSteps.ts'
 
   interface Props {
@@ -39,6 +39,7 @@
       {/if}
       <Button variant="quiet" href={request} target="_blank"><Icon name="cell-request" size={16} />Ask to add it to the catalog<span class="mbon-sr-only"> (opens in a new tab)</span></Button>
     </div>
+    {#if compute}<p class="note om-note-s">{COMPUTE_NOTE}</p>{/if}
     <p class="note om-note-s">{REQUEST_NOTE}</p>
   {:else if kind === 'na'}
     <p class="lead"><b>{ind.short}</b> is not offered for {groupTitle}.</p>

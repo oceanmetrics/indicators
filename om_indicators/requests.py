@@ -133,8 +133,11 @@ def classify(form: dict[str, str], manifest: dict, layers: dict, place_row: Call
   if ind["producer"]["name"] != "erddap-places":
     return Triage("needs-review", reasons + [f"{ind['short']} comes from {ind['producer']['name']}, which runs only by hand (whole collections, snapshot runs)"], links=links)
   layer = next((l for l in layers.get("layers", []) if (l.get("collection") or l.get("slug")) == coll), None)
-  if layer is None or layer.get("kind") != "vector":
-    return Triage("needs-review", reasons + [f"the geometry of {coll} is not published (a reference collection), so the run needs a maintainer"], links=links)
+  # erddap-places reads a place's polygon from our published parquet (vector) or, for a reference collection such as
+  # the Marine Regions EEZs, one feature at a time from the publisher's own service (`raster.feature_url`)
+  served = layer is not None and (layer.get("kind") == "vector" or (layer.get("kind") == "raster" and (layer.get("raster") or {}).get("feature_url")))
+  if not served:
+    return Triage("needs-review", reasons + [f"the geometry of {coll} is neither published nor served one place at a time, so the run needs a maintainer"], links=links)
   parts = ind_id.split(":")
   if len(parts) != 4 or not SLUG_RE.match(parts[1].lower()):
     return Triage("needs-review", reasons + [f"{ind_id} is not an erddap-places dataset:variable:stat id"], links=links)

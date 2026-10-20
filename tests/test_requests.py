@@ -35,7 +35,9 @@ MANIFEST = {"indicators": [
   {"id": "sdg:ER_MRN_MPA", "short": "MPA coverage", "producer": {"name": "places/proto/eez_indicators"},
    "dataset": {"stac": None}},
 ]}
-LAYERS = {"layers": [{"slug": "places", "kind": "vector"}, {"slug": "noaa_nerrs", "kind": "vector"}, {"slug": "mr_eez", "kind": "raster"}]}
+LAYERS = {"layers": [{"slug": "places", "kind": "vector"}, {"slug": "noaa_nerrs", "kind": "vector"},
+                     {"slug": "mr_eez", "kind": "raster", "raster": {"feature_url": "https://geo.example/wfs?mrgid={source_id}"}},
+                     {"slug": "ref_tiles_only", "kind": "raster", "raster": {"tiles": ["https://geo.example/{z}/{x}/{y}"]}}]}
 ROWS = {
   "NMS:CINMS": {"place_id": "NMS:CINMS", "name": "Channel Islands", "collection": "places",
                 "bbox": {"xmin": -120.64, "ymin": 33.36, "xmax": -118.91, "ymax": 34.21}},
@@ -43,6 +45,10 @@ ROWS = {
                "bbox": {"xmin": -121.80, "ymin": 36.79, "xmax": -121.74, "ymax": 36.86}},
   "MRGID:8456": {"place_id": "MRGID:8456", "name": "United States EEZ", "collection": "mr_eez",
                  "bbox": {"xmin": -129.2, "ymin": 23.8, "xmax": -65.7, "ymax": 49.0}},
+  "MRGID:5670": {"place_id": "MRGID:5670", "name": "Albanian EEZ", "collection": "mr_eez",
+                 "bbox": {"xmin": 18.9, "ymin": 39.6, "xmax": 20.0, "ymax": 42.0}},
+  "REF:1": {"place_id": "REF:1", "name": "A reference place", "collection": "ref_tiles_only",
+            "bbox": {"xmin": 18.9, "ymin": 39.6, "xmax": 20.0, "ymax": 42.0}},
   "BIG:1": {"place_id": "BIG:1", "name": "A big box", "collection": "noaa_nerrs",
             "bbox": {"xmin": -130, "ymin": 20, "xmax": -60, "ymax": 50}},
 }
@@ -97,9 +103,19 @@ def test_needs_review_over_the_size_limit():
   assert "over the 50 M limit" in t.reasons[-1]
 
 
-def test_needs_review_for_a_reference_collection():
+def test_an_eez_runs_by_itself_now_that_erddap_places_reads_it_from_the_publishers_feature_service():
+  t = run({"place": "MRGID:5670", "collection": "mr_eez", "indicator": "erddap:dhw_5km:CRW_SST:mean"})
+  assert t.label == "auto"
+
+
+def test_a_large_eez_still_needs_review_for_its_size():
   t = run({"place": "MRGID:8456", "collection": "mr_eez", "indicator": "erddap:dhw_5km:CRW_SST:mean"})
-  assert t.label == "needs-review" and "not published" in t.reasons[-1]
+  assert t.label == "needs-review" and "over the 50 M limit" in t.reasons[-1]
+
+
+def test_needs_review_for_a_reference_collection_with_tiles_only():
+  t = run({"place": "REF:1", "indicator": "erddap:dhw_5km:CRW_SST:mean"})
+  assert t.label == "needs-review" and "neither published nor served" in t.reasons[-1]
 
 
 def test_needs_review_for_a_producer_that_runs_by_hand():

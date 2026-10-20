@@ -3,7 +3,7 @@ import type { CoverageRow } from '../../../src/coverage/build.ts'
 import type { Indicator } from './data.ts'
 import { indexCoverage } from './matrix.ts'
 import {
-  canComputeNow, computeHref, computedGroups, datasetCoverage, erddapPlacesHref, erddapVariable, requestHref,
+  canComputeNow, COMPUTE_NOTE, computeHref, computedGroups, datasetCoverage, erddapPlacesHref, erddapVariable, REQUEST_NOTE, requestHref,
 } from './nextSteps.ts'
 
 const ind = (o: Partial<Indicator> & { id: string }): Indicator => ({
@@ -86,5 +86,12 @@ describe('requestHref for a whole collection', () => {
   it('falls back to the slug for the title when the collection has no title', () => {
     expect(requestHref({ collection: 'boem_wind_leases' })).toContain('title=Request:%20indicators%20for%20boem_wind_leases&collection=boem_wind_leases')
     expect(requestHref({ collection: 'x' })).not.toMatch(/place=|indicator=/)
+  })
+})
+
+describe('the notes under the two actions', () => {
+  it('compute it now stays in the browser and leaves the cell empty; a request fills the cell for everyone', () => {
+    expect(COMPUTE_NOTE).toContain('nothing is saved, so this cell stays empty')
+    expect(REQUEST_NOTE).toContain('this cell fills for everyone')
   })
 })

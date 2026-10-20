@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         The Ocean Metrics Indicators viewer pre-fills this form from an empty cell. A bot answers within minutes:
-        - **runs by itself** when the indicator is already in the [manifest](https://storage.oceanmetrics.io/indicators/indicators.json), comes from erddap-places, the place is in a public gazetteer collection, and the job is under about 50 million grid values; this issue then gets the link and is closed;
+        - **runs by itself** when the indicator is already in the [manifest](https://storage.oceanmetrics.io/indicators/indicators.json), comes from erddap-places, the place's polygon is published by the gazetteer or served by its publisher (as for the EEZs), and the job is under about 50 million grid values; this issue then gets the link and is closed;
         - **needs a maintainer** otherwise (a new dataset or method, a whole collection, a large place), who replies here.
 
         This issue is public. **Do not put an email address or anything private here**; replies come on this issue.

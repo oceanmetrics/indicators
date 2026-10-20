@@ -94,7 +94,7 @@ Rscript fixtures/ecoidx/build_iea_sd_fixtures.R ~/Github/noaa-iea/ecoidx   # the
 Indicators are the rows and places the columns. Places are grouped by their **home gazetteer collection** (`place_coll` in
 `coverage.parquet`: the first of the place's collections in the gazetteer's `layers.json` order, else the values `coll`;
 build flags `--gazetteer-index <file|URL|none>` and `--layers <file|URL|none>`, `OM_OFFLINE=1` uses the cached copies
-under `cache/gazetteer/`). A place in two values collections (Pitcairn's EEZ: `places` and `mr_eez`) is one place; each
+under `cache/gazetteer/`). A place in two values collections (e.g. a requested place also in a precomputed set) is one place; each
 cell reads the values file of its own coverage row. Each group says how many of its places are computed of the
 gazetteer's total and links to it. Opens on the National Marine Sanctuaries (the `places` collection: the `NMS:*` ids; `noaa_sanctuaries` holds the ONMS section ids, another id space); the other groups are chips. An indicator with no value for
 any place on display is hidden.
@@ -179,8 +179,7 @@ group holding most of its places), `place` (the place selected), `color` (`value
   metric and an EOV switch.
 - **Geometry** is the group's gazetteer collection: vector collections (`places`, `noaa_nerrs`) from the gazetteer's PMTiles, reference
   collections (`mr_eez`) by Marine Regions' own WMS (one request per tile, an SLD plus `ENV`; no Marine Regions geometry is hosted by
-  us). Values are read from every values file of the indicator that holds places of the group (the EEZ group: `mr_eez`'s file plus
-  Pitcairn's in `places`).
+  us). Values are read from every values file of the indicator that holds places of the group.
 - **Members that are not computed** are drawn as faint outlines (`--map-member`) in a vector group (the other 29 reserves beside Wells),
   and below zoom 7, where an outline is too small to see, also as a small hollow circle at the member's label point in the same faint colour;
   clicking one, or opening a link to it, frames it and offers the same ways forward as an empty Matrix cell. A reference group draws
@@ -204,12 +203,14 @@ group holding most of its places), `place` (the place selected), `color` (`value
 Anyone with a GitHub account can ask for an indicator the catalog does not hold yet for a place:
 
 1. **In the viewer:** a place picker row under "Not computed yet" asks for a whole collection (the form with the collection only). A cell that reads "not computed yet" is a dataset erddap-places can compute for that place.
-   Opening it offers "Compute it now in erddap-places" (in the browser, nothing saved) and "Ask to add it to the
-   catalog", which opens the issue form `.github/ISSUE_TEMPLATE/indicator-request.yml` filled in with the place, its
-   collection and the indicator. The requester adds a purpose and submits.
+   Opening it offers "Compute it now in erddap-places" (the values in your browser only: nothing is saved and the cell
+   stays empty) and "Ask to add it to the catalog" (the values join the catalog and the cell fills for everyone), which
+   opens the issue form `.github/ISSUE_TEMPLATE/indicator-request.yml` filled in with the place, its collection and the
+   indicator. The requester adds a purpose and submits.
 2. **Triage, within a minute** (`requests.yml`, `om_indicators/requests.py`): a bot labels the issue and comments why.
-   - `auto`: the indicator is in the manifest, comes from erddap-places, the place is in a public gazetteer collection
-     and the job is under 50 million grid values;
+   - `auto`: the indicator is in the manifest, comes from erddap-places, the place's polygon is published by the
+     gazetteer or served one place at a time by its publisher (the Marine Regions EEZs, `raster.feature_url`), and the
+     job is under 50 million grid values;
    - `already`: the values exist;
    - `needs-review`: anything else, for a maintainer.
 3. **The run, on the Mac mini:** an `auto` request runs by itself while the repository variable `REQUESTS_AUTORUN` is

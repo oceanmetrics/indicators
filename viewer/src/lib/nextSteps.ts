@@ -80,8 +80,10 @@ export function datasetCoverage(ind: Pick<Indicator, 'time_range' | 'time_grains
   return `The dataset covers ${ind.time_range[0].slice(0, 4)}\u2013${ind.time_range[1].slice(0, 4)}, at ${ind.time_grains.join(' and ')} grain.`
 }
 
-/** the sentence under the compute and request links: what a request does, with no promise of a message */
+/** what "compute it now" does: the values in the reader's browser only; the cell does not change */
+export const COMPUTE_NOTE = 'Compute it now: the values appear in your browser; nothing is saved, so this cell stays empty.'
+/** what a request does: the values join the catalog and the cell fills, with no promise of a message */
 export const REQUEST_NOTE =
-  'Small requests for catalogued datasets run automatically and usually finish within the hour; the issue gets a comment with the link.'
+  'Ask to add it: the values join the catalog and this cell fills for everyone. Small requests run by themselves, usually within the hour; the issue gets a comment with the link.'
 /** the sentence for an indicator no producer here computes on request */
 export const MAINTAINER_NOTE = 'A maintainer will look at the request and reply on the issue.'

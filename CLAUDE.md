@@ -53,9 +53,10 @@ indicators.json + coverage.parquet ──► viewer/ (imports src/status/, src/i
   change of exactly 1 SD is not a change.
 - **Places are grouped by `place_coll`** (the home gazetteer collection, written by the coverage builder from the
   gazetteer index and `layers.json`), never by the values `coll`. The values file of a cell always comes from its
-  coverage row's `coll` (`valuesCollOf()`): Pitcairn's EEZ is one place with rows in `places` and `mr_eez`. In the
-  gazetteer index the `NMS:*` sanctuaries live only in the `places` collection (the `noaa_sanctuaries`
-  collection holds `ONMS:*` ids, another id space), so the default group is `DEFAULT_GROUPS` in `viewer/src/lib/data.ts`.
+  coverage row's `coll` (`valuesCollOf()`): a place with rows in two values collections is one place. In the
+  gazetteer index the `NMS:*` sanctuaries live only in the `places` collection, which since erddap-places' places 2.0.0
+  holds those 18 alone (the `noaa_sanctuaries` collection holds `ONMS:*` ids, another id space); the default group is
+  `DEFAULT_GROUPS` in `viewer/src/lib/data.ts`. Never special-case a place or group from the marinebon API era.
   A place of a **derived** layer (`fao_high_seas`) carries `display_id` (its index `source_id`: the feature of the layer that
   draws it). **Place sets** (`config/place_sets.yml` -> the manifest's `place_sets`; `set:<id>` in `coll` and `colls`;
   `viewer/src/lib/sets.ts`) are named lists of groups: the Matrix expands them, the Map layers them. Matrix hash keys:
