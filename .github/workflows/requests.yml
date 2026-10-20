@@ -82,7 +82,9 @@ jobs:
       (needs.triage.outputs.label == 'auto' &&
        ((github.event.action != 'labeled' && vars.REQUESTS_AUTORUN == 'on') || github.event.label.name == 'run')) ||
       (needs.triage.outputs.approvable == 'true' && github.event.action == 'labeled' && github.event.label.name == 'run')
-    runs-on: [self-hosted, macmini]
+    # the Mac mini's second runner, for short jobs: on the first (`macmini`) a request waited behind erddap-places' daily
+    # precompute, which runs for hours (issue #2, 2026-10-20)
+    runs-on: [self-hosted, macmini-quick]
     concurrency:
       group: requests-run           # one job at a time on the runner, never cancelled mid-run
       cancel-in-progress: false

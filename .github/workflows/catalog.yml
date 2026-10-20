@@ -25,7 +25,9 @@ concurrency:
 
 jobs:
   catalog:
-    runs-on: [self-hosted, macmini]
+    # the Mac mini's second runner, for short jobs: the first (`macmini`) holds erddap-places' daily precompute for hours,
+    # and a runner takes one job at a time
+    runs-on: [self-hosted, macmini-quick]
     timeout-minutes: 60
     env:
       AWS_DEFAULT_REGION: us-east-1

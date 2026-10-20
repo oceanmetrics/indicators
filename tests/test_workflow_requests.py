@@ -49,3 +49,11 @@ def test_a_copernicus_marine_run_does_not_touch_the_requested_items_list():
   rebuild = next(s for s in RUN["steps"] if s.get("name") == "rebuild and publish the catalog")["run"]
   assert re.search(r'if \[ "\$REQ_FAMILY" != cmems \]; then\s+uv run python -m om_indicators.requests add-item', rebuild)
   assert "scripts/build_catalog.sh" in rebuild and "scripts/publish_catalog.sh" in rebuild
+
+
+def test_short_jobs_run_on_the_quick_runner_never_behind_the_precompute():
+  # regression (2026-10-20): issue #2's run waited on the one `macmini` runner while erddap-places' daily precompute held
+  # it for hours; the request runs and the catalog go to the Mac mini's second runner, which no long job can take
+  catalog = yaml.safe_load((Path(__file__).resolve().parent.parent / ".github" / "workflows" / "catalog.yml").read_text())
+  for runs_on in (RUN["runs-on"], catalog["jobs"]["catalog"]["runs-on"]):
+    assert runs_on == ["self-hosted", "macmini-quick"]
