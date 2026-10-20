@@ -94,9 +94,10 @@ Rscript fixtures/ecoidx/build_iea_sd_fixtures.R ~/Github/noaa-iea/ecoidx   # the
 - **Catalog:** `.github/workflows/catalog.yml` runs daily (08:07 UTC) on the self-hosted `macmini` runner:
   `scripts/build_catalog.sh` (erddap-places, eco-indicators and obis rebuilt from what they publish, the SDG series pulled
   from the published catalog), then `scripts/publish_catalog.sh` syncs to `s3://oceanmetrics.io-public/indicators/` (values first, the
-  manifest last; `--delete` only under `indicators/values/`). Read it at
-  https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/ (`storage.oceanmetrics.io/indicators/` once
-  that host's Caddy allow-list includes the prefix). To refresh the SDG series from the places prototype:
+  manifest last; `--delete` only under `indicators/values/`). Read it at https://storage.oceanmetrics.io/indicators/
+  (a 302 to the bucket, with CORS; since 2026-10-20) or straight from the bucket host
+  https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/, which the viewer uses (one round trip fewer).
+  To refresh the SDG series from the places prototype:
   `SDG_VALUES=../places/proto/eez_indicators/data/values.json scripts/build_catalog.sh && scripts/publish_catalog.sh`.
 - **Viewer:** `.github/workflows/pages.yml` tests, builds (`VITE_BASE=/indicators/`) and checks the size budget on
   every push touching the viewer, then deploys to https://oceanmetrics.io/indicators/.

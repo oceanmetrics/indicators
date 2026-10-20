@@ -2,7 +2,8 @@
 
 Any place × any indicator × time, as values only (no geometry). Built daily by
 [oceanmetrics/indicators](https://github.com/oceanmetrics/indicators) from what the producers publish; shown by the
-viewer at https://oceanmetrics.io/indicators/.
+viewer at https://oceanmetrics.io/indicators/. This folder is https://storage.oceanmetrics.io/indicators/ (each file a
+redirect to the bucket, CORS open) and https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/.
 
 - `indicators.json`: the manifest: every indicator, its category tags (ONMS sections, NaMES themes, GOOS EOVs),
   series, method, dataset, licence, citation and the place collections it covers.
