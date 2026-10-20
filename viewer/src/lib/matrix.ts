@@ -3,6 +3,7 @@
 // it is read from the coverage row, which src/coverage/ built with src/status/.
 import { fmt, periodLabel } from '../../../src/status/index.ts'
 import type { Grain, Status, Trend } from '../../../src/status/index.ts'
+import { shownGrainOrder } from '../../../src/coverage/build.ts'
 import type { CoverageRow } from '../../../src/coverage/build.ts'
 import type { Indicator, Term, VocabId, Vocab } from './data.ts'
 
@@ -49,7 +50,7 @@ export function indexCoverage(rows: CoverageRow[], indicators: Indicator[] = [])
 export function pickRow(idx: CoverageIndex, placeId: string, ind: Indicator): CoverageRow | null {
   const byGrain = idx.rows.get(key(placeId, ind.id))
   if (!byGrain) return null
-  const order: Grain[] = [ind.status_grain, 'year', 'month', 'decade', 'day', 'all']
+  const order: Grain[] = shownGrainOrder(ind.status_grain)
   let first: CoverageRow | null = null
   for (const g of order) {
     const r = byGrain.get(g)

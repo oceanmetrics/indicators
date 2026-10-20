@@ -1,6 +1,6 @@
 // the coverage builder: exact rows from small synthetic values, one test per rule.
 import { describe, expect, it } from 'vitest'
-import { coverageOf, SPARK_PERIODS } from './build.ts'
+import { coverageOf, SPARK_PERIODS, encodeSpark } from './build.ts'
 import type { ManifestIndicator, ValueRow } from './build.ts'
 import { coverageParquet } from './cli.ts'
 import { parquetReadObjects } from 'hyparquet'
@@ -34,8 +34,7 @@ describe('continuous', () => {
       sentence: 'SST in Alpha Bank over the last 5 years (2016–2020) was more than 1 SD above its 2006–2020 mean, and rose by more than 1 SD.',
     })
     expect(r.lt_mean).toBeCloseTo(35 / 15, 12)
-    expect(JSON.parse(r.spark)).toEqual([2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020]
-      .map((y, i) => [`${y}-01-01`, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 6, 7, 8, 9][i]]))
+    expect(JSON.parse(r.spark)).toEqual({ t0: '2006-01-01', g: 'year', v: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 6, 7, 8, 9] })
   })
   it('a grain other than the status grain has values but no status', () => {
     const rows = coverageOf([row({ time_grain: 'month', time: '2020-01-01' }), row({ time_grain: 'month', time: '2020-02-01', value: 2 })], SST, names)
@@ -46,11 +45,35 @@ describe('continuous', () => {
     expect([r.status, r.trend, r.why]).toEqual([null, null, '3 years of record, fewer than the 10 a status needs'])
     expect(r.sentence).toBe('SST in Alpha Bank: 3.00 °C in 2024; no status relative to its own record (3 years of record, fewer than the 10 a status needs).')
   })
-  it('the sparkline keeps the last 40 periods', () => {
+  it('the sparkline keeps the last 40 calendar periods', () => {
     const r = coverageOf(years(1951, Array.from({ length: 60 }, (_, i) => i)), SST, names)[0]
     const spark = JSON.parse(r.spark)
-    expect(spark).toHaveLength(SPARK_PERIODS)
-    expect(spark[0]).toEqual(['1971-01-01', 20])
+    expect(spark.v).toHaveLength(SPARK_PERIODS)
+    expect([spark.t0, spark.v[0]]).toEqual(['1971-01-01', 20])
+  })
+  it('a gap in the record is a null in the sparkline, not a skipped period', () => {
+    expect(JSON.parse(encodeSpark([{ t: '2020-01-01', v: 1 }, { t: '2022-01-01', v: 3 }], 'year'))).toEqual({ t0: '2020-01-01', g: 'year', v: [1, null, 3] })
+    expect(encodeSpark([], 'year')).toBe('[]')
+  })
+  it('spark values keep 4 significant digits; the full-precision value stays in last_value', () => {
+    const r = coverageOf(years(2020, [15.233456789, 0.000123456, 12345.678]), SST, names)[0]
+    expect(JSON.parse(r.spark).v).toEqual([15.23, 0.0001235, 12350])
+    expect(r.last_value).toBe(12345.678)
+  })
+  it('only the row a cell shows keeps its sparkline: the status grain, else the next grain with a value', () => {
+    const rs = coverageOf([
+      ...years(2020, [1, 2]),
+      row({ time_grain: 'month', time: '2020-01-01', value: 1 }), row({ time_grain: 'month', time: '2020-02-01', value: 2 }),
+      row({ time_grain: 'decade', time: '2020-01-01', value: 1.5 }),
+      row({ place_id: 'NMS:B', time_grain: 'month', time: '2020-01-01', value: 4 }), row({ place_id: 'NMS:B', time_grain: 'month', time: '2020-02-01', value: 5 }),
+    ], SST, names)
+    expect(rs.map(r => `${r.place_id} ${r.time_grain} ${(JSON.parse(r.spark).v ?? []).length}`)).toEqual([
+      'NMS:A decade 0', 'NMS:A month 0', 'NMS:A year 2', 'NMS:B month 2',
+    ])
+  })
+  it('regression: the all-years grain (time null) keeps its value, with no sparkline and no status', () => {
+    const r = coverageOf([row({ time_grain: 'all', time: null, value: 3 })], SST, names)[0]
+    expect([r.last_value, r.n_periods, r.t0, r.spark, r.status]).toEqual([3, 1, null, '[]', null])
   })
   it('a method not yet implemented falls back to values, and says so', () => {
     const r = coverageOf(years(2006, Array(15).fill(1)), { ...SST, status_method: 'anomaly' }, names)[0]

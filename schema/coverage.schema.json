@@ -29,7 +29,7 @@
     "lt_sd": { "type": ["number", "null"], "description": "Long-term sample SD (iea-sd); null for other methods." },
     "why": { "type": ["string", "null"], "description": "Why status is null on a status_grain row (e.g. 'record of 6 years, fewer than 10')." },
     "sentence": { "type": ["string", "null"], "description": "The method's deterministic status sentence." },
-    "spark": { "type": "string", "description": "JSON array of [period start, value] for the last 40 periods (categorical: the last class shares are not included; [] then)." }
+    "spark": { "type": "string", "description": "JSON {\"t0\": first period start, \"g\": grain, \"v\": [value or null, ...]} for the last 40 calendar periods (consecutive from t0, null for a gap, 4 significant digits), only on the row a viewer shows for the cell (the status grain, else the next grain with a value); [] otherwise and for categorical indicators. Readers also accept the older [[period start, value], ...]." }
   },
   "additionalProperties": false
 }

@@ -1,7 +1,7 @@
 // coverage: place x indicator x grain -> time range, periods, last value, a sparkline, and on the indicator's
 // status_grain row its default status and trend (schema/coverage.schema.json). the status comes from src/status/,
 // the same module the viewer runs, so a cell in the Matrix and a card in a report cannot disagree.
-import { assess, categoricalSentence, periodLabel } from '../status/index.ts'
+import { assess, categoricalSentence, completeGrid, periodLabel } from '../status/index.ts'
 import type { Grain, MethodId, Point } from '../status/index.ts'
 
 /** a contract row as read from a values file (time as an ISO date string or null) */
@@ -59,6 +59,20 @@ export interface CoverageRow {
 }
 
 export const SPARK_PERIODS = 40
+/** spark values keep 4 significant digits: finer than a 96 px line can show, and it halves coverage.parquet */
+export const SPARK_DIGITS = 4
+const sparkValue = (v: number | null) => (v == null ? null : Number(v.toPrecision(SPARK_DIGITS)))
+
+/**
+ * the spark column: the last SPARK_PERIODS calendar periods at the grain, as `{"t0": first period start, "g": grain,
+ * "v": [value or null, ...]}` (consecutive periods, null for a gap), values to SPARK_DIGITS significant digits; "[]"
+ * for no values. a third of the size of [[period start, value], ...] pairs, which readers still accept.
+ */
+export function encodeSpark(series: Point[], grain: Grain): string {
+  const grid = completeGrid(series, grain).slice(-SPARK_PERIODS)
+  if (!grid.length) return '[]'
+  return JSON.stringify({ t0: grid[0].t, g: grain, v: grid.map(p => sparkValue(p.v)) })
+}
 const IMPLEMENTED = new Set<string>(['iea-sd', 'names-pct', 'values'])
 
 const empty = (r: ValueRow, placeName = r.place_id): CoverageRow => ({
@@ -72,6 +86,11 @@ const empty = (r: ValueRow, placeName = r.place_id): CoverageRow => ({
 export function continuousRow(rows: ValueRow[], ind: ManifestIndicator, placeName: string): CoverageRow {
   const out = empty(rows[0], placeName)
   const grain = rows[0].time_grain
+  // the `all` grain is one value over the whole record, with no time: no series, no status, no line
+  if (grain === 'all') {
+    const v = rows.find(r => r.value != null)?.value ?? null
+    return v == null ? out : { ...out, n_periods: 1, last_value: v }
+  }
   const series: Point[] = rows
     .filter(r => r.value != null && r.time != null)
     .map(r => ({ t: r.time as string, v: r.value }))
@@ -80,7 +99,7 @@ export function continuousRow(rows: ValueRow[], ind: ManifestIndicator, placeNam
   const last = series[series.length - 1]
   Object.assign(out, {
     t0: series[0].t, t1: last.t, n_periods: series.length, last_time: last.t, last_value: last.v,
-    spark: JSON.stringify(series.slice(-SPARK_PERIODS).map(p => [p.t, p.v])),
+    spark: encodeSpark(series, grain),
   })
   if (grain !== ind.status_grain) return out
   const ctx = { title: ind.short, place: placeName, unit: ind.unit_label ?? '', decimals: ind.decimals ?? 2 }
@@ -117,6 +136,15 @@ export function categoricalRow(rows: ValueRow[], ind: ManifestIndicator, placeNa
 }
 
 /** every coverage row for one values file */
+/**
+ * the grains a viewer tries for a (place, indicator) cell, in order: the status grain, then year, month, decade, day
+ * and all. the first row with a value fills the cell (viewer/src/lib/matrix.ts pickRow), so only that row needs a
+ * sparkline.
+ */
+export function shownGrainOrder(statusGrain: Grain): Grain[] {
+  return [...new Set<Grain>([statusGrain, 'year', 'month', 'decade', 'day', 'all'])]
+}
+
 export function coverageOf(rows: ValueRow[], ind: ManifestIndicator, names: Map<string, string>): CoverageRow[] {
   const groups = new Map<string, ValueRow[]>()
   for (const r of rows) {
@@ -127,6 +155,14 @@ export function coverageOf(rows: ValueRow[], ind: ManifestIndicator, names: Map<
   for (const g of groups.values()) {
     const name = names.get(g[0].place_id) ?? g[0].place_id
     out.push(ind.kind === 'categorical' ? categoricalRow(g, ind, name) : continuousRow(g, ind, name))
+  }
+  // a sparkline only on the row a cell shows: the others would be bytes nobody draws (OBIS decades, months beside years)
+  const order = shownGrainOrder(ind.status_grain)
+  const byPlace = new Map<string, CoverageRow[]>()
+  for (const r of out) byPlace.set(r.place_id, [...(byPlace.get(r.place_id) ?? []), r])
+  for (const mine of byPlace.values()) {
+    const shown = order.map(g => mine.find(r => r.time_grain === g && r.last_value != null)).find(Boolean)
+    for (const r of mine) if (r !== shown) r.spark = '[]'
   }
   return out.sort((a, b) =>
     a.coll.localeCompare(b.coll) || a.place_id.localeCompare(b.place_id) || a.indicator.localeCompare(b.indicator) ||

@@ -2,8 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { parseSpark, sparkGeometry } from './spark.ts'
 
 describe('parseSpark', () => {
-  it('reads the coverage column', () => {
+  it('reads the coverage column: consecutive periods from t0 at the grain, null for a gap', () => {
+    expect(parseSpark('{"t0":"2019-01-01","g":"year","v":[1.5,null,2]}')).toEqual([['2019-01-01', 1.5], ['2020-01-01', null], ['2021-01-01', 2]])
+    expect(parseSpark('{"t0":"2020-11-01","g":"month","v":[1,2,3]}')).toEqual([['2020-11-01', 1], ['2020-12-01', 2], ['2021-01-01', 3]])
+  })
+  it('still reads the older [[period start, value], ...] form', () => {
     expect(parseSpark('[["2020-01-01",1.5],["2021-01-01",null]]')).toEqual([['2020-01-01', 1.5], ['2021-01-01', null]])
+  })
+  it('an object without a known grain or values is []', () => {
+    expect(parseSpark('{"t0":"2020-01-01","g":"week","v":[1]}')).toEqual([])
+    expect(parseSpark('{"t0":"2020-01-01","g":"year"}')).toEqual([])
   })
   it('gives [] for empty, malformed or foreign JSON, and drops malformed pairs', () => {
     expect(parseSpark('')).toEqual([])
