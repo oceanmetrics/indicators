@@ -18,5 +18,9 @@ FROM read_parquet('https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/ind
 WHERE time_grain = 'year' ORDER BY place_id, time;
 ```
 
+- `producers/cmems/`: the Copernicus Marine place producer's own output (`index.json`, and `<dataset>/<variable>/<place>/`
+  with `data.parquet` and `provenance.json`), for the places a maintainer accepted from a request. It is not the catalog: the
+  daily build reads it into `values/`, and the catalog sync never deletes it.
+
 Values are CC BY 4.0; credit the upstream providers as each indicator's `citation` says. Place ids are those of the
 [Ocean Metrics gazetteer](https://storage.oceanmetrics.io/gazetteer/).

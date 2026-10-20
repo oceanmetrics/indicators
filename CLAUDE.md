@@ -81,6 +81,16 @@ indicators.json + coverage.parquet ──► viewer/ (imports src/status/, src/i
   all rows or none) live in `validate_rows()`, each with a test.
 - **Adapters read published outputs only** and never change a producer repo. The STAC items stay the provenance:
   each values file lists the exact items/files it read in `om:provenance.sources`.
+- **Producers compute, adapters read** (`om_indicators/producers/`). The one producer is `cmems_place.py`: a maintainer
+  accepts a Copernicus Marine request with the `run` label (`requests.yml`; `requests.py` marks it `approvable`, never
+  `auto`: it uses a personal Copernicus Marine login) and it computes one gazetteer place (polygon fetched at run time,
+  never stored; the Toolbox subset of the surface layer; the mean of the cells whose centres fall inside, as
+  eco-indicators' `terra::extract`) and publishes `<dataset>/<var>/<place>/{data.parquet,provenance.json}` plus
+  `index.json` under `s3://oceanmetrics.io-public/indicators/producers/cmems/`. `adapters/cmems_places.py` reads that
+  folder into `values/indicator=<id>/coll=<the place's collection>/`; the sanctuaries (`coll=places`) stay
+  eco-indicators' (a values file another adapter wrote is never overwritten), and the manifest states the dataset of the
+  family's own producer when an indicator has files from both. Its scientific stack is the `cmems` dependency group
+  (`uv sync --group cmems`), imported inside functions, so the base install and the triage runner stay light.
 - **Producers without a STAC state their dataset in `provenance.dataset`** (SDG, `eco_indicators.py` for the Copernicus
   Marine long records at a pinned eco-indicators commit, `obis.py` for the obis-h3 release's `place_exact` layer); the
   manifest prefers it for any family and cites the dataset by its own `citation` line where `PRODUCERS[fam].cite_dataset`.

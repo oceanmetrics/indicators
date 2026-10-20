@@ -11,6 +11,7 @@ compute them:
 | [erddap-places](https://github.com/oceanmetrics/erddap-places) precomputed stats | ERDDAP grids: SST, bleaching alerts, chlorophyll, pH, O₂, nutrients, NPP, precipitation, Seascapes ... | NOAA sanctuaries and a few others (gazetteer collection `places`) | `om_indicators/adapters/erddap_places.py`: daily → month and year rows |
 | `oceanmetrics/places` `proto/eez_indicators` | UN SDG 14 series (14.5.1, 14.1.1, 14.6.1) | Marine Regions EEZs (`mr_eez`) | `om_indicators/adapters/sdg.py`: latest year |
 | [noaa-onms/eco-indicators](https://github.com/noaa-onms/eco-indicators) | Copernicus Marine long records (1993- physics, 1997- ocean colour and plankton types) | NOAA sanctuaries (`places`) | `om_indicators/adapters/eco_indicators.py`: monthly means → month and year rows |
+| `om_indicators/producers/cmems_place.py` (this repo; run by a maintainer on a request) | The same Copernicus Marine products, for one place at a time: surface-layer monthly means | Any gazetteer place whose polygon can be fetched (vector collections, the Marine Regions EEZs), e.g. the Albanian EEZ | `om_indicators/adapters/cmems_places.py`: the producer's published folder → month and year rows |
 | [obisindicators](https://github.com/marinebon/obisindicators) `obis-h3` release | OBIS records, richness, Shannon, Simpson, ES(50), Hill, Berger-Parker, density, by year, decade and EOV | Marine Regions EEZs, the high seas and the high seas by FAO major fishing area (`mr_eez`, `mr_high_seas`, `fao_high_seas`) | `om_indicators/adapters/obis.py`: exact point-in-polygon indicators |
 
 The values are derived tables (no geometry). Code is MIT; values are CC BY 4.0 with the upstream credit carried in
@@ -64,14 +65,19 @@ WHERE time_grain = 'year' ORDER BY place_id, time;
 
 ```sh
 uv sync --group dev --group brand && npm ci
+uv sync --group dev --group cmems            # the cmems group (Copernicus Marine Toolbox, xarray, shapely, NetCDF backends) is only for the place producer and its tests
 uv run --group dev pytest -q                 # contract, adapters, manifest, GOOS badges and traced glyphs
 npm test                                     # status (incl. the ecoidx cross-check), coverage, icons, favicons, viewer
 npm run check                                # svelte-check + tsc
+
+# compute one place of a Copernicus Marine indicator (a maintainer, on the Mac mini; see "Requests")
+uv run --group cmems python -m om_indicators.producers.cmems_place --place MRGID:5670 --coll mr_eez --indicator cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:no3:mean [--check] [--publish]
 
 # build the catalog from what the producers have published
 uv run om-ind erddap-places --out catalog    # gazetteer/stats -> complete month and year rows
 uv run om-ind sdg --values ../places/proto/eez_indicators/data/values.json --out catalog
 uv run om-ind eco-indicators --out catalog   # noaa-onms/eco-indicators at the latest commit of data/copernicus.csv (--ref <sha> pins one)
+uv run om-ind cmems-places --out catalog     # places a maintainer accepted from a request (the Copernicus Marine place producer's published folder)
 uv run om-ind obis --out catalog             # the latest obis-h3 release's place_exact layer (--release v20261012 pins one)
 uv run om-ind manifest --out catalog         # catalog/indicators.json
 npm run coverage:build -- catalog            # catalog/coverage.parquet (statuses from src/status; place_coll from the gazetteer index, see `--gazetteer-index`, `--layers`)
@@ -152,7 +158,7 @@ back to the Place view; `?theme=` and `?brand=` work as in the app, and `main.em
 ## Publishing
 
 - **Catalog:** `.github/workflows/catalog.yml` runs daily (08:07 UTC) on the self-hosted `macmini` runner:
-  `scripts/build_catalog.sh` (erddap-places, eco-indicators and obis rebuilt from what they publish, the SDG series pulled
+  `scripts/build_catalog.sh` (erddap-places, eco-indicators, the Copernicus Marine place producer's folder and obis rebuilt from what they publish, the SDG series pulled
   from the published catalog), then `scripts/publish_catalog.sh` syncs to `s3://oceanmetrics.io-public/indicators/` (values first, the
   manifest last; `--delete` only under `indicators/values/`). Read it at https://storage.oceanmetrics.io/indicators/
   (a 302 to the bucket, with CORS; since 2026-10-20) or straight from the bucket host
@@ -212,7 +218,8 @@ Anyone with a GitHub account can ask for an indicator the catalog does not hold 
      gazetteer or served one place at a time by its publisher (the Marine Regions EEZs, `raster.feature_url`), and the
      job is under 50 million grid values;
    - `already`: the values exist;
-   - `needs-review`: anything else, for a maintainer.
+   - `needs-review`: anything else, for a maintainer. Some of these a maintainer can accept with one label, see
+     "Accepting a request that needs review" below.
 3. **The run, on the Mac mini:** an `auto` request runs by itself while the repository variable `REQUESTS_AUTORUN` is
    `on`, at most `REQUESTS_PER_DAY` (default 10) a day. Otherwise, or past the cap, a maintainer starts it by adding the
    `run` label (only people with triage access can add labels). erddap-places computes the place and publishes it, the
@@ -220,6 +227,38 @@ Anyone with a GitHub account can ask for an indicator the catalog does not hold 
    NERR, precipitation) is the worked example.
 
 Requesters are answered on the issue only; no email is sent.
+
+### Accepting a request that needs review
+
+A request for a **Copernicus Marine** indicator (`cmems:…`, for example nitrate) at a place outside the sanctuaries is
+never run by itself, because the run uses a maintainer's personal Copernicus Marine login. When the place's polygon can be
+fetched (a collection published as vector data, or a Marine Regions one such as the EEZs, served one place at a time) and
+the job is under 10 million grid values (a 40° × 40° box of the ¼° products), the bot labels it `needs-review` and its
+comment says "A maintainer can accept it by adding the `run` label; it runs on Copernicus Marine with the maintainer's
+account". Adding the `run` label (people with triage access only) starts the run job on the Mac mini:
+
+1. the check job runs again and the producer is chosen from the checked indicator id, never from the issue text;
+2. the **Copernicus Marine place producer** (`om_indicators/producers/cmems_place.py`) fetches the polygon, asks the
+   Copernicus Marine Toolbox for the surface layer over the polygon's box (one grid cell of margin; a place across ±180°
+   in two windows), averages the cells whose centres fall inside the polygon at every month (the method of
+   noaa-onms/eco-indicators, so sanctuary and EEZ values share one method), and writes month and year rows through the
+   contract. It publishes the place's Parquet, its `provenance.json` and the merged `index.json` under
+   `s3://oceanmetrics.io-public/indicators/producers/cmems/`;
+3. the catalog is rebuilt (the `cmems-places` adapter reads that folder into `values/indicator=<id>/coll=<place's
+   collection>/`) and published, and the bot comments the Place view link and closes the issue.
+
+A request nobody can run this way (a derived collection such as the FAO high seas, a collection with tiles only, a job
+over the limit, a sanctuary, whose Copernicus Marine values come from eco-indicators) stays with a maintainer, and a
+`run` label on it gets a comment saying so. `REQUESTS_AUTORUN` never starts a Copernicus Marine request. To run one
+by hand, on the Mac mini (`uv sync --group cmems` once; the Toolbox login is in `~/.copernicusmarine/`):
+
+```sh
+uv run --group cmems python -m om_indicators.producers.cmems_place --place MRGID:5670 --coll mr_eez \
+  --indicator cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:no3:mean --check      # polygon, windows and job size; no Copernicus call
+uv run --group cmems python -m om_indicators.producers.cmems_place --place MRGID:5670 --coll mr_eez \
+  --indicator cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:no3:mean --publish    # compute and upload
+scripts/build_catalog.sh && scripts/publish_catalog.sh                        # then rebuild and publish the catalog
+```
 
 ## The paper
 
