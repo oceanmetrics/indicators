@@ -1,7 +1,7 @@
 // screenshots with the real catalog: the Matrix (matrix_<brand>_<theme>[_390].png, places as rows matrix_*_placerows*,
 // the place and indicator pickers open matrix_*_places_picker and matrix_*_indicators_picker, the drawer), the Place view (place_<place>_<brand>_<theme>[_390].png), the
 // Map view (map_<indicator>_<color>_<theme>[_390].png), the Report view (report_*: the Scorecard, the Cards report, the
-// open builder over budget, the print preview) and the embed route (embed_*).
+// open builder over budget, the print preview, Small multiples, the Quad plot, the Map sheet and the Dossier) and the embed route (embed_*).
 // headless Chrome through puppeteer-core, against the dev server (started here when nothing answers on the port).
 //   node viewer/scripts/shoot.mjs [--url http://localhost:5181/] [--only matrix_mbon_dark] [--out docs/shots/live]
 import { spawn } from 'node:child_process'
@@ -49,6 +49,20 @@ const CARD = { width: 760, height: 1000, deviceScaleFactor: 2 }
 const CARD_PHONE = { width: 390, height: 1000, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
 const EMBED_HASH = 'card=NMS:CINMS|erddap:dhw_5km:CRW_SST:mean'
 const print = async page => { await page.emulateMediaType('print') }
+// a long report reads its entries as they scroll near (a dossier); the print job (Export, Print) loads them all, so here the page is walked first
+const printAll = async page => {
+  await page.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += 600) { window.scrollTo(0, y); await new Promise(r => setTimeout(r, 150)) } window.scrollTo(0, 0) })
+  await page.waitForFunction(() => !document.querySelector('.rv [aria-busy="true"]'), { timeout: 60000 })
+  await page.emulateMediaType('print')
+}
+// the other layouts, with the real catalog: sea surface temperature for the sanctuaries, one sanctuary's indicators, the same
+// indicator mapped over the sanctuaries and over the EEZs, and a dossier of one sanctuary
+const SST_ID = 'erddap:dhw_5km:CRW_SST:mean'
+const SMALL = `view=report&pi=coll:places&ii=${SST_ID}&layout=small-multiples&title=Sea%20surface%20temperature%2C%20the%20sanctuaries`
+const QUAD = 'view=report&pi=NMS:CINMS&layout=quad&title=Channel%20Islands%3A%20where%20its%20indicators%20stand'
+const MAPSHEET = `view=report&pi=coll:places&ii=${SST_ID}&layout=map-sheet&title=Sea%20surface%20temperature%2C%20the%20sanctuaries`
+const MAPSHEET_EEZ = 'view=report&pi=coll:mr_eez&ii=sdg:ER_MRN_MPA&layout=map-sheet&title=Marine%20protected%20area%20cover%2C%20the%20EEZs'
+const DOSSIER = 'view=report&pi=NMS:CINMS&layout=dossier&title=Channel%20Islands%20dossier'
 
 const REMOVED = 'xp=NMS:NMSAS,NMS:FKNMS&xi=erddap:IMERG_monthly_global_precip:precipitation:mean'
 const scrollRight = async page => { await page.evaluate(() => { const b = document.querySelector('.box'); b.scrollLeft = b.scrollWidth }) }
@@ -191,6 +205,25 @@ const SHOTS = [
   ['report_cards_CINMS_oceanmetrics_light_390', 'oceanmetrics', 'light', REPORT_PHONE, CINMS],
   ['report_builder_overbudget_oceanmetrics_light', 'oceanmetrics', 'light', REPORT, OVER],
   ['report_print_CINMS_oceanmetrics_light', 'oceanmetrics', 'light', PAPER, CINMS, print],
+  // the other layouts
+  ['report_smallmultiples_oceanmetrics_light', 'oceanmetrics', 'light', REPORT, SMALL],
+  ['report_smallmultiples_oceanmetrics_dark', 'oceanmetrics', 'dark', REPORT, SMALL],
+  ['report_smallmultiples_oceanmetrics_light_390', 'oceanmetrics', 'light', REPORT_PHONE, SMALL],
+  ['report_smallmultiples_oceanmetrics_dark_390', 'oceanmetrics', 'dark', REPORT_PHONE, SMALL],
+  ['report_smallmultiples_free_oceanmetrics_light', 'oceanmetrics', 'light', REPORT, SMALL + '&ys=free'],
+  ['report_quad_CINMS_oceanmetrics_light', 'oceanmetrics', 'light', REPORT, QUAD],
+  ['report_quad_CINMS_oceanmetrics_dark', 'oceanmetrics', 'dark', REPORT, QUAD],
+  ['report_quad_CINMS_oceanmetrics_light_390', 'oceanmetrics', 'light', REPORT_PHONE, QUAD],
+  ['report_quad_CINMS_oceanmetrics_dark_390', 'oceanmetrics', 'dark', REPORT_PHONE, QUAD],
+  ['report_mapsheet_sst_oceanmetrics_light', 'oceanmetrics', 'light', REPORT, MAPSHEET],
+  ['report_mapsheet_sst_oceanmetrics_dark', 'oceanmetrics', 'dark', REPORT, MAPSHEET],
+  ['report_mapsheet_sst_oceanmetrics_light_390', 'oceanmetrics', 'light', REPORT_PHONE, MAPSHEET],
+  ['report_mapsheet_eez_oceanmetrics_light', 'oceanmetrics', 'light', REPORT, MAPSHEET_EEZ],
+  ['report_dossier_CINMS_oceanmetrics_light', 'oceanmetrics', 'light', REPORT, DOSSIER],
+  ['report_dossier_CINMS_oceanmetrics_dark', 'oceanmetrics', 'dark', REPORT, DOSSIER],
+  ['report_dossier_CINMS_oceanmetrics_light_390', 'oceanmetrics', 'light', REPORT_PHONE, DOSSIER],
+  ['report_dossier_print_CINMS_oceanmetrics_light', 'oceanmetrics', 'light', PAPER, DOSSIER, printAll],
+  ['report_print_smallmultiples_oceanmetrics_light', 'oceanmetrics', 'light', PAPER, SMALL, print],
   // the embed route: one card, no chrome
   ['embed_card_oceanmetrics_light', 'oceanmetrics', 'light', CARD, EMBED_HASH],
   ['embed_card_oceanmetrics_dark', 'oceanmetrics', 'dark', CARD, EMBED_HASH],
@@ -224,8 +257,10 @@ try {
     await page.waitForSelector(embed ? 'main.embed[data-state=done]' : '.lens[data-state=done]', { timeout: 30000 })
     // a report is ready when its layout is drawn and no card or recomputation is still waiting
     if (hash.includes('view=report')) {
-      await page.waitForSelector('.rv table, .rv article.card, .rv .heads, .rv [role=status]', { timeout: 30000 })
-      await page.waitForFunction(() => !document.querySelector('article.card[aria-busy="true"]') && ![...document.querySelectorAll('.rv .note')].some(n => /Recomputing/.test(n.textContent ?? '')), { timeout: 30000 })
+      await page.waitForSelector('.rv table, .rv article.card, .rv .heads, .rv .sm, .rv .qp, .rv .ms, .rv .dos, .rv [role=status]', { timeout: 30000 })
+      // no card, panel or entry is still reading its values, no status is being recomputed, and every map (the locator, the Map sheet) is drawn
+      await page.waitForFunction(() => !document.querySelector('.rv [aria-busy="true"]') && ![...document.querySelectorAll('.rv .note')].some(n => /Recomputing/.test(n.textContent ?? ''))
+        && !document.querySelector('.rv .qp [role=status], .rv .sm [role=status]') && [...document.querySelectorAll('.rv .map')].every(m => m.dataset.state === 'done'), { timeout: 60000 })
     }
     // a Place view is ready when it has cards and none is still loading
     if (hash.includes('view=map')) await page.waitForSelector('.map[data-state=done]', { timeout: 60000 })
