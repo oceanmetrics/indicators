@@ -34,13 +34,14 @@ describe('the report spec in a URL', () => {
       style: { status: 'names-pct', recent: 10, baseline: [1991, 2020] },
       time: { grain: 'year', from: 1982, to: 2020 },
       split: 'place',
+      yaxis: 'free',
       as_of: '2026.10.20',
       title: 'Sanctuary condition',
     }
     expect(specParams(s)).toEqual([
       ['pi', 'coll:places'], ['px', 'NMS:TBNMS'], ['ctx', '1'], ['ii', 'cat:water-quality,series:obis-all'], ['ix', 'obis:simpson'],
       ['layout', 'scorecard'], ['status', 'names-pct'], ['recent', '10'], ['base', '1991-2020'], ['from', '1982'], ['to', '2020'],
-      ['split', 'place'], ['asof', '2026.10.20'], ['title', 'Sanctuary condition'],
+      ['split', 'place'], ['ys', 'free'], ['asof', '2026.10.20'], ['title', 'Sanctuary condition'],
     ])
     expect(specFromParams(new Map(specParams(s)))).toEqual(s)
   })
@@ -48,6 +49,18 @@ describe('the report spec in a URL', () => {
     const s = specFromParams(kv('layout=poster&status=anomaly&grain=week&recent=1&base=2020-1991&from=x&split=tile'))
     expect(s).toEqual(DEFAULT_SPEC)
     expect(specFromParams(kv('recent=51')).style.recent).toBe(5)
+  })
+  it('ys=free is the Small multiples y axis: shared writes nothing, anything but free reads as shared', () => {
+    expect(DEFAULT_SPEC.yaxis).toBe('shared')
+    expect(specParams({ ...DEFAULT_SPEC, yaxis: 'free' })).toEqual([['ys', 'free']])
+    expect(specParams({ ...DEFAULT_SPEC, yaxis: 'shared' })).toEqual([])
+    expect(specFromParams(kv('ys=free')).yaxis).toBe('free')
+    expect(specFromParams(kv('ys=shared')).yaxis).toBe('shared')
+    expect(specFromParams(kv('ys=loose')).yaxis).toBe('shared')
+  })
+  it('an old link with ctx=1 still reads (context extents are no longer shown, the key is kept so links do not break)', () => {
+    expect(specFromParams(kv('ctx=1')).places.context).toBe(true)
+    expect(specParams(specFromParams(kv('ctx=1')))).toEqual([['ctx', '1']])
   })
   it('depth is the view\'s own key: it is passed in, never written', () => {
     expect(specFromParams(new Map(), 'dive').depth).toBe('dive')

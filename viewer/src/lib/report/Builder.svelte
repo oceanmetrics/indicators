@@ -1,7 +1,7 @@
 <script lang="ts">
   // the report builder: a preset, the two selection trees (places, indicators), the layout with its panel budget, the
   // style (status method, recent window, baseline), the years and a title. it holds no state of its own: every change goes out through `onspec` as a new spec, so the report is always a permalink.
-  import { Button, Select, Toggle } from '@marinebon/ui'
+  import { Button, Select } from '@marinebon/ui'
   import PlacePicker from '../pick/PlacePicker.svelte'
   import { multiLabel, placeGroups } from '../pick/places.ts'
   import { Icon } from '../../../../src/icons/index.ts'
@@ -113,7 +113,6 @@
     <section class="pane" aria-labelledby="bp">
       <h3 id="bp" class="mbon-label">Places <span class="n">{chosenPlaces.length} chosen</span></h3>
       <PlacePicker mode="multi" kicker="Groups and places" {idx} {layers} label={multiLabel(placeGroups(idx, layers), chosenIds)} chosen={chosenIds} ontoggle={toggleP} />
-      <Toggle checked={spec.places.context} label="Context extents" hint="needs the gazetteer's context links (not published yet)" disabled />
     </section>
     <section class="pane" aria-labelledby="bi">
       <h3 id="bi" class="mbon-label">Indicators <span class="n">{model.indicators.length} chosen</span></h3>

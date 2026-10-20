@@ -114,6 +114,32 @@ describe('lineChart', () => {
   })
 })
 
+describe('lineChart: shared y axis and compact panels (Small multiples)', () => {
+  const low = yearly([1, 2, 1, 2, 1])
+  const high = yearly([100, 120, 110, 130, 100])
+  it('a shared domain puts the same value at the same height in two panels', () => {
+    const dom: [number, number] = [1, 130]
+    const a = lineChart({ width: 160, height: 90, series: low, grain: 'year', yDomain: dom, compact: true })
+    const b = lineChart({ width: 160, height: 90, series: high, grain: 'year', yDomain: dom, compact: true })
+    expect(a.yTicks.map(t => t.y)).toEqual(b.yTicks.map(t => t.y))
+    expect(a.points[1].y).toBeGreaterThan(b.points[1].y)
+    // with its own axis a small series fills its panel instead
+    const own = lineChart({ width: 160, height: 90, series: low, grain: 'year', compact: true })
+    expect(own.points[1].y).toBeLessThan(a.points[1].y)
+  })
+  it('the domain only widens the axis: data outside it is still inside the plot', () => {
+    const g = lineChart({ width: 160, height: 90, series: high, grain: 'year', yDomain: [1, 2], compact: true })
+    expect(g.points.every(p => p.y >= g.plot.y0 - 0.1 && p.y <= g.plot.y1 + 0.1)).toBe(true)
+  })
+  it('compact pads less than the full chart and asks for fewer ticks', () => {
+    const full = lineChart({ width: 160, height: 90, series: high, grain: 'year' })
+    const c = lineChart({ width: 160, height: 90, series: high, grain: 'year', compact: true })
+    expect(c.plot.y0).toBeLessThan(full.plot.y0)
+    expect(c.plot.y1).toBeGreaterThan(full.plot.y1)
+    expect(c.yTicks.length).toBeLessThanOrEqual(full.yTicks.length)
+  })
+})
+
 describe('stacked shares', () => {
   const rows = [
     ...['2020-01-01', '2021-01-01'].flatMap((t, i) => [

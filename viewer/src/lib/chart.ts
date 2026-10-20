@@ -87,6 +87,10 @@ export interface LineSpec {
   mode?: 'line' | 'points'
   /** width of the y labels, in px; derived from the labels when omitted */
   left?: number
+  /** a y range the axis must cover as well as the data and the band: Small multiples' shared axis is the range of every panel */
+  yDomain?: [number, number] | null
+  /** a small panel: tighter padding, two y ticks (the unit label and the window label are the caller's to leave out) */
+  compact?: boolean
 }
 
 export interface LineGeometry {
@@ -120,17 +124,18 @@ export function lineChart(spec: LineSpec): LineGeometry {
   const mode = spec.mode ?? 'line'
   const vals = spec.series.filter(p => p.v != null) as { t: string; v: number }[]
   const ov = spec.overlay ?? null
-  const topPad = 20, bottomPad = 24, rightPad = 12
-  // the y range: every value and the band, then nice bounds
+  const topPad = spec.compact ? 6 : 20, bottomPad = spec.compact ? 18 : 24, rightPad = spec.compact ? 6 : 12
+  // the y range: every value and the band (and the shared domain), then nice bounds
   const ys = vals.map(p => p.v)
   if (ov) ys.push(ov.lo, ov.hi)
+  if (spec.yDomain) ys.push(...spec.yDomain)
   const lo = ys.length ? Math.min(...ys) : 0
   const hi = ys.length ? Math.max(...ys) : 1
   const padY = (hi - lo) * 0.04
-  const yt = niceTicks(lo - padY, hi + padY, 3)
+  const yt = niceTicks(lo - padY, hi + padY, spec.compact ? 2 : 3)
   const labels = yt.ticks.map(v => fmt(v, yt.decimals))
   const left = spec.left ?? Math.ceil(Math.max(...labels.map(l => l.length)) * CHAR_W) + 14
-  const plot: Plot = { x0: left, y0: topPad, x1: Math.max(left + 40, width - rightPad), y1: Math.max(topPad + 40, height - bottomPad) }
+  const plot: Plot = { x0: left, y0: topPad, x1: Math.max(left + 40, width - rightPad), y1: Math.max(topPad + (spec.compact ? 30 : 40), height - bottomPad) }
   const sy = scaleLinear(yt.lo, yt.hi, plot.y1, plot.y0)
   const empty = vals.length === 0
   const base: LineGeometry = {
