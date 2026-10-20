@@ -229,6 +229,8 @@
   .hint { margin: 0; font: var(--type-small); color: var(--text-body); }
   .hint :global(svg) { vertical-align: -2px; }
   .note { flex-basis: 100%; margin: 0; font: var(--type-small); color: var(--text-body); }
+  /* the menu sits toward the right of the controls: open it leftwards so it stays on the page */
+  @media (min-width: 900px) { .panel { left: auto; right: 0; } }
   @media (max-width: 640px) {
     .search input { width: 8rem; }
     .menu { flex-basis: 100%; }

@@ -44,6 +44,8 @@ export interface Indicator {
   category: Partial<Record<VocabId, string>>
   series: string
   series_title?: string
+  /** erddap-places: the ERDDAP variable */
+  variable?: string
   lead: boolean
   preferred?: boolean
   min_periods: number

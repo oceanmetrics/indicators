@@ -107,7 +107,7 @@
       <span class="glyph"><Icon name={glyph} size={22} /></span>
     {/if}
     <div class="titles">
-      <h4 id="t-{uid}{ind.id}">{ind.title}</h4>
+      <h4 id="t-{uid}{ind.id}" tabindex="-1">{ind.title}</h4>
       <p class="sub">{unit || 'unitless'} · status by {ind.status_grain}{model?.grain && model.grain !== ind.status_grain ? ` · shown by ${model.grain}` : ''}</p>
     </div>
   </header>
@@ -212,6 +212,7 @@
   .badge { flex: none; width: 40px; height: 40px; border-radius: 50%; }
   .glyph { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; color: var(--label-color); }
   .titles { min-width: 0; }
+  h4:focus, h4:focus-visible { outline: none; }
   h4 { margin: 0; font: var(--fw-semibold) var(--text-md) / 1.25 var(--font-display); color: var(--text-strong); text-wrap: balance; }
   .sub { margin: 2px 0 0; font: var(--fw-regular) 0.75rem / 1.3 var(--font-mono); color: var(--text-body); }
   .sentence { margin: 0; font: var(--fw-medium) var(--text-sm) / 1.45 var(--font-sans); color: var(--text-strong); text-wrap: pretty; }

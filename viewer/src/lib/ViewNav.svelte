@@ -24,7 +24,7 @@
 </nav>
 
 <style>
-  .views { display: flex; flex-wrap: wrap; gap: var(--space-1); border-bottom: 1px solid var(--border); }
+  .views { min-width: 0; display: flex; flex-wrap: wrap; gap: var(--space-1); border-bottom: 1px solid var(--border); }
   .views a, .here {
     display: inline-flex; align-items: center; gap: var(--space-2);
     padding: var(--space-2) var(--space-3); margin-bottom: -1px;
@@ -34,6 +34,6 @@
   .views a:hover { color: var(--text-strong); border-bottom-color: var(--border-strong); }
   .views [aria-current='page'] { color: var(--text-strong); border-bottom-color: var(--brand); }
   .views :global(svg) { color: var(--label-color); flex: none; }
-  .here { min-width: 0; }
-  .pn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22rem; }
+  .here { min-width: 0; max-width: 100%; }
+  .pn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22rem; min-width: 0; }
 </style>

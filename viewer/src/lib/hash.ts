@@ -187,3 +187,8 @@ export function matrixHref(came: ViewState | null, place: { vocab: VocabId; dept
     : { ...DEFAULT_STATE, colls: place.coll ? [place.coll] : [], vocab: place.vocab, depth: place.depth }
   return '#' + serializeHash(cell ? { ...s, cell } : s)
 }
+
+/** the href of the Matrix narrowed to one place group (with `#`), carrying the shared keys of the state it is opened from */
+export function groupHref(from: Pick<ViewState, 'vocab' | 'depth'>, coll: string): string {
+  return '#' + serializeHash({ ...DEFAULT_STATE, colls: [coll], vocab: from.vocab, depth: from.depth })
+}

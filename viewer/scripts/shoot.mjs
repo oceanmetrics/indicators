@@ -30,6 +30,13 @@ const SST = 'view=map&ind=erddap:dhw_5km:CRW_SST:mean&coll=places'
 const MPA = 'view=map&ind=sdg:ER_MRN_MPA&coll=mr_eez&color=value'
 const FKNMS = 'view=place&place=NMS:FKNMS'
 const FKNMS_SST = 'cell=NMS:FKNMS|erddap:dhw_5km:CRW_SST:mean'
+// the way forward from an empty cell: Wells (a NERRS reserve) has no sea surface temperature computed (not computed yet), and the
+// SDG series is not offered for a reserve; an EEZ opened on an indicator it has no values for
+const WELLS = 'colls=noaa_nerrs,places'
+const LIVE = 'cell=NERRS:WEL|erddap:dhw_5km:CRW_SST:mean&colls=places,noaa_nerrs'
+const NA = 'cell=NERRS:WEL|sdg:ER_MRN_MPA&colls=places,noaa_nerrs&empty=1'
+const OPENED = 'view=place&place=NMS:FKNMS&ind=erddap:dhw_5km:CRW_SST:mean'
+const UNCOMPUTED = 'view=place&place=MRGID:8405&ind=erddap:IMERG_monthly_global_precip:precipitation:mean'
 
 // the Report view: a report is tall, so a fixed window (the top of it), not the whole page
 const REPORT = { width: 1440, height: 1500, deviceScaleFactor: 2 }
@@ -44,6 +51,7 @@ const EMBED_HASH = 'card=NMS:CINMS|erddap:dhw_5km:CRW_SST:mean'
 const print = async page => { await page.emulateMediaType('print') }
 
 const REMOVED = 'xp=NMS:NMSAS,NMS:FKNMS&xi=erddap:IMERG_monthly_global_precip:precipitation:mean'
+const scrollRight = async page => { await page.evaluate(() => { const b = document.querySelector('.box'); b.scrollLeft = b.scrollWidth }) }
 const openMenu = async page => { await page.click('details.add > summary') }
 
 const SHOTS = [
@@ -70,6 +78,26 @@ const SHOTS = [
   ['matrix_oceanmetrics_light_placerows_390', 'oceanmetrics', 'light', PHONE, 'axes=p'],
   // the Add or restore menu open, with a place and an indicator removed
   ['matrix_oceanmetrics_light_addmenu', 'oceanmetrics', 'light', DESKTOP, REMOVED, openMenu],
+  // place groups, the legend, the ways forward from an empty cell, and the Place view opened on an indicator
+  ['matrix_oceanmetrics_light_groups', 'oceanmetrics', 'light', DESKTOP, WELLS, scrollRight],
+  ['matrix_oceanmetrics_dark_groups', 'oceanmetrics', 'dark', DESKTOP, WELLS],
+  ['matrix_oceanmetrics_light_groups_390', 'oceanmetrics', 'light', PHONE, WELLS],
+  ['legend_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, ''],
+  ['legend_mbon_dark', 'mbon', 'dark', DESKTOP, ''],
+  ['legend_oceanmetrics_light_390', 'oceanmetrics', 'light', PHONE, ''],
+  ['drawer_live_oceanmetrics_light', 'oceanmetrics', 'light', TALL, LIVE],
+  ['drawer_live_oceanmetrics_dark', 'oceanmetrics', 'dark', TALL, LIVE],
+  ['drawer_live_mbon_light', 'mbon', 'light', TALL, LIVE],
+  ['drawer_live_oceanmetrics_light_390', 'oceanmetrics', 'light', PHONE, LIVE],
+  ['drawer_na_oceanmetrics_light', 'oceanmetrics', 'light', TALL, NA],
+  ['drawer_na_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PHONE, NA],
+  ['place_opened_FKNMS_oceanmetrics_light', 'oceanmetrics', 'light', PLACE, OPENED],
+  ['place_opened_FKNMS_oceanmetrics_dark', 'oceanmetrics', 'dark', PLACE, OPENED],
+  ['place_opened_FKNMS_oceanmetrics_light_390', 'oceanmetrics', 'light', PLACE_PHONE, OPENED],
+  ['place_uncomputed_EEZ_oceanmetrics_light', 'oceanmetrics', 'light', PLACE, UNCOMPUTED],
+  ['place_uncomputed_EEZ_oceanmetrics_dark', 'oceanmetrics', 'dark', PLACE, UNCOMPUTED],
+  ['place_uncomputed_EEZ_mbon_light', 'mbon', 'light', PLACE, UNCOMPUTED],
+  ['place_uncomputed_EEZ_oceanmetrics_light_390', 'oceanmetrics', 'light', PLACE_PHONE, UNCOMPUTED],
   ['map_sst_status_oceanmetrics_light', 'oceanmetrics', 'light', MAP, SST + '&color=status'],
   ['map_sst_status_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, SST + '&color=status'],
   ['map_sst_status_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, SST + '&color=status'],
@@ -125,7 +153,10 @@ try {
     await page.evaluate(() => document.fonts.ready)
     await new Promise(r => setTimeout(r, 400))
     if (act) { await act(page); await new Promise(r => setTimeout(r, 200)) }
-    await page.screenshot({ path: resolve(OUT, name + '.png'), fullPage: !hash.includes('cell=') && !hash.includes('view=place') && !hash.includes('view=report') && !embed })
+    // the legend is shot on its own
+    const legend = name.startsWith('legend_') ? await page.$('#legend') : null
+    if (legend) await legend.screenshot({ path: resolve(OUT, name + '.png') })
+    else await page.screenshot({ path: resolve(OUT, name + '.png'), fullPage: !hash.includes('cell=') && !hash.includes('view=place') && !hash.includes('view=report') && !embed })
     // a page-level sideways scroll is a layout bug at any width
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     console.log(name, overflow > 0 ? `PAGE OVERFLOW ${overflow}px` : 'ok', errors.length ? errors : '')

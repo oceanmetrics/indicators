@@ -4,7 +4,7 @@
   import { Icon } from '../../src/icons/index.ts'
   import { loadCatalog, loadLayers, resolveDataBase, collTitle } from './lib/data.ts'
   import type { Catalog, Indicator, Layers } from './lib/data.ts'
-  import { DEFAULT_STATE, mapHref, matrixHref, parseHash, placeHref, reportHref, serializeHash } from './lib/hash.ts'
+  import { DEFAULT_STATE, groupHref, mapHref, matrixHref, parseHash, placeHref, reportHref, serializeHash } from './lib/hash.ts'
   import { DEFAULT_SPEC } from '../../src/report/spec.ts'
   import type { ViewState } from './lib/hash.ts'
   import { cellModel, groupColumns, groupRows, hiddenPlaces, indexCoverage, matrixStats, pickRow, shownGroups, withValues } from './lib/matrix.ts'
@@ -19,6 +19,7 @@
   import Drawer from './lib/Drawer.svelte'
   import ViewNav from './lib/ViewNav.svelte'
   import { placeCoverage } from './lib/place.ts'
+  import { computedGroups } from './lib/nextSteps.ts'
   import { matrixToSpec } from './lib/report/fromMatrix.ts'
   import { SOURCE_HREF } from './lib/credits.ts'
 
@@ -100,7 +101,8 @@
     if (was.view === 'matrix' && next.view === 'place') { cameFrom = was; placeT0 = performance.now(); placeMs = null }
     view = next
     // back from a place: scroll to it and put focus on its row header
-    if (was.view === 'place' && next.view === 'matrix' && was.place) {
+    // (a Matrix that reopens a cell puts focus in its drawer, and Esc returns it to the cell)
+    if (was.view === 'place' && next.view === 'matrix' && was.place && !next.cell) {
       tick().then(() => {
         const a = [...document.querySelectorAll<HTMLAnchorElement>('a.pn')].find(x => x.dataset.place === was.place)
         a?.scrollIntoView({ block: 'nearest' })
@@ -119,7 +121,12 @@
     if (view.view === 'map' && !MapView) import('./lib/map/MapView.svelte').then(m => { MapView = m.default })
     if (view.view === 'report' && !ReportView) import('./lib/report/ReportView.svelte').then(m => { ReportView = m.default })
   })
-  const backHref = $derived(matrixHref(cameFrom, { vocab: view.vocab, depth: view.depth, coll: catalog && view.place ? placeCoverage(catalog.coverage, view.place).place?.coll ?? null : null }))
+  // "Matrix" in the Place view's breadcrumb: back to the Matrix the reader came from, with the drawer open on the cell they opened this place from
+  const backHref = $derived(matrixHref(
+    cameFrom,
+    { vocab: view.vocab, depth: view.depth, coll: catalog && view.place ? placeCoverage(catalog.coverage, view.place).place?.coll ?? null : null },
+    view.place && view.ind ? { place: view.place, indicator: view.ind } : null,
+  ))
   const linkToPlace = (placeId: string, coll: string) => placeHref(view, placeId, coll)
 
   // ---- removing from the display ----
@@ -221,7 +228,8 @@
 
 {#if opened && catalog && view.view === 'matrix'}
   <Drawer {catalog} ind={opened.ind} place={opened.place} model={opened.model} depth={view.depth} vocab={view.vocab}
-    collTitle={title(opened.place.coll)} onclose={close} />
+    collTitle={title(opened.place.coll)} groups={opened.model.kind === 'na' && idx ? computedGroups(idx, opened.ind) : []} titles={title}
+    groupHref={c => groupHref(view, c)} onclose={close} />
 {/if}
 
 <style>

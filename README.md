@@ -105,6 +105,14 @@ A cell is a value with its status and trend glyphs, **not computed yet** (open i
 ask for it by a prefilled issue), **no data here** (the indicator has a values file for this place's collection, with
 nothing for the place), or a dash (**not offered** for this kind of place).
 
+**From an empty cell** the drawer (and the Place view) offers the way forward, built by `viewer/src/lib/nextSteps.ts`: for an
+erddap-places indicator **Compute it now in erddap-places** (`<base>erddap-places/#place=…&dataset=…&variable=…`) and **Ask to add
+it to the catalog** (the repo's `indicator-request.yml` issue form, pre-filled: `place`, `collection`, `indicator`); for a cell
+the indicator is not offered for, the place groups it is computed for and the request link; for no data, the reason and the
+dataset's time range. **Place view** (`#view=place&place=<id>&ind=<indicator>`): the indicator opened comes first under "You
+opened" (its card, or a "not computed yet" card with the same ways forward), the others follow, and a breadcrumb
+`Matrix › <place> › <indicator>` leads back to the Matrix with the drawer open on that cell (`cell=<place>|<indicator>`).
+
 ## Report view
 
 `#view=report` lays out chosen places x chosen indicators; the spec (`src/report/spec.ts`: rules such as `coll:places`,

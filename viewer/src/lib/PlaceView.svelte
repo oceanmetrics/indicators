@@ -2,14 +2,19 @@
   // the Place view: every indicator that has coverage for one place, one card each, grouped by the chosen vocabulary
   // (leads first, "more in this series" collapsed). each card reads only its own values file and computes its status
   // in the browser with src/status. the view is a permalink: #view=place&place=<id>[&coll=][&vocab=][&method=][&ind=].
+  // with `ind=` the indicator the reader opened comes first ("You opened"): its card, or, when the place has no values
+  // for it, a "not computed yet" card with the ways forward. a breadcrumb leads back to the Matrix cell it came from.
   import { onMount, tick } from 'svelte'
   import { Button, Notice } from '@marinebon/ui'
   import { Icon } from '../../../src/icons/index.ts'
+  import { gazetteerPlaceHref } from './data.ts'
   import type { Catalog, VocabId } from './data.ts'
   import { badgeUrl } from './delivery.ts'
-  import { METHOD_IDS } from './hash.ts'
+  import { groupHref, METHOD_IDS, placeHref } from './hash.ts'
   import type { ViewState } from './hash.ts'
-  import { indexCoverage, pickRow } from './matrix.ts'
+  import { cellModel, indexCoverage, pickRow, shortPlaceName, STATE_WORDS } from './matrix.ts'
+  import { computedGroups } from './nextSteps.ts'
+  import NextSteps from './NextSteps.svelte'
   import { coveredIndicators, groupCards, METHOD_NOTES, placeCoverage } from './place.ts'
   import { asIcon } from './icons.ts'
   import IndicatorCard from './IndicatorCard.svelte'
@@ -18,7 +23,7 @@
     catalog: Catalog
     view: ViewState
     titles: (coll: string) => string
-    /** href of "Back to the matrix" */
+    /** href of "Back to the matrix" (the Matrix state the reader came from, with the cell it opened this place from) */
     backHref: string
     onpatch: (p: Partial<ViewState>) => void
     /** ms from the start of the view until the lead cards have loaded (or failed) */
@@ -39,8 +44,17 @@
   const place = $derived(found.place)
   const idx = $derived(indexCoverage(found.rows))
   const covered = $derived(place ? coveredIndicators(idx, place.id, catalog.manifest.indicators) : [])
-  const groups = $derived(groupCards(covered, catalog.manifest.vocabularies, view.vocab))
-  const leadCount = $derived(groups.reduce((n, g) => n + g.series.length, 0))
+  // the indicator the reader opened, when the place has values for it (its card first) or not (a card with the ways forward)
+  const opened = $derived(view.ind ? catalog.manifest.indicators.find(i => i.id === view.ind) ?? null : null)
+  const openedHere = $derived(opened != null && covered.some(i => i.id === opened.id))
+  const openedModel = $derived(opened && place && !openedHere ? cellModel(opened, place, null) : null)
+  // the cards below hold the others: the opened one is above, not twice
+  const rest = $derived(openedHere ? covered.filter(i => i.id !== opened?.id) : covered)
+  const groups = $derived(groupCards(rest, catalog.manifest.vocabularies, view.vocab))
+  // every place's rows, only when a not-offered indicator asks which groups it is computed for
+  const allIdx = $derived(openedModel?.kind === 'na' ? indexCoverage(catalog.coverage) : null)
+  const openedGroup = $derived(openedModel?.kind === 'na' && opened && allIdx ? computedGroups(allIdx, opened) : [])
+  const leadCount = $derived(groups.reduce((n, g) => n + g.series.length, 0) + (openedHere ? 1 : 0))
   const withStatus = $derived(place ? covered.filter(i => pickRow(idx, place.id, i)?.status).length : 0)
   const covRow = (indId: string) => {
     const ind = covered.find(i => i.id === indId)
@@ -68,8 +82,11 @@
   async function focusCard() {
     await tick()
     const el = document.querySelector<HTMLElement>(`article.card[data-ind="${CSS.escape(view.ind ?? '')}"]`)
-    el?.scrollIntoView({ block: 'start' })
-    el?.querySelector<HTMLElement>('h4')?.focus?.()
+    if (!el) { title?.focus({ preventScroll: true }); return }
+    // the opened indicator is the first card: show the page from its top (breadcrumb, place) rather than the card alone
+    if (el.closest('.you')) window.scrollTo(0, 0)
+    else el.scrollIntoView({ block: 'start' })
+    el.querySelector<HTMLElement>('h4')?.focus?.({ preventScroll: true })
   }
 
   let title: HTMLElement | undefined = $state()
@@ -87,15 +104,25 @@
 </script>
 
 <div class="pv">
-  <p class="crumb"><a class="back" href={backHref}><Icon name="ui-prev" size={16} />Back to the matrix</a></p>
-
   {#if !place}
+    <p class="crumb"><a class="back" href={backHref}><Icon name="ui-prev" size={16} />Back to the matrix</a></p>
     <Notice kind="warn">No indicator has data for <code>{view.place}</code> in this catalog. <a href={backHref}>Back to the matrix</a> to pick a place.</Notice>
   {:else}
+    <nav class="crumb" aria-label="Breadcrumb">
+      <ol>
+        <li><a class="back" href={backHref}><Icon name="ui-prev" size={16} />Matrix</a></li>
+        {#if opened}
+          <li><a href={placeHref(view, place.id, place.coll)}>{shortPlaceName(place.name)}</a></li>
+          <li aria-current="page">{opened.short}</li>
+        {:else}
+          <li aria-current="page">{shortPlaceName(place.name)}</li>
+        {/if}
+      </ol>
+    </nav>
     <header class="top">
       <span class="mbon-label">Place · {titles(place.coll)}</span>
       <h2 id="pv-title" tabindex="-1" bind:this={title}>{place.name}</h2>
-      <p class="meta"><code>{place.id}</code> <span aria-hidden="true">·</span> collection <code>{place.coll}</code> <span aria-hidden="true">·</span> {covered.length} indicators, {withStatus} with a status relative to their own record</p>
+      <p class="meta"><code>{place.id}</code> <span aria-hidden="true">·</span> <a href={gazetteerPlaceHref(place.coll, place.id)} target="_blank" rel="noopener">in the gazetteer<Icon name="ui-external" size={14} /><span class="mbon-sr-only"> (opens in a new tab)</span></a> <span aria-hidden="true">·</span> {covered.length} indicators, {withStatus} with a status relative to their own record</p>
     </header>
 
     <section class="controls" aria-label="Place view controls">
@@ -118,6 +145,25 @@
       </div>
       <p class="note">{view.method ? `${METHOD_NOTES[view.method]} Applies to every continuous indicator at its status grain.` : 'Each card uses the status method the manifest names for its indicator; change one card or all of them.'}</p>
     </section>
+
+    {#if opened}
+      {@const term = catalog.manifest.vocabularies[view.vocab].terms.find(t => t.id === opened.category[view.vocab]) ?? { id: 'other', label: 'Other' }}
+      <section class="you" aria-labelledby="you-h">
+        <h3 id="you-h" class="mbon-label">You opened</h3>
+        {#if openedHere}
+          <IndicatorCard catalog={catalog} ind={opened} {place} collTitle={titles(place.coll)} {term} vocab={view.vocab} depth={view.depth}
+            method={view.method} cov={covRow(opened.id)} focused {onsettled} />
+        {:else if openedModel}
+          <article class="card pending" data-ind={opened.id} data-kind={openedModel.kind} aria-labelledby="t-pending">
+            <h4 id="t-pending" tabindex="-1">{opened.title}</h4>
+            <p class="state"><Icon name={openedModel.stateIcon ?? 'cell-na'} size={18} />{openedModel.kind === 'na' ? `Not offered for ${titles(place.coll)}` : STATE_WORDS[openedModel.kind === 'live' ? 'live' : 'nodata']}</p>
+            <NextSteps ind={opened} {place} kind={openedModel.kind as 'live' | 'nodata' | 'na'} reason={openedModel.reason} groupTitle={titles(place.coll)}
+              groups={openedGroup} titles={titles} groupHref={c => groupHref(view, c)} />
+          </article>
+        {/if}
+      </section>
+      {#if groups.length}<h3 class="mbon-label all">Other indicators for this place</h3>{/if}
+    {/if}
 
     {#each groups as g (g.term.id)}
       {@const gi = asIcon(g.term.glyph)}
@@ -157,12 +203,20 @@
 
 <style>
   .pv { display: grid; gap: var(--space-4); min-width: 0; }
-  .crumb { margin: 0; }
+  .crumb ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); font: var(--type-small); color: var(--text-body); }
+  .crumb li + li::before { content: '\203A'; margin-right: var(--space-1); color: var(--text-body); }
+  .crumb [aria-current] { color: var(--text-strong); font-weight: var(--fw-semibold); }
+  .you { display: grid; gap: var(--space-2); min-width: 0; }
+  .you > h3, .all { margin: var(--space-2) 0 0; color: var(--label-color); }
+  .pending { display: grid; gap: var(--space-2); padding: var(--space-4); background: var(--bg-surface); border: 1px solid var(--accent); box-shadow: 0 0 0 2px var(--accent); border-radius: var(--radius-md); max-width: 34rem; min-width: 0; }
+  .pending h4 { margin: 0; font: var(--fw-semibold) var(--text-md) / 1.25 var(--font-display); color: var(--text-strong); }
+  .pending h4:focus { outline: none; }
+  .state { margin: 0; display: flex; align-items: center; gap: var(--space-2); font: var(--type-small); color: var(--text-body); }
   .back { display: inline-flex; align-items: center; gap: var(--space-1); font: var(--fw-semibold) var(--text-sm) / 1.2 var(--font-sans); }
-  .top { display: grid; gap: var(--space-1); }
+  .top { display: grid; gap: var(--space-1); min-width: 0; }
   h2 { margin: 0; font: var(--fw-bold) var(--text-xl) / 1.15 var(--font-display); color: var(--text-strong); text-wrap: balance; }
   h2:focus, h2:focus-visible { outline: none; }
-  .meta { margin: 0; font: var(--type-small); color: var(--text-body); }
+  .meta { margin: 0; font: var(--type-small); color: var(--text-body); overflow-wrap: anywhere; }
   .controls { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: flex-start; }
   .group { display: grid; gap: var(--space-2); min-width: 0; }
   .row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }

@@ -80,6 +80,34 @@ if (cell2) {
   await page.waitForSelector('[role=dialog]', { hidden: true, timeout: 5000 })
   check((await focused())?.label === cell2.f.label, 'focus returns to the same cell')
 }
+// the way there and back: a cell -> its drawer -> "Open in place view" (the Place view opens on that indicator: its card
+// first, focus on its heading) -> the breadcrumb's Matrix link (the drawer reopens on the cell) -> Esc -> focus on the cell
+await page.goto('about:blank')
+await page.goto(`${URL_BASE}?theme=light`, { waitUntil: 'networkidle0' })
+await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
+const cell3 = await tabUntil(f => f.tag === 'BUTTON' && /\bcell\b/.test(f.cls))
+if (cell3) {
+  await page.keyboard.press('Enter')
+  await page.waitForSelector('[role=dialog]', { timeout: 5000 })
+  const toPlace = await tabUntil(f => f.tag === 'A' && /view=place/.test(f.href ?? '') && /ind=/.test(f.href ?? ''), 60)
+  check(!!toPlace, 'the drawer has "Open in place view" with ind= in its link')
+  if (toPlace) {
+    await page.keyboard.press('Enter')
+    await page.waitForSelector('.pv .you article.card h4', { timeout: 30000 })
+    await new Promise(r => setTimeout(r, 600))
+    const onHead = await page.evaluate(() => document.activeElement?.tagName === 'H4' && !!document.activeElement.closest('.you'))
+    check(onHead, 'the Place view opens on the indicator: its card is first and focus is on its heading')
+    check(await page.evaluate(() => !!document.querySelector('nav.crumb')), 'the Place view has a breadcrumb')
+    await page.evaluate(() => document.querySelector('nav.crumb a.back')?.focus())
+    await page.keyboard.press('Enter')
+    check(await page.waitForSelector('[role=dialog]', { timeout: 8000 }).then(() => true, () => false), 'the breadcrumb Matrix link reopens the drawer on the cell')
+    check(await page.evaluate(() => location.hash.includes('cell=') && !location.hash.includes('view=place')), 'the Matrix hash has cell=')
+    await page.keyboard.press('Escape')
+    await page.waitForSelector('[role=dialog]', { hidden: true, timeout: 5000 })
+    check((await focused())?.label === cell3.f.label, 'Esc returns focus to the cell the reader started from')
+  }
+}
+
 // Tab to the first remove button of a kind, press Enter: the hash gets xp= (place) or xi= (indicator), focus stays on a button
 for (const [kind, key] of [['place', 'xp='], ['indicator', 'xi=']]) {
   await page.goto('about:blank')   // a fresh load: a hash-only change would keep the page, and the focus, as it was

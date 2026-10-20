@@ -11,8 +11,10 @@
   import { EOV_GLYPH_CREDIT, GOOS_CREDIT, STATUS_NOTE } from './credits.ts'
   import { mapHref, placeHref } from './hash.ts'
   import type { Depth } from './hash.ts'
-  import { classText, STATUS_WORDS, TREND_WORDS, periodText, valueText } from './matrix.ts'
+  import { classText, STATUS_WORDS, TREND_WORDS, periodText, valueText, valuesCollOf } from './matrix.ts'
   import type { CellModel, Place } from './matrix.ts'
+  import type { GroupCount } from './nextSteps.ts'
+  import NextSteps from './NextSteps.svelte'
   import CopyButton from './CopyButton.svelte'
   import Spark from './Spark.svelte'
   import Elements from './Elements.svelte'
@@ -24,10 +26,15 @@
     model: CellModel
     depth: Depth
     vocab: VocabId
+    /** the title of the place's group */
     collTitle: string
+    /** the groups the indicator is computed for (for a cell it is not offered for), their titles and Matrix hrefs */
+    groups?: GroupCount[]
+    titles?: (coll: string) => string
+    groupHref?: (coll: string) => string
     onclose: () => void
   }
-  let { catalog, ind, place, model, depth, vocab, collTitle, onclose }: Props = $props()
+  let { catalog, ind, place, model, depth, vocab, collTitle, groups = [], titles, groupHref, onclose }: Props = $props()
 
   const row = $derived(model.row)
   const m = $derived(catalog.manifest)
@@ -39,12 +46,9 @@
 
   const lines = $derived(configLines(ind, place, m.version))
   const hash = $derived(configHash(lines))
-  const headline = $derived.by(() => {
-    if (row?.sentence) return row.sentence
-    if (model.kind === 'live') return `${ind.short} for ${place.name} has not been computed. erddap-places can compute it in the browser from ${ind.dataset.title}; this read-only viewer does not do that yet.`
-    if (model.kind === 'nodata') return `No ${ind.short} data for ${place.name} yet${model.reason ? `: ${model.reason}` : ''}.`
-    return `${ind.short} is not defined for ${place.name}: the indicator has no values for ${collTitle} and its producer (${ind.producer.name}) does not compute it on the fly.`
-  })
+  // a cell with a value reads its sentence; any other cell reads its way forward (NextSteps)
+  const headline = $derived(row?.sentence ?? '')
+  const valuesColl = $derived(valuesCollOf(ind, place, row))
   const citation = $derived(ind.citation ?? '')
 
   onMount(() => { closeBtn?.focus() })
@@ -80,12 +84,15 @@
     </button>
   </header>
 
-  <p class="headline">{headline}</p>
+  {#if headline}<p class="headline">{headline}</p>{/if}
+  {#if model.kind === 'live' || model.kind === 'nodata' || model.kind === 'na'}
+    <NextSteps {ind} {place} kind={model.kind} reason={model.reason} groupTitle={collTitle} {groups} {titles} {groupHref} />
+  {/if}
   <p class="toplace">
     <a class="plink" href={placeHref({ vocab, depth, method: null }, place.id, place.coll, ind.id)}>
       <Icon name="view-place" size={16} />Open in place view <span class="mbon-sr-only">: {place.name}, {ind.short}</span>
     </a>
-    <a class="plink" href={mapHref({ vocab, depth, method: null }, ind.id, place.coll)}>
+    <a class="plink" href={mapHref({ vocab, depth, method: null }, ind.id, valuesColl)}>
       <Icon name="view-map" size={16} />Open in map view <span class="mbon-sr-only">: {ind.short}</span>
     </a>
   </p>
@@ -110,7 +117,7 @@
     </div>
   {/if}
 
-  <Elements {catalog} {ind} {place} {collTitle} {row} {depth} />
+  <Elements {catalog} {ind} {place} {collTitle} {valuesColl} {row} {depth} />
 
   <section class="config" aria-label="Configuration">
     <h3 class="k"><Icon name="el-config" size={18} />Configuration <code>{hash}</code></h3>

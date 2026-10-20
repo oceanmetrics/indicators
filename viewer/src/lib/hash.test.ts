@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_STATE, mapHref, matrixHref, parseHash, placeHref, reportHref, serializeHash } from './hash.ts'
+import { DEFAULT_STATE, groupHref, mapHref, matrixHref, parseHash, placeHref, reportHref, serializeHash } from './hash.ts'
 import { DEFAULT_SPEC } from '../../../src/report/spec.ts'
 import type { ViewState } from './hash.ts'
 
@@ -74,6 +74,10 @@ describe('the Place view hash', () => {
     expect(matrixHref(came, { vocab: 'eov', depth: 'dive', coll: 'places' })).toBe('#colls=mr_eez&q=dutch&vocab=names&leads=0')
     expect(matrixHref(null, { vocab: 'eov', depth: 'dive', coll: 'places' })).toBe('#colls=places&vocab=eov&depth=dive')
     expect(matrixHref(place, { vocab: 'onms', depth: 'swim', coll: null })).toBe('#')
+  })
+  it('groupHref opens the Matrix on one place group, with the vocabulary and detail it is shown in', () => {
+    expect(groupHref({ vocab: 'eov', depth: 'dive' }, 'mr_eez')).toBe('#colls=mr_eez&vocab=eov&depth=dive')
+    expect(groupHref({ vocab: 'onms', depth: 'swim' }, 'places')).toBe('#colls=places')
   })
   it('matrixHref with a cell reopens the drawer on it, from the state it came from or from a cold permalink', () => {
     const cell = { place: 'NMS:CINMS', indicator: 'erddap:dhw_5km:CRW_SST:mean' }
