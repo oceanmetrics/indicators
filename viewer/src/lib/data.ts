@@ -44,7 +44,7 @@ export interface Indicator {
   category: Partial<Record<VocabId, string>>
   series: string
   series_title?: string
-  /** erddap-places: the ERDDAP variable */
+  /** the quantity measured, shared across producers (`sst`, `ph`); not the ERDDAP variable, which is in the id */
   variable?: string
   lead: boolean
   preferred?: boolean

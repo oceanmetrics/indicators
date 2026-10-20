@@ -40,12 +40,15 @@ describe('requestHref', () => {
 })
 
 describe('the compute-now link', () => {
-  const sst = ind({ id: 'erddap:dhw_5km:CRW_SST:mean', variable: 'CRW_SST' })
+  const sst = ind({ id: 'erddap:dhw_5km:CRW_SST:mean', variable: 'sst' })
   const place = { id: 'NERRS:WEL', name: 'Wells', coll: 'noaa_nerrs' }
   it('an erddap-places indicator links to its dataset and variable', () => {
     expect(computeHref(sst, place)).toBe('https://oceanmetrics.io/erddap-places/#place=NERRS:WEL&dataset=dhw_5km&variable=CRW_SST')
   })
-  it('the variable falls back to the third part of the id', () => {
+  it('regression: the ERDDAP variable comes from the id, never the manifest variable (sst, dic)', () => {
+    expect(erddapVariable({ id: 'erddap:cmems_biogeochem_carbon:dissic:mean', variable: 'dic' } as never)).toBe('dissic')
+  })
+  it('the variable is the third part of the id', () => {
     expect(erddapVariable({ id: 'erddap:dhw_5km:CRW_BAA:share' })).toBe('CRW_BAA')
     expect(erddapVariable({ id: 'sdg:14.5.1' })).toBeNull()
   })

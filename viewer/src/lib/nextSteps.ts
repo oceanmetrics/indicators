@@ -32,9 +32,11 @@ export function requestHref(r: RequestInput): string {
   return `${SOURCE_HREF}/issues/new?template=indicator-request.yml&title=${enc(title)}&place=${enc(r.placeId)}&collection=${enc(r.collection)}&indicator=${enc(r.indicatorId)}`
 }
 
-/** the ERDDAP variable of an erddap-places indicator: the manifest's, else the third part of `erddap:<dataset>:<variable>:<stat>` */
-export function erddapVariable(ind: Pick<Indicator, 'id'> & { variable?: string }): string | null {
-  if (ind.variable) return ind.variable
+/**
+ * the ERDDAP variable of an erddap-places indicator: the third part of `erddap:<dataset>:<variable>:<stat>`. never the
+ * manifest's `variable`, which is the quantity measured across producers (`sst` for CRW_SST, `dic` for dissic).
+ */
+export function erddapVariable(ind: Pick<Indicator, 'id'>): string | null {
   const parts = ind.id.split(':')
   return parts[0] === 'erddap' && parts.length >= 4 ? parts[2] : null
 }
