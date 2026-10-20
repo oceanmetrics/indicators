@@ -152,3 +152,9 @@ def test_add_item_keeps_one_of_each_and_refuses_anything_else():
   assert add_item(["items/a.json"], "items/a.json") == ["items/a.json"]
   with pytest.raises(ValueError):
     add_item([], "../items/a.json")
+
+
+def test_a_tiny_job_says_its_count_in_full():
+  dims = {**DIMS, "time": {"extent": ["2025-01-01T00:00:00Z", "2025-12-31T00:00:00Z"], "step": "P1M"}}
+  t = classify({"place": "NERR:ELK", "indicator": "erddap:dhw_5km:CRW_SST:mean"}, MANIFEST, LAYERS, ROWS.get, lambda url: dims, lambda p, c, i: False, TODAY)
+  assert t.reasons[-1] == "48 grid values: small enough to run by itself"  # 2 x 2 cells of 0.05 deg x 12 months

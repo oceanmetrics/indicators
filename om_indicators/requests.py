@@ -145,7 +145,8 @@ def classify(form: dict[str, str], manifest: dict, layers: dict, place_row: Call
   if est > MAX_AUTO_VALUES:
     return Triage("needs-review", reasons + [f"about {est / 1e6:,.0f} M grid values, over the {MAX_AUTO_VALUES // 1_000_000} M limit for an automatic run"], estimate=est, links=links)
   job = {"dataset": parts[1], "variable": parts[2], "indicator": ind_id, "coll": coll, "place": place}
-  return Triage("auto", reasons + [f"about {est / 1e6:,.1f} M grid values: small enough to run by itself"], job=job, estimate=est, links=links)
+  size = f"about {est / 1e6:,.1f} M" if est >= 100_000 else f"{est:,}"
+  return Triage("auto", reasons + [f"{size} grid values: small enough to run by itself"], job=job, estimate=est, links=links)
 
 
 def check_job(job: dict[str, str]) -> dict[str, str]:
