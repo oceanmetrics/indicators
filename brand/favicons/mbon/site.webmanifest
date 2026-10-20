@@ -1,0 +1,23 @@
+{
+  "name": "Ocean Metrics Indicators · MBON",
+  "short_name": "MBON Indicators",
+  "description": "Marine indicators for any place, over time, from open data. Every number carries its dataset, method and place.",
+  "start_url": "./",
+  "display": "standalone",
+  "theme_color": "#f6fafb",
+  "background_color": "#f6fafb",
+  "icons": [
+    {
+      "src": "favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

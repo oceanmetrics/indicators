@@ -1,0 +1,23 @@
+{
+  "name": "Ocean Metrics Indicators",
+  "short_name": "OM Indicators",
+  "description": "Marine indicators for any place, over time, from open data. Every number carries its dataset, method and place.",
+  "start_url": "./",
+  "display": "standalone",
+  "theme_color": "#f4fafb",
+  "background_color": "#f4fafb",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

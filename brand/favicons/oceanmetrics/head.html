@@ -1,0 +1,29 @@
+<!-- Ocean Metrics Indicators: brand head (oceanmetrics theme). Paste verbatim into <head>, BEFORE any stylesheet.
+     Every path is relative to this file's folder. A site that serves the set elsewhere changes the "./" prefix
+     once, in every line below. The og:image and twitter:image URLs must be absolute for a crawler to fetch them:
+     a deployed page replaces "./" with its origin and path there.
+     Page titles are "<view> · Ocean Metrics Indicators", for example "Matrix · Ocean Metrics Indicators".
+     The inline script sets the theme before first paint, so there is no flash of the wrong colour. It follows the
+     kit's rule (@marinebon/ui theme.js): ?theme=light|dark, then localStorage "mbon-theme", then the system
+     prefers-color-scheme. It must stay inline. -->
+<script>(function(){var d=document.documentElement,t=null;try{var q=new URLSearchParams(location.search).get("theme");if(q==="light"||q==="dark")t=q}catch(e){}if(!t){try{var s=localStorage.getItem("mbon-theme");if(s==="light"||s==="dark")t=s}catch(e){}}if(!t){try{t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}catch(e){t="light"}}d.dataset.theme=t;d.style.colorScheme=t})();</script>
+<link rel="icon" type="image/svg+xml" href="./favicon.svg">
+<link rel="icon" type="image/x-icon" sizes="32x32" href="./favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+<link rel="manifest" href="./site.webmanifest">
+<meta name="theme-color" content="#f4fafb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a2831" media="(prefers-color-scheme: dark)">
+<meta property="og:site_name" content="Ocean Metrics Indicators">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Ocean Metrics Indicators">
+<meta property="og:description" content="Marine indicators for any place, over time, from open data. Every number carries its dataset, method and place.">
+<meta property="og:image" content="./og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Ocean Metrics Indicators: any place · any indicator · over time">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Ocean Metrics Indicators">
+<meta name="twitter:description" content="Marine indicators for any place, over time, from open data. Every number carries its dataset, method and place.">
+<meta name="twitter:image" content="./og-image.png">
