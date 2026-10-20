@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { TRANSPARENT, classedIds, fillColorExpr, lineColorExpr, lineWidthExpr, haloWidthExpr } from './paint.ts'
+import { DOT_IMAGE, DOT_MAXZOOM, TRANSPARENT, classedIds, fillColorExpr, focusFilter, lineColorExpr, lineWidthExpr, haloWidthExpr, memberDotsLayer, onlyFilter } from './paint.ts'
 
 const classOf = new Map([['NMS:B', 1], ['NMS:A', 0], ['NMS:C', 1]])
 
@@ -44,5 +44,36 @@ describe('the halo under classed outlines', () => {
   it('a darker ring under each classed place only', () => {
     expect(haloWidthExpr(['NMS:A', 'NMS:B'])).toEqual(['case', ['in', ['get', 'place_id'], ['literal', ['NMS:A', 'NMS:B']]], 4.5, 0])
     expect(haloWidthExpr([])).toBe(0)
+  })
+})
+
+describe('a derived part draws only its pieces', () => {
+  it('the filter keeps the features whose id is a piece, sorted; a whole layer has none', () => {
+    expect(onlyFilter(['FAO:87', 'FAO:21'])).toEqual(['in', ['get', 'place_id'], ['literal', ['FAO:21', 'FAO:87']]])
+    expect(onlyFilter(null)).toBeUndefined()
+  })
+  it('the selected place is outlined by the id of its feature; none selected matches nothing', () => {
+    expect(focusFilter('FAO:21')).toEqual(['==', ['get', 'place_id'], 'FAO:21'])
+    expect(focusFilter(null)).toEqual(['==', ['get', 'place_id'], ''])
+  })
+})
+
+describe('the hollow circles of the members that are not computed', () => {
+  it('a symbol layer below the zoom where outlines show, at every member the computed list does not hold', () => {
+    expect(memberDotsLayer('places', 'noaa_nerrs', ['NERRS:WEL', 'NERRS:ACE'])).toEqual({
+      id: 'places:dots', type: 'symbol', source: 'places', 'source-layer': 'noaa_nerrs', maxzoom: DOT_MAXZOOM,
+      layout: { 'icon-image': DOT_IMAGE, 'icon-allow-overlap': true, 'icon-ignore-placement': true },
+      filter: ['!', ['in', ['get', 'place_id'], ['literal', ['NERRS:ACE', 'NERRS:WEL']]]],
+    })
+  })
+  it('nothing computed: every member; the circles are visible only at small zooms', () => {
+    const l = memberDotsLayer('p', 'x', [])
+    expect('filter' in l).toBe(false)
+    expect(DOT_MAXZOOM).toBeGreaterThanOrEqual(5)
+    expect(DOT_MAXZOOM).toBeLessThanOrEqual(8)
+  })
+  it('a derived part limits the circles to its pieces', () => {
+    expect(memberDotsLayer('p', 'x', ['A'], ['A', 'B']).filter).toEqual(['all', ['in', ['get', 'place_id'], ['literal', ['A', 'B']]], ['!', ['in', ['get', 'place_id'], ['literal', ['A']]]]])
+    expect(memberDotsLayer('p', 'x', [], ['B', 'A']).filter).toEqual(['in', ['get', 'place_id'], ['literal', ['A', 'B']]])
   })
 })

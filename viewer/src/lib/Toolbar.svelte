@@ -4,14 +4,14 @@
   // display (the x on a header) is brought back by ticking it in a picker. all state lives in `view` (the URL hash).
   import { Button } from '@marinebon/ui'
   import { Icon } from '../../../src/icons/index.ts'
-  import type { Indicator, Layers, Vocab, VocabId } from './data.ts'
+  import type { Indicator, Layers, PlaceSet, Vocab, VocabId } from './data.ts'
   import { DEPTHS } from './hash.ts'
   import type { Depth, ViewState } from './hash.ts'
   import type { CoverageIndex, Place } from './matrix.ts'
   import type { TreeNode } from './report/tree.ts'
   import PlacePicker from './pick/PlacePicker.svelte'
   import IndicatorPicker from './pick/IndicatorPicker.svelte'
-  import { matrixChosen, multiLabel, placeGroups } from './pick/places.ts'
+  import { matrixChosen, multiLabel, placeGroups, placeSetInfos } from './pick/places.ts'
   import { multiIndicatorLabel } from './pick/indicators.ts'
 
   interface Props {
@@ -29,8 +29,10 @@
     displayed: Place[]
     /** the Report view opened with what the Matrix shows now (matrixToSpec) */
     reportHref?: string
+    /** the manifest's place sets */
+    sets?: PlaceSet[]
   }
-  let { view, idx, layers, groups, onchange, indicators, vocabs, shown, displayed, reportHref = '' }: Props = $props()
+  let { view, idx, layers, groups, onchange, indicators, vocabs, shown, displayed, reportHref = '', sets = [] }: Props = $props()
 
   const DEPTH_UI: Record<Depth, { label: string; icon: 'depth-skim' | 'depth-swim' | 'depth-dive'; note: string }> = {
     skim: { label: 'Skimmer', icon: 'depth-skim', note: 'Glyphs and the last value for each place.' },
@@ -40,11 +42,11 @@
 
   // ---- places ----
   const chosenPlaces = $derived(matrixChosen(idx, groups, view.hidePlaces))
-  const placeLabel = $derived(multiLabel(placeGroups(idx, layers), chosenPlaces))
+  const placeLabel = $derived(multiLabel(placeGroups(idx, layers), chosenPlaces, placeSetInfos(sets, placeGroups(idx, layers), layers)))
   // the rules of a tick arrive with the panel (a tick only happens in an open panel)
   async function tickPlace(node: { kind: 'collection' | 'place'; key: string }, on: boolean) {
     const { toggleMatrixPlaces } = await import('./pick/placesTree.ts')
-    onchange(toggleMatrixPlaces(idx, { colls: groups, hidePlaces: view.hidePlaces }, node, on))
+    onchange(toggleMatrixPlaces(idx, { colls: groups, hidePlaces: view.hidePlaces }, node, on, sets))
   }
 
   // ---- indicators ----
@@ -56,7 +58,7 @@
 </script>
 
 <section class="controls" aria-label="Matrix controls">
-  <PlacePicker mode="multi" {idx} {layers} label={placeLabel} chosen={chosenPlaces} ontoggle={tickPlace}
+  <PlacePicker mode="multi" {idx} {layers} {sets} label={placeLabel} chosen={chosenPlaces} ontoggle={tickPlace}
     removed={view.hidePlaces.length} onrestore={() => onchange({ hidePlaces: [] })} />
   <IndicatorPicker mode="multi" label={multiIndicatorLabel(shown.size, view.vocab, view.leads)} {indicators} {vocabs} vocab={view.vocab}
     onvocab={v => onchange({ vocab: v })} chosen={shown} {idx} places={displayed} ontoggle={tickInd}

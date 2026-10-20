@@ -198,11 +198,12 @@ if (t) {
   check(await hashChanged(was, 'xi='), `indicators picker: Space unticks it (${await page.evaluate(() => location.hash)})`)
   await closeWithEsc(t, 'indicators picker')
 }
-// Map, group: ArrowDown to the second group, Enter chooses it, the panel closes and focus returns to the button
+// Map, group: the place set is the first row, then the groups; ArrowDown to the second group, Enter chooses it, the panel closes and focus returns to the button
 await fresh('#view=map&ind=erddap:dhw_5km:CRW_SST:mean&coll=places')
 was = await page.evaluate(() => location.hash)
 t = await openWith(/places?\b/, 'group picker')
 if (t) {
+  await page.keyboard.press('ArrowDown')
   await page.keyboard.press('ArrowDown')
   await page.keyboard.press('ArrowDown')
   await page.keyboard.press('Enter')

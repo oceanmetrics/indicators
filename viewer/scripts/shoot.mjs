@@ -68,6 +68,24 @@ const choosePickerRow = key => async page => {
 const NERRS_PRECIP = 'view=map&ind=erddap:IMERG_monthly_global_precip:precipitation:mean&coll=noaa_nerrs&place=NERRS:WEL'
 const NERRS_MEMBER = 'view=map&ind=erddap:IMERG_monthly_global_precip:precipitation:mean&coll=noaa_nerrs&place=NERRS:ACE'
 const EEZ_OBIS = 'view=map&ind=obis:species&coll=mr_eez'
+// the political ocean: the EEZs (Marine Regions' WMS) over the high seas by FAO area (the FAO major areas' PMTiles), one scale
+const NERRS_ALL = 'view=map&ind=erddap:IMERG_monthly_global_precip:precipitation:mean&coll=noaa_nerrs'
+const POLITICAL = 'view=map&ind=obis:species&coll=set:political&grain=decade'
+// a real click at a longitude and latitude of the world view: the map opens framed on [-180, -85, 180, 85] with 24 px of padding,
+// so the click is placed from the canvas size by the Web Mercator formulae. then wait for the selected place to be named
+const clickAt = (lon, lat) => async page => {
+  await page.evaluate(() => document.querySelector('.map canvas').scrollIntoView({ block: 'center' }))
+  await new Promise(r => setTimeout(r, 300))
+  const b = await page.evaluate(() => { const r = document.querySelector('.map canvas').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height } })
+  const mercY = l => Math.log(Math.tan(Math.PI / 4 + (l * Math.PI) / 360)) / (2 * Math.PI)
+  const size = Math.min(b.w - 48, (b.h - 48) / (2 * mercY(85)))
+  const x = b.x + b.w / 2 + (lon / 360) * size
+  const y = b.y + b.h / 2 - mercY(lat) * size
+  await page.mouse.click(x, y)
+  await page.waitForFunction(() => document.querySelector('.pick .name')?.textContent, { timeout: 30000 })
+  await page.waitForSelector('.map[data-state=done]', { timeout: 60000 })
+  await new Promise(r => setTimeout(r, 800))
+}
 
 const SHOTS = [
   ['matrix_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, ''],
@@ -144,6 +162,23 @@ const SHOTS = [
   ['map_nerrs_member_oceanmetrics_light', 'oceanmetrics', 'light', MAP, NERRS_MEMBER],
   ['map_nerrs_member_mbon_dark_390', 'mbon', 'dark', MAP_PHONE, NERRS_MEMBER],
   ['map_eez_obis_oceanmetrics_light', 'oceanmetrics', 'light', MAP, EEZ_OBIS],
+  // the political set: EEZs over the high seas by FAO area, coloured by OBIS species richness (all taxa, latest decade)
+  ['map_political_species_oceanmetrics_light', 'oceanmetrics', 'light', MAP, POLITICAL],
+  ['map_political_species_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, POLITICAL],
+  ['map_political_species_mbon_light', 'mbon', 'light', MAP, POLITICAL],
+  ['map_political_species_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, POLITICAL],
+  ['map_political_species_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, POLITICAL],
+  // a click on the high seas (south-east Pacific, FAO 87) selects the piece, not the FAO area; a click inside an EEZ (Easter Island)
+  // selects the EEZ, though the FAO area lies below it
+  ['map_political_click_highseas_oceanmetrics_light', 'oceanmetrics', 'light', MAP, POLITICAL, clickAt(-105, -45)],
+  ['map_political_click_highseas_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, POLITICAL, clickAt(-105, -45)],
+  ['map_political_click_eez_oceanmetrics_light', 'oceanmetrics', 'light', MAP, POLITICAL, clickAt(-109, -27)],
+  // the group picker lists the set above the groups
+  ['map_sets_picker_oceanmetrics_light', 'oceanmetrics', 'light', MAP, POLITICAL, openPicker('Place group')],
+  ['matrix_sets_picker_oceanmetrics_dark', 'oceanmetrics', 'dark', DESKTOP, '', openPicker('Places')],
+  // the NERRs at continental zoom: Wells coloured, the 29 others as faint outlines and small hollow circles
+  ['map_nerrs_continental_oceanmetrics_light', 'oceanmetrics', 'light', MAP, NERRS_ALL],
+  ['map_nerrs_continental_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, NERRS_ALL],
   // the Place view's pickers
   ['place_place_picker_oceanmetrics_light', 'oceanmetrics', 'light', PLACE, FKNMS, openPicker('Place')],
   ['place_place_picker_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PLACE_PHONE, FKNMS, openPicker('Place')],

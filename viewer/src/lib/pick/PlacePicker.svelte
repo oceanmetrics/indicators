@@ -3,7 +3,7 @@
   // modes: `multi` (Matrix, Report: tick groups and places), `group` (Map: exactly one group), `place` (Place view: one place;
   // choosing hands it back and the caller navigates).
   import Popover from './Popover.svelte'
-  import type { Layers } from '../data.ts'
+  import type { Layers, PlaceSet } from '../data.ts'
   import type { CoverageIndex } from '../matrix.ts'
   import type { GroupNote, PickMode } from './places.ts'
 
@@ -26,8 +26,10 @@
     removed?: number
     onrestore?: () => void
     kicker?: string
+    /** the place sets offered above the groups (multi: a tick; group: one choice); none in the Place view and the Report builder */
+    sets?: PlaceSet[]
   }
-  let { mode, idx, layers, label, chosen = new Set(), ontoggle, current = null, onchoose, noteOf = () => null, removed = 0, onrestore, kicker = mode === 'place' ? 'Place' : mode === 'group' ? 'Place group' : 'Places' }: Props = $props()
+  let { mode, idx, layers, label, chosen = new Set(), ontoggle, current = null, onchoose, noteOf = () => null, removed = 0, onrestore, kicker = mode === 'place' ? 'Place' : mode === 'group' ? 'Place group' : 'Places', sets = [] }: Props = $props()
 
   // the panel is its own chunk: nothing of it is fetched until the button is first pressed
   let Panel = $state.raw<typeof import('./PlacePanel.svelte').default | null>(null)
@@ -37,7 +39,7 @@
 <Popover {label} {kicker} icon="view-place" onopen={load}>
   {#snippet children(close)}
     {#if Panel}
-      <Panel {mode} {idx} {layers} {chosen} {ontoggle} {current} {onchoose} {noteOf} {removed} {onrestore} {close} />
+      <Panel {mode} {idx} {layers} {sets} {chosen} {ontoggle} {current} {onchoose} {noteOf} {removed} {onrestore} {close} />
     {:else}
       <p role="status">Loading the places…</p>
     {/if}

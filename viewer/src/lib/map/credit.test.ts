@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Indicator } from '../data.ts'
-import { basemapCredit, dataCredit, layerCredit } from './credit.ts'
+import { basemapCredit, dataCredit, layerCredit, partsCredit } from './credit.ts'
 
 describe('the credit lines', () => {
   it('the basemap is named for the theme', () => {
@@ -25,5 +25,20 @@ describe('the credit lines', () => {
     expect(dataCredit({ ...ind, dataset: { ...ind.dataset, license: undefined, providers: [] } } as unknown as Indicator)).toBe('Data: CRW SST')
     expect(dataCredit({ ...ind, dataset: { ...ind.dataset, license: 'other' } } as unknown as Indicator)).toBe('Data: CRW SST (NOAA CRW)')
     expect(dataCredit({ ...ind, dataset: { ...ind.dataset, license: 'various' } } as unknown as Indicator)).toBe('Data: CRW SST (NOAA CRW)')
+  })
+})
+
+describe('the credit of the parts drawn', () => {
+  const eez = { title: 'EEZ', attribution: 'Flanders Marine Institute (2023).', source_link: { href: 'u', title: 'Marine Regions (VLIZ)' } }
+  const fao = { title: 'FAO', attribution: 'FAO. 2024. Major Fishing Areas.', source_link: null }
+  it('one group: its attribution and its source', () => {
+    expect(partsCredit([eez])).toBe('Places: Flanders Marine Institute (2023) (Marine Regions (VLIZ))')
+  })
+  it('a set: each group’s attribution, once', () => {
+    expect(partsCredit([fao, eez, eez])).toBe('Places: FAO. 2024. Major Fishing Areas. Flanders Marine Institute (2023) (Marine Regions (VLIZ))')
+  })
+  it('the title stands in for a missing attribution, and nothing gives nothing', () => {
+    expect(partsCredit([{ title: 'T', attribution: '', source_link: null }])).toBe('Places: T')
+    expect(partsCredit([])).toBe('')
   })
 })

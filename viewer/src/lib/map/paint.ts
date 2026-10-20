@@ -53,3 +53,36 @@ export function lineWidthExpr(ids: string[], known: string[] = []): Expr {
 export function haloWidthExpr(ids: string[]): Expr {
   return ids.length ? ['case', ['in', ['get', 'place_id'], ['literal', ids]], 4.5, 0] : 0
 }
+
+// ---- derived parts: only the features that are pieces of the group ----
+
+/** the filter that keeps only the features of the layer that are pieces of a derived group (`only` = their ids); no filter for a whole layer */
+export function onlyFilter(only: string[] | null): Expr | undefined {
+  return only ? ['in', ['get', 'place_id'], ['literal', [...only].sort()]] : undefined
+}
+
+/** the filter of the selected place's outline: the feature with this id */
+export const focusFilter = (featureId: string | null): Expr => ['==', ['get', 'place_id'], featureId ?? '']
+
+// ---- members that are not computed, seen from far away ----
+
+/** below this zoom a member's outline is too small to see, so it is also drawn as a small hollow circle */
+export const DOT_MAXZOOM = 7
+/** the image of the hollow circle (drawn by the canvas in the faint colour) */
+export const DOT_IMAGE = 'om-member-ring'
+
+/**
+ * the symbol layer of the hollow circles: one at the label point of each member of the collection that is not computed (`known`
+ * lists the computed ones), only below DOT_MAXZOOM, and only among the pieces of a derived part (`only`). the circle takes
+ * its colour from the image, which the canvas draws in the same faint token as the outlines.
+ */
+export function memberDotsLayer(source: string, sourceLayer: string, known: string[], only: string[] | null = null): Record<string, unknown> {
+  const notKnown: Expr | undefined = known.length ? ['!', ['in', ['get', 'place_id'], ['literal', [...known].sort()]]] : undefined
+  const keep = onlyFilter(only)
+  const filter = notKnown && keep ? ['all', keep, notKnown] : notKnown ?? keep
+  return {
+    id: `${source}:dots`, type: 'symbol', source, 'source-layer': sourceLayer, maxzoom: DOT_MAXZOOM,
+    layout: { 'icon-image': DOT_IMAGE, 'icon-allow-overlap': true, 'icon-ignore-placement': true },
+    ...(filter ? { filter } : {}),
+  }
+}

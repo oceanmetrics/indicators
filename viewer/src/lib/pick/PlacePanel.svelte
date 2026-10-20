@@ -8,10 +8,10 @@
   import Tree from '../report/Tree.svelte'
   import PickSearch from './PickSearch.svelte'
   import type { TreeNode } from '../report/tree.ts'
-  import type { Layers } from '../data.ts'
+  import type { Layers, PlaceSet } from '../data.ts'
   import type { CoverageIndex } from '../matrix.ts'
   import { arrowNav } from './nav.ts'
-  import { placeGroups } from './places.ts'
+  import { placeGroups, placeSetInfos } from './places.ts'
   import type { GroupNote, PickMode } from './places.ts'
   import { groupPickNodes, placePickTree, uncomputedCollections } from './placesTree.ts'
 
@@ -19,6 +19,7 @@
     mode: PickMode
     idx: CoverageIndex
     layers: Layers
+    sets?: PlaceSet[]
     chosen: ReadonlySet<string>
     ontoggle?: (node: { kind: 'collection' | 'place'; key: string }, on: boolean) => void
     current: string | null
@@ -28,18 +29,19 @@
     onrestore?: () => void
     close: () => void
   }
-  let { mode, idx, layers, chosen, ontoggle, current, onchoose, noteOf, removed, onrestore, close }: Props = $props()
+  let { mode, idx, layers, sets = [], chosen, ontoggle, current, onchoose, noteOf, removed, onrestore, close }: Props = $props()
 
   let query = $state('')
   let root = $state<HTMLDivElement>()
   // the panel arrives after the button was pressed (it is loaded on the first open): the search box takes the focus now
   onMount(() => root?.querySelector<HTMLElement>('[data-autofocus]')?.focus())
   const groups = $derived(placeGroups(idx, layers))
+  const setInfos = $derived(placeSetInfos(sets, groups, layers))
   const searching = $derived(query.trim() !== '')
   // a search is the same tree narrowed to the places that match (every group open); the group picker lists groups until one is typed
   const nodes = $derived<TreeNode[]>(
-    mode === 'group' && !searching ? groupPickNodes(groups, current, noteOf)
-      : placePickTree(groups, mode === 'place' ? new Set(current ? [current] : []) : mode === 'multi' ? chosen : new Set(), query),
+    mode === 'group' && !searching ? groupPickNodes(groups, current, noteOf, setInfos)
+      : placePickTree(groups, mode === 'place' ? new Set(current ? [current] : []) : mode === 'multi' ? chosen : new Set(), query, mode === 'multi' ? setInfos : []),
   )
   const nHits = $derived(nodes.reduce((n, g) => n + g.children.length, 0))
   const uncomputed = $derived(uncomputedCollections(layers, idx))

@@ -76,14 +76,14 @@
   let placeT0 = $state(0)
   let placeMs = $state<number | null>(null)
 
-  const title = (coll: string) => collTitle(coll, layers)
+  const title = (coll: string) => collTitle(coll, layers, catalog?.manifest.place_sets)
   const total = (coll: string) => layers[coll]?.n ?? null
   const patch = (p: Partial<ViewState>) => { view = { ...view, ...p } }
 
   // ---- derived tables ----
   const idx = $derived(catalog ? indexCoverage(catalog.coverage) : null)
   // the groups on display: those asked for, else the sanctuaries (every group while searching)
-  const groups = $derived(idx ? shownGroups(idx.colls, view.colls, view.q) : [])
+  const groups = $derived(idx ? shownGroups(idx.colls, view.colls, view.q, catalog?.manifest.place_sets) : [])
   const allCols = $derived(catalog
     ? groupColumns(catalog.manifest.indicators, catalog.manifest.vocabularies, view.vocab, view.leads, { add: view.addInds, hide: view.hideInds })
     : [])
@@ -225,7 +225,7 @@
         <p class="status" role="status">Loading the report…</p>
       {/if}
     {:else if catalog && idx}
-      <Toolbar {view} {idx} {layers} {groups} onchange={patch} indicators={catalog.manifest.indicators} vocabs={catalog.manifest.vocabularies} {shown} {displayed} reportHref={matrixReportHref} />
+      <Toolbar {view} {idx} {layers} {groups} sets={catalog.manifest.place_sets} onchange={patch} indicators={catalog.manifest.indicators} vocabs={catalog.manifest.vocabularies} {shown} {displayed} reportHref={matrixReportHref} />
       <p class="summary" role="status" aria-live="polite">
         <Icon name="view-matrix" size={18} />
         <span>

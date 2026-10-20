@@ -88,7 +88,7 @@
     <Notice kind="warn">{missing}</Notice>
   {:else if catalog && mapView}
     {#if MapView}
-      <MapView {catalog} view={mapView} titles={c => collTitle(c)} onpatch={patchMap} />
+      <MapView {catalog} view={mapView} titles={c => collTitle(c, {}, catalog?.manifest.place_sets)} onpatch={patchMap} />
       <p class="credit om-note"><a href={mapHome} target="_top">View in Ocean Metrics Indicators</a></p>
     {:else}
       <p class="status" role="status">Loading the map…</p>

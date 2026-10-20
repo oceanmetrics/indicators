@@ -17,6 +17,22 @@ export function layerCredit(layer: Pick<GazLayer, 'title' | 'attribution'> | nul
   return layer ? `Places: ${layer.attribution || layer.title}` : ''
 }
 
+/**
+ * the credit of the places the parts draw: each group's own attribution once (a set shares a source between groups), with the
+ * link text of its source in brackets; "Places: ..." or nothing
+ */
+export function partsCredit(layers: readonly Pick<GazLayer, 'title' | 'attribution' | 'source_link'>[]): string {
+  const seen = new Set<string>()
+  const lines: string[] = []
+  for (const l of layers) {
+    const text = (l.attribution || l.title).replace(/\.+$/, '')
+    if (seen.has(text)) continue
+    seen.add(text)
+    lines.push(text + (l.source_link ? ` (${l.source_link.title})` : ''))
+  }
+  return lines.length ? `Places: ${lines.join('. ')}` : ''
+}
+
 /** the dataset, the organisations that produce or license it, and its licence */
 export function dataCredit(ind: Pick<Indicator, 'dataset'>): string {
   const who = ind.dataset.providers.filter(p => p.roles.some(r => r === 'producer' || r === 'licensor')).map(p => p.name)

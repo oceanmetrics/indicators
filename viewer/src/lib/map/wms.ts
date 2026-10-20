@@ -44,13 +44,17 @@ const OGC_ENV =
  * the SLD: rule one outlines the places with no ENV entry (no fill, so the basemap shows); the else rule fills the
  * rest with the colour of their class, a Recode over the ENV value, 85 % opaque, with a thin line round it.
  */
-export function sldBody(layer: string, idField: string, colors: string[], noneStroke: string, lineStroke: string): string {
+export function sldBody(layer: string, idField: string, colors: string[], noneStroke: string, lineStroke: string, noneFill: string | null = null): string {
   const env = OGC_ENV(idField)
+  // under a layer of ours (a place set draws the FAO areas below the EEZs): every fill is opaque and the places with no class are
+  // filled too, with the colour `noneFill`, so nothing below shows through them
+  const opacity = noneFill ? '1' : '0.85'
+  const noneRule = noneFill ? `<Fill><CssParameter name="fill">${noneFill}</CssParameter><CssParameter name="fill-opacity">1</CssParameter></Fill>` : ''
   const recode = `<ogc:Function name="Recode">${env}${colors.map((c, k) => `<ogc:Literal>${k}</ogc:Literal><ogc:Literal>${c}</ogc:Literal>`).join('')}</ogc:Function>`
   return `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc"><NamedLayer><Name>${layer}</Name><UserStyle><FeatureTypeStyle>` +
     `<Rule><ogc:Filter><ogc:PropertyIsEqualTo>${env}<ogc:Literal>x</ogc:Literal></ogc:PropertyIsEqualTo></ogc:Filter>` +
-    `<PolygonSymbolizer><Stroke><CssParameter name="stroke">${noneStroke}</CssParameter><CssParameter name="stroke-width">0.8</CssParameter></Stroke></PolygonSymbolizer></Rule>` +
-    `<Rule><ElseFilter/><PolygonSymbolizer><Fill><CssParameter name="fill">${recode}</CssParameter><CssParameter name="fill-opacity">0.85</CssParameter></Fill>` +
+    `<PolygonSymbolizer>${noneRule}<Stroke><CssParameter name="stroke">${noneStroke}</CssParameter><CssParameter name="stroke-width">0.8</CssParameter></Stroke></PolygonSymbolizer></Rule>` +
+    `<Rule><ElseFilter/><PolygonSymbolizer><Fill><CssParameter name="fill">${recode}</CssParameter><CssParameter name="fill-opacity">${opacity}</CssParameter></Fill>` +
     `<Stroke><CssParameter name="stroke">${lineStroke}</CssParameter><CssParameter name="stroke-width">0.5</CssParameter></Stroke></PolygonSymbolizer></Rule>` +
     `</FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`
 }
@@ -62,12 +66,14 @@ const encEnv = (s: string) => encodeURIComponent(s).replace(/%3A/gi, ':').replac
  * a MapLibre raster tile URL: one WMS GetMap per 256-px tile (`{bbox-epsg-3857}` is MapLibre's), the places coloured by
  * their class. colours are resolved CSS colours read from the theme's tokens, in class order.
  */
-export function wmsTileUrl(raster: Pick<RasterRef, 'tiles'>, entries: WmsEntry[], colors: string[], noneStroke: string, lineStroke: string, idField = 'mrgid'): string {
+export function wmsTileUrl(
+  raster: Pick<RasterRef, 'tiles'>, entries: WmsEntry[], colors: string[], noneStroke: string, lineStroke: string, idField = 'mrgid', noneFill: string | null = null,
+): string {
   const layer = layerName(raster)
   const q = [
     'SERVICE=WMS', 'VERSION=1.1.1', 'REQUEST=GetMap', `LAYERS=${layer}`, 'STYLES=', 'SRS=EPSG:3857', 'BBOX={bbox-epsg-3857}',
     'WIDTH=256', 'HEIGHT=256', 'FORMAT=image/png', 'TRANSPARENT=true',
-    `SLD_BODY=${encodeURIComponent(sldBody(layer, idField, colors, noneStroke, lineStroke))}`,
+    `SLD_BODY=${encodeURIComponent(sldBody(layer, idField, colors, noneStroke, lineStroke, noneFill))}`,
     `ENV=${encEnv(envString(entries))}`,
   ]
   return `${wmsEndpoint(raster)}?${q.join('&')}`

@@ -86,3 +86,23 @@ describe('GetFeatureInfo', () => {
     expect(bbox[3]).toBe(90)
   })
 })
+
+describe('the SLD under a layer of ours (a place set)', () => {
+  const sld = sldBody('eez', 'mrgid', ['red', 'blue'], 'grey', LINE, 'tint')
+  it('fills the places with no class with the no-data colour, opaque, before their outline', () => {
+    const none = sld.split('<Rule>')[1]
+    expect(none).toContain('<PolygonSymbolizer><Fill><CssParameter name="fill">tint</CssParameter><CssParameter name="fill-opacity">1</CssParameter></Fill><Stroke>')
+  })
+  it('fills the classes fully opaque, so what is drawn below does not show through', () => {
+    const fill = sld.split('<Rule>')[2]
+    expect(fill).toContain('<CssParameter name="fill-opacity">1</CssParameter>')
+    expect(fill).not.toContain('0.85')
+  })
+  it('without the no-data colour the SLD is the single-group one, byte for byte', () => {
+    expect(sldBody('eez', 'mrgid', ['red', 'blue'], 'grey', LINE, null)).toBe(sldBody('eez', 'mrgid', ['red', 'blue'], 'grey', LINE))
+  })
+  it('the tile URL carries it', () => {
+    const url = wmsTileUrl(RASTER, [{ id: '8456', k: 0 }], COLORS.slice(0, 1), 'grey', LINE, 'mrgid', 'tint')
+    expect(decodeURIComponent(url.split('SLD_BODY=')[1].split('&ENV=')[0])).toContain('<CssParameter name="fill">tint</CssParameter>')
+  })
+})
