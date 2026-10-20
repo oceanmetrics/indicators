@@ -106,6 +106,7 @@ gazetteer's total and links to it (a group nothing is computed for also links to
 first 300 and says how to narrow it). Opens on the National Marine Sanctuaries (the `places` collection: the `NMS:*` ids; `noaa_sanctuaries` holds the ONMS section ids, another id space). An indicator with no value for
 any place on display is hidden, unless none has a value (places no one has computed yet: all stay, so each empty cell can be asked for).
 A place of a **derived** gazetteer layer (the high seas by FAO area, `fao_high_seas`, which has no geometry of its own) also carries `display_id` in `coverage.parquet`: its index `source_id` (`FAO:21`), the id of the feature of the layer that draws it (`fao_major_areas`); null for any other place.
+Every row also carries `lat` and `lon`, the centre of the place's bbox in the gazetteer index (`src/coverage/centre.ts`: the index writes the bbox of a place that crosses the antimeridian with its east beyond 180, so the longitude is unwrapped before the middle is taken, then put back in -180..180; 4 decimals; null when the index has no bbox). They order places north to south and west to east ("Order" below); the places picked from the whole gazetteer get the same centre from the same function.
 
 **The selection** is one object, shared by the Matrix, Map, Report and Place views, chosen in the **Select section** above the view tabs (every view
 but the Place view's body; the Place view carries it in its hash and its links). It is the report spec's own `places` and `indicators` rules
