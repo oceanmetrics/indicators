@@ -409,6 +409,7 @@ check(!!t, `order control: Tab reaches its button${t ? ` ("${t.f.label}")` : ''}
 if (t) {
   await page.keyboard.press('Enter')
   check(await page.waitForSelector('.pop[role=dialog]', { timeout: 10000 }).then(() => true, () => false), 'order control: Enter opens the panel')
+  await page.waitForSelector('.pop .om-row button', { timeout: 10000 })   // the panel is a lazy chunk: wait for its content before Tab
   const ns = await tabUntil(f => f.tag === 'BUTTON' && f.label === 'North to south', 20)
   check(!!ns, 'order control: Tab reaches "North to south"')
   if (ns) {

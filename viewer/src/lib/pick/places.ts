@@ -6,6 +6,8 @@ import type { Layers, PlaceSet } from '../data.ts'
 import { isPolygonLayer } from '../gazetteerPlaces.ts'
 import { setRef } from '../sets.ts'
 import { orderGroups, shortPlaceName } from '../matrix.ts'
+import { orderPlaces } from '../../../../src/report/order.ts'
+import type { AxisOrder, PlaceSort } from '../../../../src/report/order.ts'
 import type { CoverageIndex, Place } from '../matrix.ts'
 
 export type PickMode = 'multi' | 'place'
@@ -28,6 +30,8 @@ export interface GroupOpts {
   all?: boolean
   /** the gazetteer's places are read (the universe holds them) */
   gazetteer?: boolean
+  /** the order of the places (the Select section's): within a group the computed places come first, then the others in this order; absent = by name */
+  order?: AxisOrder<PlaceSort>
 }
 
 /**
@@ -46,7 +50,9 @@ export function placeGroups(universe: Place[], idx: CoverageIndex, layers: Layer
       .sort((a, b) => (rank.get(a) ?? 1e9) - (rank.get(b) ?? 1e9) || collTitle(a, layers).localeCompare(collTitle(b, layers)))
     : []
   return [...orderGroups(idx.colls), ...others].map(coll => {
-    const places = (by.get(coll) ?? []).slice().sort((a, b) => Number(computedIds.has(b.id)) - Number(computedIds.has(a.id)) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+    const mine = by.get(coll) ?? []
+    const inOrder = orderPlaces(mine, { ...(opts.order ?? { sort: 'az', custom: [] }), group: true }, c => c).flatMap(g => g.items)
+    const places = [...inOrder.filter(p => computedIds.has(p.id)), ...inOrder.filter(p => !computedIds.has(p.id))]
     const computed = nComputed.get(coll) ?? 0
     const total = layers[coll]?.n ?? null
     return { coll, title: collTitle(coll, layers), computed, total, places, loaded: !!opts.gazetteer || (computed > 0 && (total == null || computed >= total)) }

@@ -6,7 +6,7 @@ import type { AxisOrder, IndicatorSort, OrderSpec, PlaceSort } from '../../../..
 
 export type OrderAxisName = 'places' | 'indicators'
 
-const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1)
+const lower = (s: string) => (s === 'A to Z' ? s : s.charAt(0).toLowerCase() + s.slice(1))
 
 /** "north to south", "north to south, ungrouped": what one axis is in, in a few words */
 function axisWords(sort: string, words: Record<string, string>, a: AxisOrder<string>): string {

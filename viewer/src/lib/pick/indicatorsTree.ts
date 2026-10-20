@@ -7,6 +7,8 @@ import type { CoverageIndex, Place } from '../matrix.ts'
 import type { Check, TreeNode } from '../report/tree.ts'
 import { CAT_OTHER, toggleCategory, toggleIndicator, toggleSeries } from '../report/tree.ts'
 import type { IndSel } from '../selection.ts'
+import { orderIndicators } from '../../../../src/report/order.ts'
+import type { AxisOrder, IndicatorSort } from '../../../../src/report/order.ts'
 
 /** for each indicator, the ids of the given places that have a value for it (the row a Matrix cell would show) */
 export function placesWithValue(idx: CoverageIndex, places: Pick<Place, 'id'>[], indicators: Indicator[]): Map<string, Set<string>> {
@@ -35,13 +37,15 @@ export interface IndicatorTreeOpts {
   query?: string
   /** a hint of its own for a leaf (the Place view: "not computed yet"); the group nodes then carry none */
   hintOf?: (ind: Indicator) => string
+  /** the order of the categories and of the series in them (the Select section's); absent = the vocabulary's order */
+  order?: AxisOrder<IndicatorSort>
 }
 
 const ofPlaces = (n: number, of: number) => `${n} of ${of} places`
 const check = (on: number, of: number): Check => (on === 0 ? 'unchecked' : on === of ? 'checked' : 'mixed')
 
 /**
- * the tree of indicators the picker lists: categories in the vocabulary's order ("Other" last), each series under its lead's
+ * the tree of indicators the picker lists: categories in the order given (the vocabulary's by default; "Other" last), each series under its lead's
  * category with its lead as the series' own box and the other members under "more". an indicator is listed when some
  * place of the selection has a value for it, when `showEmpty` is on or when it is chosen already; a search keeps the
  * leaves it matches.
@@ -76,11 +80,13 @@ export function buildIndicatorPickTree(o: IndicatorTreeOpts): TreeNode[] {
     })
   }
   const out: TreeNode[] = []
-  for (const term of [...terms, { id: CAT_OTHER, label: 'Other' }]) {
-    const kids = [...seriesOf.values()].filter(({ lead }) => {
-      const tag = lead.category[vocab]
-      return term.id === CAT_OTHER ? !tag || !known.has(tag) : tag === term.id
-    }).map(x => x.node)
+  // the leads in the order given, by category: the sort key and the custom order of the Select section (always grouped here: this is a tree of categories)
+  const leads = [...seriesOf.values()].map(x => x.lead)
+  const groups = orderIndicators(leads, { ...(o.order ?? { sort: 'vocab', custom: [] }), group: true }, vocab, terms)
+  const labelOf = new Map<string, string>([...terms.map(t => [t.id, t.label] as [string, string]), [CAT_OTHER, 'Other']])
+  for (const g of groups) {
+    const term = { id: g.id, label: labelOf.get(g.id) ?? g.id }
+    const kids = g.items.map(lead => seriesOf.get(lead.series)!.node)
     if (!kids.length) continue
     const on = kids.filter(k => k.children[0].state === 'checked').length
     out.push({

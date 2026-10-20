@@ -6,6 +6,7 @@
   import type { Indicator, Vocab, VocabId } from '../data.ts'
   import type { TreeNode } from '../report/tree.ts'
   import type { CoverageIndex, Place } from '../matrix.ts'
+  import type { AxisOrder, IndicatorSort } from '../../../../src/report/order.ts'
 
   interface Props {
     mode: 'multi' | 'single'
@@ -34,6 +35,8 @@
     hintOf?: (ind: Indicator) => string
     /** single: the way to the whole list ("another indicator": the Map lists the selection's indicators only) */
     onother?: () => void
+    /** the order of the categories and of the series in them */
+    order?: AxisOrder<IndicatorSort>
   }
   let props: Props = $props()
   let pop: { show: () => void } | undefined = $state()

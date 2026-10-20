@@ -40,7 +40,7 @@
 
   // ---- places ----
   const chosenPlaces = $derived(new Set(places.map(p => p.id)))
-  const groups = $derived(placeGroups(universe, idx, layers, { all: true, gazetteer }))
+  const groups = $derived(placeGroups(universe, idx, layers, { all: true, gazetteer, order: view.spec.order.places }))
   const placeWords = $derived(multiLabel(groups, chosenPlaces, placeSetInfos(sets, groups)))
   const setSelection = (sel: Partial<Selection>) => onchange({ spec: withSelection(view, sel).spec })
   // the rules of a tick arrive with the panel (a tick only happens in an open panel)
@@ -66,10 +66,10 @@
 
 <section class="select" aria-label="Selection: places and indicators">
   <div class="pickers">
-    <PlacePicker mode="multi" {idx} {universe} {layers} {sets} label={placeWords} chosen={chosenPlaces} ontoggle={tickPlace} {gazetteer} {loading} ongazetteer={ongazetteer} />
+    <PlacePicker mode="multi" {idx} {universe} {layers} {sets} label={placeWords} chosen={chosenPlaces} ontoggle={tickPlace} {gazetteer} {loading} ongazetteer={ongazetteer} order={view.spec.order.places} />
     <IndicatorPicker bind:this={indPicker} mode="multi" label={multiIndicatorLabel(indicators.length, view.vocab, leadsOnly(view.spec.indicators))} indicators={m.indicators} vocabs={m.vocabularies}
       vocab={view.vocab} onvocab={v => onchange({ vocab: v })} chosen={chosenInds} {idx} places={computedChosen} nPlaces={places.length} ontoggle={tickInd}
-      leads={leadsOnly(view.spec.indicators)} onleads={v => setSelection({ indicators: setLeadsOnly(view.spec.indicators, v) })}
+      order={view.spec.order.indicators} leads={leadsOnly(view.spec.indicators)} onleads={v => setSelection({ indicators: setLeadsOnly(view.spec.indicators, v) })}
       showEmpty={view.showEmpty} onempty={v => onchange({ showEmpty: v })} />
     <OrderPicker order={view.spec.order} vocab={view.vocab} onchange={order => setSelection({ order })} />
   </div>

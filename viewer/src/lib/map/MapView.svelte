@@ -30,6 +30,7 @@
   import IndicatorPicker from '../pick/IndicatorPicker.svelte'
   import { placesWithValueAnywhere } from '../pick/indicatorsTree.ts'
   import { MODE_LABELS, mapModel, periodToT } from './classes.ts'
+  import type { MapItem } from './classes.ts'
   import { basemapCredit, dataCredit, partsCredit } from './credit.ts'
   import { loadGazetteer } from './gazetteer.ts'
   import type { GazLayer } from './gazetteer.ts'
@@ -42,6 +43,8 @@
   import type { FullMode } from './frame.ts'
   import MapLegend from './MapLegend.svelte'
   import MapTable from './MapTable.svelte'
+  import { tableInOrder } from './tableOrder.ts'
+  import { isDefaultAxis } from '../../../../src/report/order.ts'
 
   interface Props {
     catalog: Catalog
@@ -67,6 +70,8 @@
   const sets = $derived(m.place_sets ?? [])
   const selPlaces = $derived(view.spec.places)
   const places = $derived(universe ?? (needsPlaces(selPlaces) ? indexCoverage(catalog.coverage).places : null))
+  // the table follows the order the reader chose for the places (Select section); the default is its class order
+  const inOrder = $derived(isDefaultAxis(view.spec.order.places) ? null : (items: MapItem[]) => tableInOrder(items, places ?? [], view.spec.order.places, titles))
   const chosenGroups = $derived(selectionGroups(selPlaces, places, sets, selPlaces.include.includes('*') ? orderGroups(catalog.coverage.map(groupOf)) : []))
   const members = $derived(chosenGroups.map(g => g.group))
   const keep = $derived(placeFilter(chosenGroups))
@@ -227,7 +232,7 @@
 {:else}
   <section class="controls" aria-label="Map controls">
     <IndicatorPicker mode="single" label={family ? FAMILY_LABEL : ind.short} indicators={pickList} vocabs={m.vocabularies} vocab={view.vocab}
-      onvocab={v => onpatch({ vocab: v })} chosen={chosenInd} withValues={have} nPlaces={nSelected} onchoose={chooseInd} {onother} />
+      onvocab={v => onpatch({ vocab: v })} chosen={chosenInd} withValues={have} nPlaces={nSelected} onchoose={chooseInd} {onother} order={view.spec.order.indicators} />
     {#if family}
       <div class="group">
         <Select label="Metric" value={family.metric} options={family.metrics.map(c => ({ value: c.id, label: c.label }))}
@@ -344,7 +349,7 @@
     </aside>
   </div>
 
-  <MapTable {model} placeHref={toPlace} selected={selectedId} caption={`${ind.title}, ${selTitle}: value, period and class of every place`} />
+  <MapTable {model} {inOrder} placeHref={toPlace} selected={selectedId} caption={`${ind.title}, ${selTitle}: value, period and class of every place`} />
 {/if}
 
 <style>

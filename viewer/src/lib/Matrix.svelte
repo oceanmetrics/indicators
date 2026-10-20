@@ -158,6 +158,9 @@
      button, shown on focus, goes straight to the first cell -->
 <button type="button" class="skip" onclick={() => box?.querySelector<HTMLButtonElement>('button.cell')?.focus()}>Skip to the first cell</button>
 <p class="mbon-sr-only" role="status" aria-live="polite">{said}</p>
+{#if !gp}
+  {#each rows as g (g.coll)}{#if g.total}<p class="om-note">The first {g.places.length} of {g.total.toLocaleString('en-US')} places: search, or pick places in the Select section, to narrow it.</p>{/if}{/each}
+{/if}
 <div class="box" role="region" aria-label={indRows ? 'Indicators by places' : 'Places by indicators'} tabindex="-1" bind:this={box}>
   <table class="matrix om-t" class:indrows={indRows} class:nogroups={indRows ? !gp : !gi}>
     <thead>
@@ -304,9 +307,6 @@
   @media (hover: none) {
     .x { opacity: 1; width: 2rem; height: 2rem; top: 0; right: 0; }
     th.colh, th.rowh { padding-right: 2.25rem; }
-    .mv, .mv.inl { position: static; opacity: 1; pointer-events: auto; display: flex; width: max-content; margin: var(--space-1) 0 0; }
-    .mv button { width: 2rem; height: 2rem; }
-    .box :global(th[draggable='true']) { cursor: auto; }
   }
   @media (prefers-reduced-motion: reduce) { .x, .mv { transition: none; } }
 
@@ -329,6 +329,12 @@
   .box :global(th[data-drop='before'][data-dir='row']) { box-shadow: inset 0 4px 0 var(--accent); }
   .box :global(th[data-drop='after'][data-dir='row']) { box-shadow: inset 0 -4px 0 var(--accent); }
   .box :global(th[data-drop='no']) { cursor: no-drop; outline: 2px dashed var(--border-strong); outline-offset: -3px; }
+  @media (hover: none) {
+    .mv, .mv.inl { position: static; opacity: 1; pointer-events: auto; display: flex; width: max-content; margin: var(--space-1) 0 0; }
+    .mv.inl { display: inline-flex; margin: 0 0 0 var(--space-2); }
+    .mv button { width: 2rem; height: 2rem; }
+    .box :global(th[draggable='true']) { cursor: auto; }
+  }
 
   @media (max-width: 640px) {
     .box { --place-w: 8.75rem; max-height: 68dvh; }

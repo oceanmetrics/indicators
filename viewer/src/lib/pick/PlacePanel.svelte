@@ -12,6 +12,7 @@
   import { arrowNav } from './nav.ts'
   import { placeGroups, placeSetInfos } from './places.ts'
   import type { PickMode } from './places.ts'
+  import type { AxisOrder, PlaceSort } from '../../../../src/report/order.ts'
   import { placePickTree } from './placesTree.ts'
 
   interface Props {
@@ -27,16 +28,17 @@
     gazetteer: boolean
     loading: boolean
     ongazetteer?: () => void
+    order?: AxisOrder<PlaceSort>
     close: () => void
   }
-  let { mode, idx, universe, layers, sets = [], chosen, ontoggle, current, onchoose, gazetteer, loading, ongazetteer, close }: Props = $props()
+  let { mode, idx, universe, layers, sets = [], chosen, ontoggle, current, onchoose, gazetteer, loading, ongazetteer, order, close }: Props = $props()
 
   let query = $state('')
   let root = $state<HTMLDivElement>()
   // the panel arrives after the button was pressed (it is loaded on the first open): the search box takes the focus now
   onMount(() => root?.querySelector<HTMLElement>('[data-autofocus]')?.focus())
   const multi = $derived(mode === 'multi')
-  const groups = $derived(placeGroups(universe, idx, layers, { all: multi, gazetteer }))
+  const groups = $derived(placeGroups(universe, idx, layers, { all: multi, gazetteer, order }))
   const setInfos = $derived(multi ? placeSetInfos(sets, groups) : [])
   const searching = $derived(query.trim() !== '')
   // a search looks in the whole gazetteer: its places are read when one is typed
