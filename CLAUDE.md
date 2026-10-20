@@ -55,18 +55,22 @@ indicators.json + coverage.parquet ──► viewer/ (imports src/status/, src/i
   gazetteer index and `layers.json`), never by the values `coll`. The values file of a cell always comes from its
   coverage row's `coll` (`valuesCollOf()`): a place with rows in two values collections is one place. In the
   gazetteer index the `NMS:*` sanctuaries live only in the `places` collection, which since erddap-places' places 2.0.0
-  holds those 18 alone (the `noaa_sanctuaries` collection holds `ONMS:*` ids, another id space); the default group is
-  `DEFAULT_GROUPS` in `viewer/src/lib/data.ts`. Never special-case a place or group from the marinebon API era.
+  holds those 18 alone (the `noaa_sanctuaries` collection holds `ONMS:*` ids, another id space); the default selection is
+  `DEFAULT_SPEC.places` (`coll:places`) in `src/report/spec.ts`. Never special-case a place or group from the marinebon API era.
   A place of a **derived** layer (`fao_high_seas`) carries `display_id` (its index `source_id`: the feature of the layer that
-  draws it). **Place sets** (`config/place_sets.yml` -> the manifest's `place_sets`; `set:<id>` in `coll` and `colls`;
-  `viewer/src/lib/sets.ts`) are named lists of groups: the Matrix expands them, the Map layers them. Matrix hash keys:
-  `colls`, `q`, `vocab`, `leads`, `depth`, `cell`, `axes=p`, `empty=1`, `xp`, `xi`, `ai` (README "Matrix view").
-- **The Map view** (`viewer/src/lib/map/`): classes, legends and the table come from `classes.ts` (status and trend
+  draws it). **Place sets** (`config/place_sets.yml` -> the manifest's `place_sets`; the rule `set:<id>`;
+  `viewer/src/lib/sets.ts`) are named lists of groups: the Matrix expands them, the Map layers them. **One selection**
+  (`viewer/src/lib/selection.ts`, the Select section above the tabs) is shared by the Matrix, Map, Report and Place views: the report spec's
+  own `places` and `indicators` rules, in the hash as `pi`, `px` (place ids, `coll:<slug>`, `set:<id>`; default `coll:places`) and `ii`, `ix`
+  (`*` = leads, `all`, `cat:`, `series:`, ids). The old keys (`colls`, `xp`, `xi`, `ai`, `leads`, a Map's `coll`) are read as the same selection on
+  parse. Other hash keys: `q`, `vocab`, `depth`, `cell`, `axes=p`, `empty=1` (README "Matrix view"). The place picker lists every polygon
+  collection of the gazetteer; the gazetteer's places are read lazily (`gazetteerPlaces.ts`), never for the default selection.
+- **The Map view** (`viewer/src/lib/map/`): every group of the selection is a layered part (`selection.ts`: a group chosen in part is
+  restricted to its places); classes, legends and the table come from `classes.ts` (status and trend
   only through `src/status`); reference collections (Marine Regions `mr_*`) are drawn by Marine Regions' own WMS
-  (`wms.ts`: an SLD plus `ENV`, one request per tile) and never from geometry we host. The map's `coll` is a place group
-  (`place_coll ?? coll`, `pick.ts`), read from every values file that holds its places; the group's members that are not
-  computed are drawn faint in a vector group, and below zoom 7 also as a small hollow circle (`paint.ts`). A **place set** is
-  drawn by layering its groups (`parts.ts`: vector and derived groups first, WMS on top, one legend and scale), a **derived**
+  (`wms.ts`: an SLD plus `ENV`, one request per tile) and never from geometry we host. The map's groups are the selection's (`place_coll ?? coll`, `pick.ts`), read from every values file that holds their places; a group's members that are not
+  computed are drawn faint in a vector group, and below zoom 7 also as a small hollow circle (`paint.ts`). Several groups (a **place set**, or any selection) are
+  drawn by layering them (`parts.ts`: vector and derived groups first, WMS on top, one legend and scale), a **derived**
   group as the features of its `via` layer matched by `display_id`; a click answers from the top part down. Reference
   geometry (Marine Regions) is never hosted by us, in a set as anywhere: the EEZs stay Marine Regions' own WMS.
 - **The pickers** (`viewer/src/lib/pick/`): one place picker and one indicator picker for every view, the rules in plain
