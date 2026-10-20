@@ -98,7 +98,7 @@ def test_rows_validate_against_the_contract():
 def test_overlap_note_states_the_rule_with_the_numbers_of_release_json():
   assert obis.overlap_note("mr_eez", INFO_EEZ) == (
     "a record counts in every place whose polygon contains it (Marine Regions joint regimes overlap their parties' 200 NM "
-    "zones; 3 locations, 10 records counted twice in mr_eez); totals across places therefore exceed the distinct records "
+    "zones; 3 locations fall in more than one place, adding 10 to a sum of the place totals in mr_eez); totals across places therefore exceed the distinct records "
     "and are never summed")
   assert "no overlaps in mr_high_seas" in obis.overlap_note("mr_high_seas", INFO_HS)
 
@@ -181,7 +181,7 @@ def test_run_provenance_lists_the_release_files_with_checksums(tmp_path):
     assert p["sources"][1]["checksum"] == "sha256:" + hashlib.sha256(fh.read()).hexdigest()
   assert p["sources"][0]["updated"] == "2026-10-12T11:52:30Z"
   assert p["source_version"] == "OBIS snapshot 2026-10-11, WoRMS 2026-10-01, obis-h3 v20261012"
-  assert "3 locations, 10 records counted twice in mr_eez" in p["method"]
+  assert "3 locations fall in more than one place, adding 10 to a sum of the place totals in mr_eez" in p["method"]
   assert p["dataset"]["id"] == "obis" and p["dataset"]["title"] == "OBIS occurrence data" and p["dataset"]["license"] == "various"
   assert p["dataset"]["citation"] == ("OBIS (2026) Ocean Biodiversity Information System. Intergovernmental Oceanographic "
                                       "Commission of UNESCO. https://obis.org")

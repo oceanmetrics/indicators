@@ -24,7 +24,7 @@ rules (each one a named function below, each tested):
             row (time null) per place and indicator; n = the records for every metric, so a metric's sample size is
             always the same column; nulls stay null (es where n < 50).
   overlap   a record counts in every place whose polygon contains it, so totals across places exceed the distinct records
-            and are never summed. `overlap_note()` states it with the numbers of release.json (records counted twice =
+            and are never summed. `overlap_note()` states it with the numbers of release.json (the surplus in a sum of place totals =
             records_in + records_out - records_total).
   pin       the release is `latest.json` unless `--release` names one; its files are immutable, cached under
             cache/obis/<release>/, and listed with their sha256 in om:provenance.sources.
@@ -101,8 +101,10 @@ def place_rows(years: list[dict], indicators: list[dict], coll: str, snapshot_ye
 
 def overlap_note(coll: str, info: dict) -> str:
   """the double-counting rule with the numbers of release.json's place_exact entry for `coll`."""
-  twice = info["records_in"] + info["records_out"] - info["records_total"]
-  where = (f"{info['overlaps']:,} locations, {twice:,} records counted twice in {coll}" if info["overlaps"]
+  # records_in counts a record once per place it falls in: the surplus over the distinct records is what the
+  # overlaps add to a sum of place totals (a record in three places adds two)
+  surplus = info["records_in"] + info["records_out"] - info["records_total"]
+  where = (f"{info['overlaps']:,} locations fall in more than one place, adding {surplus:,} to a sum of the place totals in {coll}" if info["overlaps"]
            else f"no overlaps in {coll}")
   return ("a record counts in every place whose polygon contains it (Marine Regions joint regimes overlap their parties' "
           f"200 NM zones; {where}); totals across places therefore exceed the distinct records and are never summed")
