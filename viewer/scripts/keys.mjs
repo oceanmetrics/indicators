@@ -62,7 +62,15 @@ await page.goto(`${URL_BASE}?theme=light#axes=t`, { waitUntil: 'networkidle0' })
 await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
 const flipped = await page.evaluate(() => !!document.querySelector('table.matrix.flipped'))
 check(flipped, 'the hash axes=t flips the matrix (indicators in rows)')
-const cell2 = await tabUntil(f => f.tag === 'BUTTON' && /\bcell\b/.test(f.cls))
+// the place headers come first in Tab order; the skip button jumps over them
+const skip = await tabUntil(f => f.tag === 'BUTTON' && f.label === 'Skip to the first cell', 80)
+check(!!skip, `flipped: Tab reaches "Skip to the first cell"${skip ? ` (${skip.presses} presses)` : ''}`)
+if (skip) {
+  await page.keyboard.press('Enter')
+  const f = await focused()
+  check(f?.tag === 'BUTTON' && /\bcell\b/.test(f.cls), 'flipped: the skip button puts focus on the first cell')
+}
+const cell2 =await tabUntil(f => f.tag === 'BUTTON' && /\bcell\b/.test(f.cls))
 check(!!cell2, `flipped: Tab reaches a Matrix cell${cell2 ? ` (${cell2.presses} presses: "${cell2.f.label}")` : ''}`)
 if (cell2) {
   await page.keyboard.press('Enter')

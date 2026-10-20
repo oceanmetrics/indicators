@@ -84,6 +84,9 @@
   </span>
 {/snippet}
 
+<!-- the headers hold a link and a remove button per place or indicator, so the cells sit far down the Tab order: a skip
+     button, shown on focus, goes straight to the first cell -->
+<button type="button" class="skip" onclick={() => box?.querySelector<HTMLButtonElement>('button.cell')?.focus()}>Skip to the first cell</button>
 <div class="box" role="region" aria-label={flipped ? 'Indicators by places' : 'Places by indicators'} tabindex="-1" bind:this={box}>
   <table class="matrix" class:flipped>
     <thead>
@@ -161,6 +164,12 @@
     overscroll-behavior: contain;
   }
   .box:focus-visible { outline-offset: 2px; }
+  .skip { position: absolute; left: -9999px; }
+  .skip:focus-visible {
+    position: static; justify-self: start; padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--control-bg);
+    font: var(--type-small); color: var(--text-strong);
+  }
   table.matrix {
     border-collapse: separate;
     border-spacing: 0;
