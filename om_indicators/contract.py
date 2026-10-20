@@ -269,3 +269,21 @@ def read_values(path: Path | str) -> tuple[pa.Table, dict | None]:
 def utc_now() -> str:
   """the created stamp, to the second."""
   return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# coverage ----
+def validate_coverage(path: Path | str) -> list[str]:
+  """coverage.parquet: every row against schema/coverage.schema.json, unique (coll, place_id, indicator, time_grain),
+  and status / trend only on rows that name a status method."""
+  table = pq.read_table(path)
+  v = _validator("coverage")
+  errors, seen = [], set()
+  for i, r in enumerate(table.to_pylist()):
+    errors += [f"row {i}: {'.'.join(map(str, e.path)) or 'row'}: {e.message}" for e in v.iter_errors(r)]
+    key = (r.get("coll"), r.get("place_id"), r.get("indicator"), r.get("time_grain"))
+    if key in seen:
+      errors.append(f"row {i}: duplicate (coll, place_id, indicator, time_grain) {key}")
+    seen.add(key)
+    if (r.get("status") is not None or r.get("trend") is not None) and r.get("status_method") is None:
+      errors.append(f"row {i}: a status or trend without a status_method")
+  return [f"{path}: {e}" for e in errors]

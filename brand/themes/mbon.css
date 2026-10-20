@@ -1,0 +1,26 @@
+/* ============================================================================
+   MBON theme for @marinebon/ui (oceanmetrics/indicators brand/themes)
+   The kit's own tokens, unchanged: cobalt brand, teal accent, one coral action, the
+   MBON wordmark in the kit's Header. This file only adds what the indicators viewer
+   needs beyond the kit, in the kit's palette: the *-ink partners of the pipeline
+   colours for glyphs and text on the page ground (>= 3:1 in both themes; the kit's
+   navy place colour is unreadable on its abyss ground) and the mark spark.
+   Load it AFTER the kit's tokens.css.
+   ========================================================================== */
+
+:root,
+[data-theme="light"] {
+  --om-mark-spark: #f5b53f;            /* the kit's sun-400 */
+  --pipe-dataset-ink:  #6d4aa7;
+  --pipe-place-ink:    #01375f;
+  --pipe-method-ink:   #15788f;
+  --pipe-delivery-ink: #c4471d;        /* coral-500 deepened to 4.6:1 on white */
+}
+
+[data-theme="dark"] {
+  --om-mark-spark: #f5b53f;
+  --pipe-dataset-ink:  #b39ae0;
+  --pipe-place-ink:    #79a3e8;        /* the kit's cobalt-300 */
+  --pipe-method-ink:   #74c8d6;        /* the kit's teal-300 */
+  --pipe-delivery-ink: #f7a98c;        /* the kit's coral-300 */
+}

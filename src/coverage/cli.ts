@@ -39,7 +39,7 @@ async function placeNames(index: string): Promise<Map<string, string>> {
 }
 
 const COLUMNS: [keyof CoverageRow, 'STRING' | 'DOUBLE' | 'INT32' | 'JSON'][] = [
-  ['place_id', 'STRING'], ['coll', 'STRING'], ['indicator', 'STRING'], ['time_grain', 'STRING'],
+  ['place_id', 'STRING'], ['place_name', 'STRING'], ['coll', 'STRING'], ['indicator', 'STRING'], ['time_grain', 'STRING'],
   ['t0', 'STRING'], ['t1', 'STRING'], ['n_periods', 'INT32'], ['last_time', 'STRING'], ['last_value', 'DOUBLE'],
   ['last_class', 'STRING'], ['status_method', 'STRING'], ['status', 'STRING'], ['trend', 'STRING'],
   ['recent_mean', 'DOUBLE'], ['recent_from', 'STRING'], ['recent_to', 'STRING'], ['lt_mean', 'DOUBLE'],

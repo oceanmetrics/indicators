@@ -28,7 +28,7 @@ describe('continuous', () => {
     expect(rows).toHaveLength(1)
     const r = rows[0]
     expect(r).toMatchObject({
-      place_id: 'NMS:A', coll: 'places', indicator: SST.id, time_grain: 'year', t0: '2006-01-01', t1: '2020-01-01',
+      place_id: 'NMS:A', place_name: 'Alpha Bank', coll: 'places', indicator: SST.id, time_grain: 'year', t0: '2006-01-01', t1: '2020-01-01',
       n_periods: 15, last_time: '2020-01-01', last_value: 9, last_class: null, status_method: 'iea-sd',
       status: 'above', trend: 'up', recent_mean: 7, recent_from: '2016-01-01', recent_to: '2020-01-01', why: null,
       sentence: 'SST in Alpha Bank over the last 5 years (2016–2020) was more than 1 SD above its 2006–2020 mean, and rose by more than 1 SD.',

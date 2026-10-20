@@ -98,7 +98,13 @@ def _add_validate(sub: argparse._SubParsersAction) -> None:
       for e in errs:
         print(e)
     print(f"{n} values files, {len(problems)} with problems")
-    return 1 if problems else 0
+    cov = Path(a.catalog) / "coverage.parquet"
+    cov_errors = contract.validate_coverage(cov) if cov.exists() else []
+    for e in cov_errors[:50]:
+      print(e)
+    if cov.exists():
+      print(f"coverage.parquet: {len(cov_errors)} problems")
+    return 1 if problems or cov_errors else 0
   p.set_defaults(func=func)
 
 

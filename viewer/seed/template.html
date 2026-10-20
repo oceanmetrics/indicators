@@ -1,0 +1,547 @@
+<title>Ocean Metrics Indicators</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* layout: app shell. top bar with views and audience depth; a place x indicator matrix; a detail drawer that
+   opens a cell as its four elements (place, dataset, method, delivery) bound by a hashed configuration */
+:root {
+  --bg: #eef3f4; --surface: #ffffff; --sunk: #e3eaec; --ink: #0f222a; --muted: #566a73; --line: #d3dee2;
+  --accent: #0b5d6e; --accent-ink: #ffffff; --accent-soft: #d5e9ec;
+  --el-place: #2b66ad; --el-data: #2a8455; --el-method: #cf7a22; --el-delivery: #bd3f36; --el-config: #74818a;
+  --ok: #2a8455; --warn: #b7791f; --run: #2b66ad;
+  --ramp-0: #e7f1f2; --ramp-1: #b5d8dc; --ramp-2: #6fb3bd; --ramp-3: #2d8494; --ramp-4: #0b4f5e;
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --f-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0c171c; --surface: #12212a; --sunk: #0a1419; --ink: #e2ecef; --muted: #93a8b1; --line: #233741;
+  --accent: #5cc0cf; --accent-ink: #062027; --accent-soft: #163c45;
+  --el-place: #6fa3e6; --el-data: #5fc08b; --el-method: #f0a453; --el-delivery: #ef7a70; --el-config: #9aa7b0;
+  --ok: #5fc08b; --warn: #e9b44c; --run: #6fa3e6;
+  --ramp-0: #15323a; --ramp-1: #1d5260; --ramp-2: #2b7f8f; --ramp-3: #4fb0bf; --ramp-4: #a6e3eb;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0c171c; --surface: #12212a; --sunk: #0a1419; --ink: #e2ecef; --muted: #93a8b1; --line: #233741;
+  --accent: #5cc0cf; --accent-ink: #062027; --accent-soft: #163c45;
+  --el-place: #6fa3e6; --el-data: #5fc08b; --el-method: #f0a453; --el-delivery: #ef7a70; --el-config: #9aa7b0;
+  --ok: #5fc08b; --warn: #e9b44c; --run: #6fa3e6;
+  --ramp-0: #15323a; --ramp-1: #1d5260; --ramp-2: #2b7f8f; --ramp-3: #4fb0bf; --ramp-4: #a6e3eb;
+  color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--f-body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+a { color: var(--accent); }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* top bar ---- */
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding-block: 10px; }
+.brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+.brand b { font: 700 20px/1 var(--f-display); letter-spacing: -0.01em; }
+.brand span { font: 500 13px var(--f-display); color: var(--muted); }
+.sponsor { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+.sponsor strong { color: var(--ink); font-weight: 600; }
+nav.views { display: flex; gap: 2px; }
+nav.views button { border: 0; background: none; padding: 7px 12px; border-radius: 6px; cursor: pointer; color: var(--muted); font-weight: 500; }
+nav.views button[aria-selected="true"] { background: var(--accent-soft); color: var(--ink); }
+.depth { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.depth button { border: 0; background: none; padding: 6px 11px; cursor: pointer; font-size: 13px; color: var(--muted); }
+.depth button + button { border-left: 1px solid var(--line); }
+.depth button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.depth-note { font-size: 12px; color: var(--muted); padding-bottom: 8px; }
+
+main { padding-block: 16px 40px; display: grid; gap: 14px; }
+.mock { font-size: 12px; color: var(--muted); }
+.mock b { color: var(--ink); font-weight: 600; }
+
+/* filters ---- */
+.filters { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.filters .lbl { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 11px; cursor: pointer; font-size: 13px; }
+.chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.search { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 10px; min-width: 0; width: 220px; max-width: 100%; }
+
+/* matrix ---- */
+.matrix-box { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+table.matrix { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-variant-numeric: tabular-nums; }
+.matrix th, .matrix td { border-bottom: 1px solid var(--line); padding: 0; }
+.matrix thead th { position: sticky; top: 0; background: var(--surface); z-index: 2; text-align: left; vertical-align: bottom; padding: 10px 10px 8px; min-width: 128px; }
+.matrix thead th .fam { display: block; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+.matrix thead th .t { font-weight: 600; font-size: 13px; line-height: 1.2; display: block; }
+.matrix thead th .u { font-size: 11.5px; color: var(--muted); }
+.matrix th.place { position: sticky; left: 0; z-index: 3; background: var(--surface); min-width: 210px; max-width: 240px; padding: 8px 12px; text-align: left; border-right: 1px solid var(--line); }
+.matrix tbody th.place { z-index: 1; font-weight: 500; }
+.matrix tbody th.place small { display: block; color: var(--muted); font-weight: 400; font-size: 11.5px; font-family: var(--f-mono); }
+.matrix tr.group th { background: var(--sunk); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 6px 12px; text-align: left; position: sticky; left: 0; }
+.cell { display: flex; flex-direction: column; gap: 2px; width: 100%; min-height: 54px; padding: 7px 10px; border: 0; background: none; text-align: left; cursor: pointer; }
+.cell:hover { background: var(--accent-soft); }
+.cell .v { font-weight: 600; font-size: 13.5px; }
+.cell .v small { font-weight: 400; color: var(--muted); font-size: 11px; }
+.cell .h { font: 10.5px var(--f-mono); color: var(--muted); }
+.cell svg { display: block; }
+.st { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; border-radius: 999px; padding: 2px 8px; width: fit-content; border: 1px solid var(--line); color: var(--muted); }
+.st.live { border-style: dashed; border-color: var(--el-data); color: var(--el-data); }
+.st.auto { border-color: var(--accent); color: var(--accent); }
+.st.review { border-color: var(--warn); color: var(--warn); }
+.st.running { border-color: var(--run); color: var(--run); }
+.st.queued { color: var(--run); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.running .dot { animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .running .dot { animation: none; } }
+.na { color: var(--muted); font-size: 12px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 12px; color: var(--muted); }
+
+/* drawer ---- */
+.scrim { position: fixed; inset: 0; background: #0006; z-index: 20; }
+aside.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); background: var(--surface); z-index: 21; border-left: 1px solid var(--line);
+  overflow-y: auto; padding: calc(16px + env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) calc(28px + env(safe-area-inset-bottom, 0px)) 20px; display: grid; gap: 16px; align-content: start; }
+.dh { display: flex; gap: 12px; align-items: start; }
+.dh h2 { font: 700 21px/1.15 var(--f-display); margin: 0; text-wrap: balance; }
+.dh p { margin: 3px 0 0; color: var(--muted); }
+.close { margin-left: auto; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+.elements { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.el { border: 1px solid var(--line); border-left: 4px solid var(--c); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+.el .k { font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--c); font-weight: 600; }
+.el .x { font-size: 13px; overflow-wrap: anywhere; }
+.el .x code { font: 11.5px var(--f-mono); color: var(--muted); }
+.el.config { grid-column: 1 / -1; background: var(--sunk); }
+.headline { font: 500 19px/1.35 var(--f-display); margin: 0; text-wrap: pretty; }
+.chart { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--muted); font: 11px var(--f-body); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.stats div { background: var(--sunk); border-radius: 8px; padding: 8px 10px; }
+.stats b { display: block; font-size: 16px; font-variant-numeric: tabular-nums; }
+.stats span { font-size: 11.5px; color: var(--muted); }
+pre.code { margin: 0; background: var(--sunk); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-x: auto; font: 12px/1.5 var(--f-mono); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.seg button { border: 0; background: none; padding: 4px 10px; cursor: pointer; font-size: 12.5px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.btn { border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); border-radius: 8px; padding: 7px 14px; cursor: pointer; font-weight: 500; }
+.btn.ghost { background: none; color: var(--accent); }
+h3 { font: 600 15px var(--f-display); margin: 0; }
+.sub { font-size: 12.5px; color: var(--muted); margin: 0; }
+.route { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; }
+.route.auto { border-color: var(--accent); }
+.route.review { border-color: var(--warn); }
+.route .big { font: 600 16px var(--f-display); }
+label.f { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
+label.f input, label.f select, label.f textarea { border: 1px solid var(--line); background: var(--surface); border-radius: 7px; padding: 7px 9px; color: var(--ink); min-width: 0; width: 100%; }
+.form { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+
+/* map ---- */
+.mapbox { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 10px; }
+.mapbox svg { width: 100%; height: auto; display: block; background: var(--sunk); border-radius: 8px; }
+.land { fill: var(--line); stroke: none; }
+.grat { stroke: var(--line); stroke-width: .4; fill: none; opacity: .7; }
+.mk { stroke: var(--surface); stroke-width: 1.2; cursor: pointer; }
+.mk:hover { stroke: var(--ink); }
+.ramp { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.ramp i { display: inline-block; width: 26px; height: 10px; }
+input[type=range] { accent-color: var(--accent); }
+
+/* requests + about ---- */
+.cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.req { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.req:last-child { border-bottom: 0; }
+.req .id { font: 12px var(--f-mono); color: var(--muted); }
+.req .t { font-weight: 500; }
+.req .m { grid-column: 2 / -1; font-size: 12.5px; color: var(--muted); }
+.four { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.four .el { padding: 12px 14px; }
+.four .el p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+.prose { max-width: 68ch; }
+.prose p { margin: 0 0 8px; }
+table.prod { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.prod th, table.prod td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.prod th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.tbl { overflow-x: auto; }
+@media (max-width: 640px) { .elements { grid-template-columns: 1fr; } .brand span { display: none; } }
+</style>
+
+<header class="top">
+  <div class="wrap bar">
+    <div class="brand"><b>Ocean Metrics Indicators</b><span>any place · any indicator · over time</span></div>
+    <nav class="views" role="tablist" aria-label="Views">
+      <button role="tab" id="tab-matrix" data-view="matrix" aria-selected="true">Matrix</button>
+      <button role="tab" id="tab-map" data-view="map" aria-selected="false">Map</button>
+      <button role="tab" id="tab-requests" data-view="requests" aria-selected="false">Requests</button>
+      <button role="tab" id="tab-about" data-view="about" aria-selected="false">How it works</button>
+    </nav>
+    <div class="depth" role="group" aria-label="Detail level">
+      <button id="d-skim" data-depth="skim" aria-pressed="false" title="Headline, map and trend">Skimmer</button>
+      <button id="d-swim" data-depth="swim" aria-pressed="true" title="Charts, filters and justifying metadata">Swimmer</button>
+      <button id="d-dive" data-depth="dive" aria-pressed="false" title="Configuration, data URLs and code">Diver</button>
+    </div>
+    <span class="sponsor">Sponsored by <strong>MBON</strong></span>
+  </div>
+  <div class="wrap depth-note" id="depthNote"></div>
+</header>
+
+<main class="wrap">
+  <p class="mock"><b>Mockup.</b> Values are real where shown: ERDDAP statistics precomputed by erddap-places, OBIS counts
+    from the OBIS API (2026-10-19), UN SDG 14.5.1. Request states, emails and the run queue are examples.</p>
+  <section id="view-matrix"></section>
+  <section id="view-map" hidden></section>
+  <section id="view-requests" hidden></section>
+  <section id="view-about" hidden></section>
+</main>
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-label="Indicator detail"></aside>
+
+<script>
+const DATA = /*DATA*/;
+
+// indicators: one column each (dataset + method), grouped by family ----
+const IND = [
+  { id: "obis_records", fam: "Biodiversity", title: "OBIS occurrence records", unit: "records", dp: 0, grain: "decade",
+    dataset: { name: "OBIS occurrence snapshot", ref: "s3://obis-open-data/occurrence/ (2026-10-11)", href: "https://obis.org/" },
+    method: { name: "records inside the place, by decade", fn: "obisindicators::obis_place_indicators_exact", ver: "0.9.0 (planned)" },
+    cost: () => ({ values: 0, route: "review", why: "Each new place collection is one exact join over the 100 GB OBIS snapshot." }) },
+  { id: "obis_species", fam: "Biodiversity", title: "Species richness", unit: "species", dp: 0, grain: "decade",
+    dataset: { name: "OBIS + WoRMS", ref: "OBIS snapshot 2026-10-11 · WoRMS 2026-10-01", href: "https://obis.org/" },
+    method: { name: "distinct accepted species, by decade", fn: "obisindicators::obis_place_indicators_exact", ver: "0.9.0 (planned)" } },
+  { id: "obis_es50", fam: "Biodiversity", title: "ES(50) Hurlbert", unit: "expected species", dp: 1, grain: "decade",
+    dataset: { name: "OBIS + WoRMS", ref: "OBIS snapshot 2026-10-11", href: "https://obis.org/" },
+    method: { name: "expected species in 50 records", fn: "obisindicators::calc_indicators", ver: "0.8.0" } },
+  { id: "sst", fam: "Physical", title: "Sea surface temperature", unit: "°C", dp: 2, grain: "year",
+    dataset: { name: "NOAA Coral Reef Watch 5 km", ref: "PacIOOS ERDDAP dhw_5km · CRW_SST", href: "https://pae-paha.pacioos.hawaii.edu/erddap/griddap/dhw_5km.html" },
+    method: { name: "area-weighted daily mean → annual mean", fn: "erddap-places sql/stats_daily.sql", ver: "app 0.3.7" }, path: "dhw_5km/CRW_SST", cellKm2: 30, steps: 15000 },
+  { id: "chl", fam: "Biogeochemistry", title: "Chlorophyll-a", unit: "mg m⁻³", dp: 2, grain: "year",
+    dataset: { name: "Copernicus Marine BGC", ref: "ERDDAP cmems_biogeochem_phyto · chl", href: "https://marine.copernicus.eu/" },
+    method: { name: "area-weighted monthly mean → annual mean", fn: "erddap-places sql/stats_daily.sql", ver: "app 0.3.7" }, path: "cmems_biogeochem_phyto/chl", cellKm2: 75, steps: 41 },
+  { id: "ph", fam: "Biogeochemistry", title: "pH", unit: "", dp: 3, grain: "year",
+    dataset: { name: "Copernicus Marine BGC", ref: "ERDDAP cmems_biogeochem_carbon · ph", href: "https://marine.copernicus.eu/" },
+    method: { name: "area-weighted monthly mean → annual mean", fn: "erddap-places sql/stats_daily.sql", ver: "app 0.3.7" }, path: "cmems_biogeochem_carbon/ph", cellKm2: 75, steps: 41 },
+  { id: "o2", fam: "Biogeochemistry", title: "Dissolved oxygen", unit: "mmol m⁻³", dp: 0, grain: "year",
+    dataset: { name: "Copernicus Marine BGC", ref: "ERDDAP cmems_biogeochem_pp · o2", href: "https://marine.copernicus.eu/" },
+    method: { name: "area-weighted monthly mean → annual mean", fn: "erddap-places sql/stats_daily.sql", ver: "app 0.3.7" }, path: "cmems_biogeochem_pp/o2", cellKm2: 75, steps: 41 },
+  { id: "npp", fam: "Biogeochemistry", title: "Net primary productivity", unit: "mg C m⁻² d⁻¹", dp: 0, grain: "year",
+    dataset: { name: "MODIS NPP (VGPM)", ref: "ERDDAP moda_npp_mo_glob · npp", href: "https://coastwatch.pfeg.noaa.gov/erddap/" },
+    method: { name: "area-weighted monthly mean → annual mean", fn: "erddap-places sql/stats_daily.sql", ver: "app 0.3.7" }, path: "moda_npp_mo_glob/npp", cellKm2: 85, steps: 259 },
+  { id: "sdg1451", fam: "SDG 14", title: "14.5.1 Marine KBAs protected", unit: "%", dp: 1, grain: "year",
+    dataset: { name: "UN SDG Global Database", ref: "series ER_MRN_MPA", href: "https://unstats.un.org/sdgs/dataportal/database?series=ER_MRN_MPA" },
+    method: { name: "country value → EEZ (territory, else sovereign)", fn: "places proto/eez_indicators/sdg.py", ver: "0.1" } },
+];
+const COLL = { noaa_sanctuaries: { name: "NOAA National Marine Sanctuaries", src: "NOAA ONMS", link: "https://sanctuaries.noaa.gov/" },
+               mr_eez: { name: "Exclusive Economic Zones", src: "Marine Regions (VLIZ)", link: "https://www.marineregions.org/" } };
+const DEPTH_NOTE = {
+  skim: "Skimmer: a headline and a trend for each place. Open any value for the one-sentence answer.",
+  swim: "Swimmer: trends with the numbers behind them. Open a value for its chart, statistics and sources.",
+  dive: "Diver: every value carries its job id. Open one for the configuration, data URLs, a query and the code.",
+};
+const state = { view: "matrix", depth: "swim", colls: new Set(["noaa_sanctuaries", "mr_eez"]), fams: new Set(IND.map(i => i.fam)), q: "", decade: 2010, mapInd: "obis_species" };
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const place = id => DATA.places.find(p => p.id === id);
+const ind = id => IND.find(i => i.id === id);
+const cellOf = (p, i) => (DATA.cells[p.id] || {})[i.id] || { status: i.id.startsWith("obis") ? "review" : "auto" };
+
+function fmt(v, dp) {
+  if (v == null || Number.isNaN(v)) return "–";
+  if (Math.abs(v) >= 10000) return (v >= 1e6 ? (v / 1e6).toFixed(v >= 1e7 ? 0 : 1) + " M" : Math.round(v / 1000) + " k");
+  return v.toLocaleString(undefined, { minimumFractionDigits: dp, maximumFractionDigits: dp });
+}
+// FNV-1a over the canonical configuration: a stand-in for the sha256 job id of the paper's §2.4
+function jobId(s) { let h1 = 0x811c9dc5, h2 = 0x01000193; for (const ch of s) { h1 ^= ch.charCodeAt(0); h1 = Math.imul(h1, 16777619) >>> 0; h2 = Math.imul(h2 ^ h1, 2246822519) >>> 0; } return (h1.toString(16).padStart(8, "0") + h2.toString(16).padStart(8, "0")).slice(0, 12); }
+function config(p, i) {
+  const c = cellOf(p, i);
+  return [
+    `place_id: "${p.id}"`,
+    `dataset_id: "${i.dataset.ref}"`,
+    `method:`,
+    `  function: "${i.method.fn}"`,
+    `  version: "${i.method.ver}"`,
+    `  arguments:`,
+    `    summary: "${i.method.name}"`,
+    `    time_grain: "${i.grain}"`,
+    `delivery: ["viewer", "csv", "parquet", "api", "llm_tool"]`,
+    `schedule: "${i.fam === "Biodiversity" ? "P1M  # with each OBIS snapshot" : i.fam === "SDG 14" ? "P1Y" : "P7D"}"`,
+  ].join("\n");
+}
+const latest = c => c.series && c.series.length ? c.series[c.series.length - 1] : null;
+function trend(series) { // least-squares slope per decade over the last 20 points
+  const s = series.slice(-20); if (s.length < 3) return null;
+  const n = s.length, mx = s.reduce((a, d) => a + d[0], 0) / n, my = s.reduce((a, d) => a + d[1], 0) / n;
+  let num = 0, den = 0; for (const [x, y] of s) { num += (x - mx) * (y - my); den += (x - mx) ** 2; }
+  return den ? num / den * 10 : null;
+}
+
+// sparkline (line for years, bars for decades) ----
+function spark(c, w = 104, h = 26) {
+  const s = c.series || []; if (s.length < 2) return "";
+  const ys = s.map(d => d[1]), lo = Math.min(...ys), hi = Math.max(...ys), sy = v => h - 2 - (hi === lo ? .5 : (v - lo) / (hi - lo)) * (h - 4);
+  if (c.grain === "decade") {
+    const bw = w / s.length;
+    return `<svg width="${w}" height="${h}" aria-hidden="true">${s.map((d, k) => `<rect x="${k * bw + 1}" y="${sy(d[1])}" width="${bw - 2}" height="${h - sy(d[1])}" fill="var(--ramp-${k === s.length - 1 ? 4 : 2})"/>`).join("")}</svg>`;
+  }
+  const x = k => 1 + k / (s.length - 1) * (w - 4), pts = s.map((d, k) => `${x(k).toFixed(1)},${sy(d[1]).toFixed(1)}`).join(" ");
+  const [lx, ly] = [x(s.length - 1), sy(s[s.length - 1][1])];
+  return `<svg width="${w}" height="${h}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.4"/><circle cx="${lx}" cy="${ly}" r="2.4" fill="var(--accent)"/></svg>`;
+}
+const STATUS = {
+  live: ["live", "Compute live", "Computed in your browser when you open it"],
+  auto: ["auto", "Request · runs itself", "Small job: runs automatically and emails you"],
+  review: ["review", "Request · review", "Large job: a maintainer schedules it"],
+  running: ["running", "Running", "An automatic job is running"],
+  queued: ["queued", "Queued", "Waiting for the runner"],
+};
+function cellHTML(p, i) {
+  const c = cellOf(p, i);
+  if (c.status === "na") return `<span class="na" title="${esc(c.why || "Not defined for this kind of place")}">n/a</span>`;
+  if (c.status !== "ready") { const [cls, txt, tip] = STATUS[c.status === "small" ? "auto" : c.status === "large" ? "review" : c.status];
+    return `<span class="st ${cls}" title="${tip}"><span class="dot"></span>${txt}${c.since ? " · " + c.since : ""}</span>`; }
+  const [t, v] = latest(c), tr = c.series.length > 2 ? trend(c.series) : null;
+  const arrow = tr == null ? "" : tr > 0 ? " ↗" : " ↘";
+  const val = `<span class="v">${fmt(v, i.dp)} <small>${esc(i.unit)} · ${c.grain === "decade" ? t + "s" : t}</small></span>`;
+  if (state.depth === "skim") return `${val.replace("</small></span>", `${arrow}</small></span>`)}`;
+  return `${spark(c)}${val}${state.depth === "dive" ? `<span class="h">job ${jobId(config(p, i))}</span>` : ""}`;
+}
+
+// matrix view ----
+function visible() {
+  const q = state.q.trim().toLowerCase();
+  return { places: DATA.places.filter(p => state.colls.has(p.coll) && (!q || (p.name + " " + p.code).toLowerCase().includes(q))),
+           inds: IND.filter(i => state.fams.has(i.fam)) };
+}
+function renderMatrix() {
+  const { places, inds } = visible(), fams = [...new Set(IND.map(i => i.fam))];
+  const ready = places.reduce((a, p) => a + inds.filter(i => cellOf(p, i).status === "ready").length, 0);
+  let rows = "";
+  for (const k of Object.keys(COLL)) {
+    const ps = places.filter(p => p.coll === k); if (!ps.length) continue;
+    rows += `<tr class="group"><th colspan="${inds.length + 1}">${COLL[k].name} · ${COLL[k].src}</th></tr>`;
+    rows += ps.map(p => `<tr><th class="place" scope="row">${esc(p.name)}<small>${esc(p.code)} · ${fmt(p.area_km2, 0)} km²</small></th>${inds.map(i =>
+      `<td><button class="cell" data-p="${esc(p.id)}" data-i="${i.id}" aria-label="${esc(p.name)}: ${esc(i.title)}">${cellHTML(p, i)}</button></td>`).join("")}</tr>`).join("");
+  }
+  $("#view-matrix").innerHTML = `
+    <div class="filters">
+      <span class="lbl">Places</span>${Object.entries(COLL).map(([k, c]) => `<button class="chip" data-coll="${k}" aria-pressed="${state.colls.has(k)}">${c.name}</button>`).join("")}
+      <span class="lbl">Indicators</span>${fams.map(f => `<button class="chip" data-fam="${f}" aria-pressed="${state.fams.has(f)}">${f}</button>`).join("")}
+      <input class="search" id="q" type="search" placeholder="Find a place" value="${esc(state.q)}" aria-label="Find a place">
+    </div>
+    <p class="sub">${places.length} places × ${inds.length} indicators · ${ready} of ${places.length * inds.length} computed. Open any cell; an empty one becomes a request.</p>
+    <div class="matrix-box"><table class="matrix">
+      <thead><tr><th class="place">Place</th>${inds.map(i => `<th scope="col"><span class="fam">${i.fam}</span><span class="t">${i.title}</span><span class="u">${esc(i.unit || "unitless")} · by ${i.grain}</span></th>`).join("")}</tr></thead>
+      <tbody>${rows}</tbody></table></div>
+    <div class="legend"><span class="st live"><span class="dot"></span>Compute live</span> computed in the browser on open
+      <span class="st auto"><span class="dot"></span>Request · runs itself</span> small job, emails you when done
+      <span class="st review"><span class="dot"></span>Request · review</span> large job, scheduled by a maintainer
+      <span class="na">n/a</span> not defined for this kind of place</div>`;
+}
+
+// detail drawer ----
+function bigChart(c, i) {
+  const s = c.series, W = 520, H = 210, L = 46, R = 12, T = 12, B = 26;
+  const ys = s.map(d => d[1]), lo0 = Math.min(...ys), hi0 = Math.max(...ys), pad = (hi0 - lo0) * .08 || Math.abs(hi0) * .05 || 1;
+  const lo = c.grain === "decade" ? 0 : lo0 - pad, hi = hi0 + pad, x0 = s[0][0], x1 = s[s.length - 1][0];
+  const sx = x => L + (x1 === x0 ? .5 : (x - x0) / (x1 - x0)) * (W - L - R), sy = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  const ticks = [lo, (lo + hi) / 2, hi].map(v => `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${sy(v) + 4}" text-anchor="end">${fmt(v, i.dp)}</text>`).join("");
+  let marks;
+  if (c.grain === "decade") {
+    const bw = (W - L - R) / s.length * .7;
+    marks = s.map((d, k) => { const cx = L + (k + .5) * (W - L - R) / s.length; return `<rect x="${cx - bw / 2}" y="${sy(d[1])}" width="${bw}" height="${sy(lo) - sy(d[1])}" fill="var(--ramp-${k === s.length - 1 ? 4 : 3})"/><text x="${cx}" y="${H - 8}" text-anchor="middle">${d[0]}s</text>`; }).join("");
+  } else {
+    const pts = s.map(d => `${sx(d[0]).toFixed(1)},${sy(d[1]).toFixed(1)}`).join(" ");
+    const area = `${sx(x0)},${sy(lo)} ${pts} ${sx(x1)},${sy(lo)}`;
+    const xt = s.length > 2 ? [x0, Math.round((x0 + x1) / 2), x1] : s.map(d => d[0]);
+    marks = `<polygon points="${area}" fill="var(--accent-soft)"/><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2"/>` +
+      `<circle cx="${sx(x1)}" cy="${sy(s[s.length - 1][1])}" r="3.5" fill="var(--accent)"/>` + xt.map(x => `<text x="${sx(x)}" y="${H - 8}" text-anchor="middle">${x}</text>`).join("");
+  }
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(i.title)} over time">${ticks}${marks}</svg>`;
+}
+function headline(p, i, c) {
+  const [t, v] = latest(c), s = c.series;
+  if (c.grain === "decade") {
+    const prev = s[s.length - 2];
+    const pct = prev && prev[1] ? Math.round((v - prev[1]) / prev[1] * 100) : null;
+    return `${p.name}: ${fmt(v, 0)} ${i.unit} in the ${t}s${pct != null ? `, ${pct >= 0 ? "up" : "down"} ${Math.abs(pct)}% on the ${prev[0]}s` : ""}.` + (c.total ? ` ${fmt(c.total, 0)} ${i.unit === "records" ? "records" : "species"} in all years.` : "");
+  }
+  if (s.length >= 12) {
+    const base = s.filter(d => d[0] >= 1991 && d[0] <= 2020).map(d => d[1]), m = base.reduce((a, b) => a + b, 0) / base.length, dv = v - m;
+    return `${i.title} in ${p.name} averaged ${fmt(v, i.dp)} ${i.unit} in ${t}, ${fmt(Math.abs(dv), i.dp)} ${i.unit} ${dv >= 0 ? "above" : "below"} its 1991–2020 mean.`;
+  }
+  return `${i.title} in ${p.name}: ${fmt(v, i.dp)} ${i.unit} in ${t}${c.basis ? ` (the ${c.basis}'s reported value)` : ""}.`;
+}
+function estimate(p, i) {
+  if (i.cost) return i.cost(p);
+  if (i.cellKm2) { const n = Math.max(1, Math.round(p.area_km2 / i.cellKm2)) * i.steps; return { values: n, route: n < 5e7 ? "auto" : "review",
+    why: n < 5e7 ? "Within the automatic limit (50 M grid values) for a catalogued dataset." : "Over the automatic limit of 50 M grid values." }; }
+  return { values: 0, route: "review", why: "A new dataset or method needs a maintainer to add it." };
+}
+function requestPanel(p, i, c) {
+  const e = estimate(p, i), auto = e.route === "auto";
+  if (c.status === "live") return `<div class="route auto"><span class="big">Computed live in your browser</span>
+    <p class="sub">DuckDB-WASM reads only the grid cells inside ${esc(p.name)} from ERDDAP (≈ ${fmt(estimate(p, { ...i, steps: 365 }).values, 0)} values per year of data) and summarizes them here. Nothing is stored until you ask for it.</p>
+    <div class="row"><button class="btn" data-act="live">Compute now</button><button class="btn ghost" data-act="save">Save as a precomputed series</button></div><p class="sub" id="actmsg"></p></div>`;
+  if (c.status === "running" || c.status === "queued") return `<div class="route auto"><span class="big">${c.status === "running" ? "Running on the Ocean Metrics runner" : "Queued"}</span>
+    <p class="sub">Requested through issue #142 (example). We email the requester when the series is published, and the issue closes with its link.</p></div>`;
+  return `<div class="route ${auto ? "auto" : "review"}">
+    <span class="big">${auto ? "Runs automatically" : "Needs a maintainer"}</span>
+    <p class="sub">${e.values ? `About ${fmt(e.values, 0)} grid values. ` : ""}${esc(e.why)}</p>
+    <p class="sub">${auto ? "Submitting opens a GitHub issue labelled <b>auto</b>. The runner computes the series, publishes it, emails you and closes the issue." : "Submitting opens a GitHub issue labelled <b>needs-review</b>. A maintainer sizes it, schedules it and replies on the issue."}</p>
+    <div class="form">
+      <label class="f">Time range<select id="r-range"><option>All available</option><option>Last 10 years</option><option>1991–2020</option></select></label>
+      <label class="f">Time step<select id="r-grain"><option>${i.grain === "decade" ? "Decade" : "Year"}</option><option>Month</option></select></label>
+      <label class="f" style="grid-column:1/-1">Email for the result (optional)<input id="r-email" type="email" placeholder="you@example.org" autocomplete="email"></label>
+    </div>
+    <div class="row"><button class="btn" data-act="issue">Preview the request</button></div>
+    <pre class="code" id="issue" hidden></pre></div>`;
+}
+function openCell(pid, iid) {
+  const p = place(pid), i = ind(iid), c = cellOf(p, i), ready = c.status === "ready";
+  const els = `<div class="elements">
+    <div class="el" style="--c:var(--el-place)"><div class="k">Place</div><div class="x">${esc(p.name)} <code>${esc(p.id)}</code></div></div>
+    <div class="el" style="--c:var(--el-data)"><div class="k">Dataset</div><div class="x"><a href="${i.dataset.href}" target="_blank" rel="noopener">${esc(i.dataset.name)}</a> <code>${esc(i.dataset.ref)}</code></div></div>
+    <div class="el" style="--c:var(--el-method)"><div class="k">Method</div><div class="x">${esc(i.method.name)} <code>${esc(i.method.fn)} ${esc(i.method.ver)}</code></div></div>
+    <div class="el" style="--c:var(--el-delivery)"><div class="k">Delivery</div><div class="x">This viewer · CSV · Parquet · API · LLM tool call</div></div>
+    <div class="el config" style="--c:var(--el-config)"><div class="k">Configuration</div><div class="x">job <code>${jobId(config(p, i))}</code> · re-run ${i.fam === "Biodiversity" ? "with each monthly OBIS snapshot" : i.fam === "SDG 14" ? "yearly" : "weekly"} · logged</div></div></div>`;
+  let body = "";
+  if (ready) {
+    const [t, v] = latest(c), tr = trend(c.series), s = c.series;
+    const hl = `<p class="headline">${esc(headline(p, i, c))}</p>`;
+    const chart = s.length > 1 ? bigChart(c, i) : "";
+    const stats = `<div class="stats"><div><b>${fmt(v, i.dp)}</b><span>latest · ${c.grain === "decade" ? t + "s" : t}</span></div>
+      <div><b>${s.length > 1 ? fmt(Math.min(...s.map(d => d[1])), i.dp) + " – " + fmt(Math.max(...s.map(d => d[1])), i.dp) : "–"}</b><span>range</span></div>
+      <div><b>${tr == null ? "–" : (tr > 0 ? "+" : "") + fmt(tr, i.dp + 1)}</b><span>trend per decade</span></div>
+      <div><b>${s[0][0]}${c.grain === "decade" ? "s" : ""}–${t}${c.grain === "decade" ? "s" : ""}</b><span>${s.length} ${c.grain}s</span></div></div>`;
+    const src = `<p class="sub">Place from <a href="${COLL[p.coll].link}" target="_blank" rel="noopener">${COLL[p.coll].src}</a>${p.coll === "mr_eez" ? ` · <a href="https://www.marineregions.org/gazetteer.php?p=details&id=${p.id.split(":")[1]}" target="_blank" rel="noopener">view at Marine Regions</a>` : ""}. Data: ${esc(i.dataset.name)}, ${esc(i.dataset.ref)}.</p>`;
+    const url = i.path ? `https://storage.oceanmetrics.io/gazetteer/stats/${i.path}/NMS:${p.code}.parquet` : `https://storage.oceanmetrics.io/indicators/values/indicator=${i.id}/coll=${p.coll}/data.parquet`;
+    const dive = `<h3>Configuration</h3><pre class="code">${esc(config(p, i))}</pre>
+      <h3>Data</h3><p class="sub"><a href="${url}" target="_blank" rel="noopener">${esc(url)}</a>${i.path ? "" : " (planned path)"}</p>
+      <pre class="code">${esc(`-- DuckDB, straight from storage
+SELECT time, value, n
+FROM 'https://storage.oceanmetrics.io/indicators/values/indicator=${i.id}/coll=${p.coll}/data.parquet'
+WHERE place_id = '${p.id}' AND time_grain = '${c.grain}'
+ORDER BY time;`)}</pre>
+      <p class="sub">Code: <a href="https://github.com/oceanmetrics/indicators" target="_blank" rel="noopener">oceanmetrics/indicators</a> (planned) · producer: ${esc(i.method.fn)}.</p>`;
+    body = state.depth === "skim" ? `${hl}${chart}${src}` : state.depth === "swim" ? `${hl}${chart}${stats}${src}` : `${hl}${chart}${stats}${dive}`;
+  } else {
+    body = `<p class="headline">${c.status === "na" ? "Not defined for this place." : `No ${esc(i.title.toLowerCase())} for ${esc(p.name)} yet.`}</p>${c.status === "na" ? `<p class="sub">${esc(c.why || "SDG indicators are reported by country, so they map onto EEZs, not onto sanctuaries.")}</p>` : requestPanel(p, i, c)}`;
+  }
+  const d = $("#drawer");
+  d.innerHTML = `<div class="dh"><div><h2>${esc(i.title)}</h2><p>${esc(p.name)} · ${COLL[p.coll].name}</p></div><button class="close" id="dclose">Close</button></div>${els}${body}`;
+  d.hidden = false; $("#scrim").hidden = false; $("#dclose").focus();
+  d.onclick = ev => {
+    const a = ev.target.closest("[data-act]"); if (!a) return;
+    if (a.dataset.act === "issue") {
+      const em = $("#r-email").value.trim(), e = estimate(p, i);
+      const pre = $("#issue"); pre.hidden = false;
+      pre.textContent = `Title: Indicator request: ${i.title} for ${p.name}
+Labels: indicator-request, ${e.route === "auto" ? "auto" : "needs-review"}
+
+place_id: ${p.id}
+collection: ${p.coll}
+indicator: ${i.id}
+dataset: ${i.dataset.ref}
+time_range: ${$("#r-range").value}
+time_grain: ${$("#r-grain").value.toLowerCase()}
+estimate: ${e.values ? e.values.toLocaleString() + " grid values" : "maintainer to size"}
+notify: ${em ? "yes (address kept out of the issue, sent to the runner privately)" : "no"}
+
+(This mockup does not open the issue.)`;
+    } else if (a.dataset.act === "live" || a.dataset.act === "save") {
+      $("#actmsg").textContent = a.dataset.act === "live" ? "In the app this computes here, as erddap-places does today. The mockup stops at this point." : "This would open a small automatic request, so the series is kept and refreshed.";
+    }
+  };
+}
+function closeDrawer() { $("#drawer").hidden = true; $("#scrim").hidden = true; }
+
+// map view: markers on a public-domain coastline (Natural Earth); the app draws true boundaries ----
+function renderMap() {
+  const i = ind(state.mapInd), W = 960, H = 400, X0 = -190, X1 = 20, Y0 = -12, Y1 = 62;
+  const px = lon => (lon - X0) / (X1 - X0) * W, py = lat => (Y1 - lat) / (Y1 - Y0) * H;
+  const land = DATA.land.map(r => "M" + r.map(([x, y]) => `${px(x).toFixed(1)},${py(y).toFixed(1)}`).join("L") + "Z").join("");
+  let grat = ""; for (let x = -180; x <= 20; x += 30) grat += `<line class="grat" x1="${px(x)}" x2="${px(x)}" y1="0" y2="${H}"/>`; for (let y = 0; y <= 60; y += 30) grat += `<line class="grat" x1="0" x2="${W}" y1="${py(y)}" y2="${py(y)}"/>`;
+  const val = p => { const c = cellOf(p, i); if (c.status !== "ready") return null; if (c.grain === "decade") { const d = c.series.find(s => s[0] === state.decade); return d ? d[1] : null; } return latest(c)[1]; };
+  const ps = DATA.places.filter(p => state.colls.has(p.coll)), vs = ps.map(val).filter(v => v != null), lo = Math.min(...vs), hi = Math.max(...vs);
+  const log = i.unit === "records";
+  const t = v => log ? (Math.log10(v + 1) - Math.log10(lo + 1)) / ((Math.log10(hi + 1) - Math.log10(lo + 1)) || 1) : (v - lo) / ((hi - lo) || 1);
+  const col = v => v == null ? "var(--surface)" : `var(--ramp-${Math.min(4, Math.floor(t(v) * 4.999))})`;
+  const mk = ps.map(p => { const v = val(p), r = Math.max(5, Math.min(22, Math.sqrt(p.area_km2) / 40));
+    return `<circle class="mk" cx="${px(p.lon)}" cy="${py(p.lat)}" r="${r}" fill="${col(v)}" ${v == null ? 'stroke-dasharray="2 2" style="stroke:var(--muted)"' : ""} data-p="${esc(p.id)}"><title>${esc(p.name)}: ${v == null ? "not computed" : fmt(v, i.dp) + " " + i.unit}</title></circle>`; }).join("");
+  const opts = IND.filter(x => DATA.places.some(p => cellOf(p, x).status === "ready")).map(x => `<option value="${x.id}" ${x.id === state.mapInd ? "selected" : ""}>${x.fam} · ${x.title}</option>`).join("");
+  const steps = 5, rampLbl = [...Array(steps)].map((_, k) => `<i style="background:var(--ramp-${k})"></i>`).join("");
+  $("#view-map").innerHTML = `<div class="mapbox">
+    <div class="row"><label class="f" style="min-width:240px">Indicator<select id="mapInd">${opts}</select></label>
+      ${i.grain === "decade" ? `<label class="f">Decade: <b id="decLbl">${state.decade}s</b><input id="dec" type="range" min="1960" max="2020" step="10" value="${state.decade}"></label>` : `<span class="sub">Latest year per place</span>`}</div>
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Map of ${esc(i.title)}">${grat}<path class="land" d="${land}"/>${mk}</svg>
+    <div class="ramp">${fmt(lo, i.dp)} ${rampLbl} ${fmt(hi, i.dp)} ${esc(i.unit)}${log ? " (log scale)" : ""} · dashed: not computed, open it to request</div>
+    <p class="sub">Mockup map: each place is a marker at its centroid, sized by area, on Natural Earth coastlines. The app draws true boundaries
+      (NOAA sanctuaries from the gazetteer; Marine Regions EEZs as vector tiles once VLIZ agrees) and colours them the same way.</p></div>`;
+}
+
+// requests view ----
+function renderRequests() {
+  const reqs = [
+    ["#148", "SST for Ghana EEZ, monthly", "auto", "Done · 2026-10-18", "Ran in 3 min on the runner; requester emailed; issue closed with the series link."],
+    ["#147", "Chlorophyll-a for Ghana EEZ", "auto", "Running · 4 min", "Copernicus Marine BGC, 2021–2025, about 120 k grid values."],
+    ["#146", "Net primary productivity for Belize EEZ", "auto", "Queued", "Waiting for the runner after #147."],
+    ["#145", "ES(50) for all Marine Regions EEZs, by decade", "review", "Scheduled · next OBIS snapshot", "Exact join over the full snapshot; a maintainer ran a timing test first."],
+    ["#141", "Seascape classes for Chumash Heritage", "review", "Awaiting a maintainer", "New dataset in this place collection; AOML seascapes are 8-day, 5 km."],
+  ];
+  $("#view-requests").innerHTML = `<div class="cards">
+    <div class="card"><h3>How a request is handled</h3>
+      <p class="sub"><b>Small jobs run themselves.</b> A catalogued dataset for one place, under 50 M grid values, runs on the Ocean Metrics runner as soon as the issue opens. We email you when the series is published.</p>
+      <p class="sub"><b>Large jobs need a maintainer.</b> New datasets, new methods or whole collections (every EEZ at once) wait for a maintainer, who sizes and schedules them.</p>
+      <p class="sub">Every request is a public GitHub issue, so anyone can see what was asked, what ran and where the result lives. Email addresses go to the runner privately, never into the issue.</p></div>
+    <div class="card"><h3>Recent requests <span class="sub">(examples)</span></h3>
+      ${reqs.map(([id, t, r, s, m]) => `<div class="req"><span class="id">${id}</span><span class="t">${t}</span><span class="st ${r === "auto" ? "auto" : "review"}${s.startsWith("Running") ? " running" : ""}"><span class="dot"></span>${s}</span><span class="m">${m}</span></div>`).join("")}</div></div>`;
+}
+
+// about view ----
+function renderAbout() {
+  $("#view-about").innerHTML = `<div class="cards" style="grid-template-columns:1fr"><div class="card prose">
+    <h3>Four elements, one configuration</h3>
+    <p>Every value here is one job: a <b style="color:var(--el-place)">place</b>, a <b style="color:var(--el-data)">dataset</b>, a <b style="color:var(--el-method)">method</b> and a <b style="color:var(--el-delivery)">delivery</b>, bound by a configuration that hashes to a job id, is logged, and re-runs on a schedule. This is the grammar of “Coding Ocean Indicators: Patterns and People” (MBON, in revision), carried from four case studies to every combination.</p></div>
+    <div class="four">
+      <div class="el" style="--c:var(--el-place)"><div class="k">Place</div><p>A persistent id from the Ocean Metrics gazetteer: NOAA sanctuaries, Marine Regions MRGID, ProtectedSeas PSGID, BOEM areas. Each links back to its source.</p></div>
+      <div class="el" style="--c:var(--el-data)"><div class="k">Dataset</div><p>A persistent URL to a community data service: ERDDAP™ grids and tables, the OBIS snapshot with WoRMS, Copernicus Marine, the UN SDG database.</p></div>
+      <div class="el" style="--c:var(--el-method)"><div class="k">Method</div><p>A version-pinned summary: area-weighted means (erddap-places), exact point-in-polygon diversity (obisindicators), country-to-EEZ joins.</p></div>
+      <div class="el" style="--c:var(--el-delivery)"><div class="k">Delivery</div><p>This viewer, CSV and Parquet, a DuckDB query, an alert, or a tool a language model can call. Skimmers, swimmers and divers enter at their own depth.</p></div>
+    </div>
+    <div class="card"><h3>Who computes what</h3><div class="tbl"><table class="prod">
+      <thead><tr><th>Producer</th><th>Places</th><th>Indicators</th><th>How</th></tr></thead><tbody>
+      <tr><td>erddap-places</td><td>Sanctuaries, any gazetteer polygon</td><td>ERDDAP grids and tables</td><td>Precomputed weekly; live in the browser for the rest</td></tr>
+      <tr><td>obisindicators</td><td>EEZs, offshore regions, any collection</td><td>Records, richness, Shannon, Simpson, ES(50)</td><td>Exact join on each monthly OBIS snapshot</td></tr>
+      <tr><td>obis-hex</td><td>H3 hexagons</td><td>The same diversity indices</td><td>Grid maps for exploring between places</td></tr>
+      <tr><td>SDG adapter</td><td>EEZs</td><td>UN SDG 14 series</td><td>Country values joined by M49 code</td></tr>
+      </tbody></table></div>
+      <p class="sub">All producers write one long table (place, indicator, time grain, time, value) and one manifest, so this viewer lists everything that exists and turns every gap into a request.</p></div></div>`;
+}
+
+// wiring ----
+function render() {
+  document.querySelectorAll("nav.views button").forEach(b => b.setAttribute("aria-selected", b.dataset.view === state.view));
+  document.querySelectorAll(".depth button").forEach(b => b.setAttribute("aria-pressed", b.dataset.depth === state.depth));
+  $("#depthNote").textContent = DEPTH_NOTE[state.depth];
+  for (const v of ["matrix", "map", "requests", "about"]) $("#view-" + v).hidden = v !== state.view;
+  ({ matrix: renderMatrix, map: renderMap, requests: renderRequests, about: renderAbout })[state.view]();
+}
+document.addEventListener("click", ev => {
+  const t = ev.target.closest("button, circle.mk"); if (!t) return;
+  if (t.dataset.view) { state.view = t.dataset.view; render(); }
+  else if (t.dataset.depth) { state.depth = t.dataset.depth; render(); if (!$("#drawer").hidden && state.open) openCell(...state.open); }
+  else if (t.dataset.coll) { state.colls.has(t.dataset.coll) ? state.colls.delete(t.dataset.coll) : state.colls.add(t.dataset.coll); render(); }
+  else if (t.dataset.fam) { state.fams.has(t.dataset.fam) ? state.fams.delete(t.dataset.fam) : state.fams.add(t.dataset.fam); render(); }
+  else if (t.classList.contains("cell")) { state.open = [t.dataset.p, t.dataset.i]; openCell(...state.open); }
+  else if (t.matches("circle.mk")) { state.open = [t.dataset.p, state.mapInd]; openCell(...state.open); }
+  else if (t.id === "dclose") closeDrawer();
+});
+$("#scrim").addEventListener("click", closeDrawer);
+document.addEventListener("keydown", ev => { if (ev.key === "Escape") closeDrawer(); });
+document.addEventListener("input", ev => {
+  if (ev.target.id === "q") { state.q = ev.target.value; const pos = ev.target.selectionStart; renderMatrix(); const q = $("#q"); q.focus(); q.setSelectionRange(pos, pos); }
+  if (ev.target.id === "dec") { state.decade = +ev.target.value; renderMap(); }
+});
+document.addEventListener("change", ev => { if (ev.target.id === "mapInd") { state.mapInd = ev.target.value; renderMap(); } });
+const hash = location.hash.slice(1); if (["matrix", "map", "requests", "about"].includes(hash)) state.view = hash;
+render();
+</script>

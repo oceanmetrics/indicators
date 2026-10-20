@@ -1,0 +1,117 @@
+/* ============================================================================
+   Ocean Metrics theme for @marinebon/ui (oceanmetrics/indicators brand/themes)
+   Maps the Ocean Metrics brand v1 palette (oceanmetrics.io/brand/v1, DESIGN.md and
+   static/css/tokens/colors.css of oceanmetrics.github.io) onto the kit's SEMANTIC
+   tokens, so every kit component wears it unchanged. Load it AFTER the kit's
+   tokens.css. Light and dark follow the kit's switch, [data-theme] on <html>.
+   - brand: teal (fill #0c7288, white text 5.6:1 in both themes)
+   - action: the one sun, with dark ink (never white on yellow)
+   - accent / link: teal-bright and teal on light; teal-bright and sky-teal on dark,
+     as DESIGN.md sets links (teal as text on light, sky-teal on dark)
+   - the pipeline colours (dataset, place, method, delivery) stay the kit's: they carry
+     the paper's grammar, not a brand. Their *-ink partners are for glyphs and text
+     on the page ground and reach >= 3:1 in both themes (tests/brand contrast).
+   ========================================================================== */
+
+:root,
+[data-theme="light"] {
+  --om-teal: #0c7288;
+  --om-teal-deep: #0a5c6e;
+  --om-teal-bright: #1aa0bd;
+  --om-sky-teal: #86d6e5;
+  --om-sun: #f5b528;
+  --om-sun-deep: #e0951a;
+  --om-mark-spark: #f5b528;            /* the ensō waterline: fixed in both themes */
+
+  --bg-page:        #f4fafb;           /* foam-bg */
+  --bg-surface:     #ffffff;
+  --bg-tint:        #e6f5f8;           /* foam-tint */
+  --bg-inverse:     #0c4553;           /* deep-navy */
+  --bg-abyss:       #0a2831;           /* night */
+
+  --text-strong:    #082129;
+  --text-heading:   #123a45;
+  --text-body:      #3c5b64;
+  --text-muted:     #5c7880;
+  --text-on-dark:   #eaf7fa;
+  --text-on-dark-muted: #a2c6cf;
+
+  --brand:          #0c7288;
+  --brand-hover:    #0a5c6e;
+  --accent:         #1aa0bd;
+  --accent-hover:   #0c7288;
+  --action:         #f5b528;
+  --action-hover:   #e0951a;
+  --link:           #0c7288;
+  --label-color:    #0c7288;
+
+  --on-brand:       #ffffff;
+  --on-action:      #082129;           /* dark ink on the sun */
+
+  --border:         #d6ebef;
+  --border-strong:  #c2e0e7;
+  --divider:        #e7f4f6;
+  --focus-ring:     #1aa0bd;
+
+  --pane-bg:        #ffffff;
+  --pane-border:    #d6ebef;
+  --popover-bg:     #ffffff;
+  --control-bg:     #ffffff;
+  --control-hover:  #e6f5f8;
+  --selected-bg:    #e4f6fa;
+
+  --pipe-dataset-ink:  #6d4aa7;
+  --pipe-place-ink:    #01375f;
+  --pipe-method-ink:   #15788f;
+  --pipe-delivery-ink: #c4471d;        /* the coral, deepened to 4.6:1 on white */
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --om-mark-spark: #f5b528;
+
+  --bg-page:        #0a2831;           /* night */
+  --bg-surface:     #103a45;
+  --bg-tint:        #12414d;
+  --bg-inverse:     #07222a;
+  --bg-abyss:       #04141a;
+
+  --text-strong:    #f1f9fb;
+  --text-heading:   #e6f4f7;
+  --text-body:      #b7d0d6;
+  --text-muted:     #83a0a7;
+  --text-on-dark:   #eaf7fa;
+  --text-on-dark-muted: #a2c6cf;
+
+  --brand:          #0c7288;
+  --brand-hover:    #43b9d2;
+  --accent:         #43b9d2;
+  --accent-hover:   #86d6e5;
+  --action:         #f5b528;
+  --action-hover:   #ffce4d;
+  --link:           #86d6e5;
+  --label-color:    #86d6e5;
+
+  --on-brand:       #ffffff;
+  --on-action:      #082129;
+
+  --border:         #234853;
+  --border-strong:  #2c5764;
+  --divider:        #173540;
+  --focus-ring:     #43b9d2;
+
+  --pane-bg:        #103a45;
+  --pane-border:    #234853;
+  --popover-bg:     #12414d;
+  --control-bg:     #12414d;
+  --control-hover:  #174a57;
+  --selected-bg:    #1a5462;
+
+  --pipe-dataset-ink:  #b39ae0;
+  --pipe-place-ink:    #7fb0e6;
+  --pipe-method-ink:   #5cc3d6;
+  --pipe-delivery-ink: #f7956f;
+
+  color-scheme: dark;
+}

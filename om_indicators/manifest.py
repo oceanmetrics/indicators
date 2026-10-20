@@ -77,15 +77,18 @@ def load_config(config: Path = CONFIG) -> tuple[dict, dict[str, dict]]:
 def vocabularies(vocabs: dict[str, dict], goos: dict | None) -> dict[str, dict]:
   """the vocabularies as the manifest carries them: eov terms get their glyph and, where GOOS has one, its badge."""
   out = {}
-  badges = {e["id"]: e for e in (goos or {}).get("icons", [])}
+  badges = {e["id"]: e for e in (goos or {}).get("items", [])}
   for name, v in vocabs.items():
     terms = []
     for t in v["terms"]:
       t = dict(t)
       if name == "eov":
         t["glyph"] = f"eov-{t['id']}"
-        if t["id"] in badges:
-          t["badge"] = f"goos-eov/webp/128/{t['id']}.webp"
+        b = badges.get(t["id"])
+        if b:
+          t["badge"] = f"goos-eov/{b['webp128']}"
+          if b.get("kind") == "eov":  # GOOS's own EOV names (assets/goos-eov/manifest.json labels_from)
+            t["label"] = b["label"]
       terms.append(t)
     out[name] = {k: v[k] for k in ("title", "source", "note", "credit") if k in v} | {"terms": terms}
   return out

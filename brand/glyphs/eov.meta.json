@@ -1,0 +1,581 @@
+{
+ "eov-dissolved-organic-carbon": {
+  "fallback": "mdiMolecule",
+  "path_chars": 9402,
+  "readable_16": false,
+  "source": "biogeochemistry/Dissolved-organic-carbon.png",
+  "source_sha256": "6da73d9e5ca020629706a78866ddadde55da8bf05305525b258c24a4c6c45aae",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.891,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.8,
+   "px_per_unit": 10,
+   "subpaths": 115,
+   "turdsize": 25
+  }
+ },
+ "eov-fish": {
+  "path_chars": 1470,
+  "readable_16": true,
+  "source": "bioeco/Fish.png",
+  "source_sha256": "ea1f706332f429b954e1ebffe1aa37205c5d58748ad67170223d1b7072d51883",
+  "trace": {
+   "alphamax": 1.2,
+   "area_kept": 1.03,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 2.0,
+   "px_per_unit": 10,
+   "subpaths": 3,
+   "turdsize": 100
+  }
+ },
+ "eov-hard-coral": {
+  "path_chars": 9576,
+  "readable_16": true,
+  "source": "bioeco/Hard-coral.png",
+  "source_sha256": "3ed2e7f90bcac2f4be2ab595766b3cfaf5a3b3b84b881d5f117201c59c7d5b47",
+  "trace": {
+   "alphamax": 1.3,
+   "area_kept": 1.016,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 3.0,
+   "px_per_unit": 10,
+   "subpaths": 1,
+   "turdsize": 200
+  }
+ },
+ "eov-inorganic-carbon": {
+  "fallback": "mdiMoleculeCo2",
+  "path_chars": 1214,
+  "readable_16": false,
+  "source": "biogeochemistry/Inorganic-carbon.png",
+  "source_sha256": "8162314e298bb6ab33fbe9b76c30d1159419b9c73d9850f009d80bc4f5bd1578",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.969,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.4,
+   "px_per_unit": 10,
+   "subpaths": 6,
+   "turdsize": 12
+  }
+ },
+ "eov-invertebrates": {
+  "path_chars": 761,
+  "readable_16": true,
+  "source": "bioeco/Invertebrates.png",
+  "source_sha256": "e825f85f5e2cdd5637230c2142823f500971aafb4237384c7c20bda22aa93cfd",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.996,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.4,
+   "px_per_unit": 10,
+   "subpaths": 1,
+   "turdsize": 12
+  }
+ },
+ "eov-macroalgae": {
+  "path_chars": 4527,
+  "readable_16": true,
+  "source": "bioeco/Macroalgae.png",
+  "source_sha256": "267e5d6bf43cf9d838cf4b1d1209cab4ebc1f0d7581519c18a3729fc95b52c87",
+  "trace": {
+   "alphamax": 1.3,
+   "area_kept": 1.05,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 3.0,
+   "px_per_unit": 10,
+   "subpaths": 1,
+   "turdsize": 200
+  }
+ },
+ "eov-mangroves": {
+  "path_chars": 1398,
+  "readable_16": true,
+  "source": "bioeco/Mangroves.png",
+  "source_sha256": "720dcc659fb97a52ee74cdb66e2bd6a1f1596b954e4490eef527b46a33a804ba",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.981,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.4,
+   "px_per_unit": 10,
+   "subpaths": 1,
+   "turdsize": 12
+  }
+ },
+ "eov-marine-debris": {
+  "path_chars": 1442,
+  "readable_16": true,
+  "source": "cross-disciplinary/Marine-debris.png",
+  "source_sha256": "afeaa5948996bd243ee5fc34c8a8adc6ace6f48ea938f50bb61c58074bf96436",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.988,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.8,
+   "px_per_unit": 10,
+   "subpaths": 7,
+   "turdsize": 25
+  }
+ },
+ "eov-marine-mammals": {
+  "path_chars": 1375,
+  "readable_16": true,
+  "source": "bioeco/Marine-mammals.png",
+  "source_sha256": "e9da62eaeb0a825a86f282c6c28b70981c54e22842118a34a6f0cc4cd6b03296",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.998,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.4,
+   "px_per_unit": 10,
+   "subpaths": 2,
+   "turdsize": 12
+  }
+ },
+ "eov-microbes": {
+  "fallback": "mdiBacteria",
+  "path_chars": 3257,
+  "readable_16": false,
+  "source": "bioeco/Microbes.png",
+  "source_sha256": "d0005f7fe49b042678cd23628b9b3819d10fa3a9b0d647610fef3724cbeeac79",
+  "trace": {
+   "alphamax": 1.3,
+   "area_kept": 0.997,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 3.0,
+   "px_per_unit": 10,
+   "subpaths": 3,
+   "turdsize": 200
+  }
+ },
+ "eov-nitrous-oxide": {
+  "fallback": "mdiGasCylinder",
+  "path_chars": 2391,
+  "readable_16": false,
+  "source": "biogeochemistry/Nitrous-oxide.png",
+  "source_sha256": "ffca17c2d1f5a496b58991089bcdf7107d66207795e3c9c1b90590e6973df8de",
+  "trace": {
+   "alphamax": 1.3,
+   "area_kept": 0.982,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 3.0,
+   "px_per_unit": 10,
+   "subpaths": 4,
+   "turdsize": 200
+  }
+ },
+ "eov-nutrients": {
+  "fallback": "mdiFlaskOutline",
+  "path_chars": 1919,
+  "readable_16": false,
+  "source": "biogeochemistry/Nutrients.png",
+  "source_sha256": "8948f9326559f0a29151129f8d61ecda0fe0556b8c53a9ad328c054283c59d38",
+  "trace": {
+   "alphamax": 1.3,
+   "area_kept": 1.017,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 3.0,
+   "px_per_unit": 10,
+   "subpaths": 4,
+   "turdsize": 200
+  }
+ },
+ "eov-ocean-bottom-pressure": {
+  "fallback": "mdiGauge",
+  "path_chars": 900,
+  "readable_16": false,
+  "source": "physics/Bottom-pressure.png",
+  "source_sha256": "7eacc99fb413430137377025f77d882b72aa54ad6957bd7bce12bd0b349aa6f9",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.964,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.4,
+   "px_per_unit": 10,
+   "subpaths": 2,
+   "turdsize": 12
+  }
+ },
+ "eov-ocean-colour": {
+  "fallback": "mdiPaletteOutline",
+  "path_chars": 547,
+  "readable_16": false,
+  "source": "cross-disciplinary/Ocean-colour.png",
+  "source_sha256": "9b2c931db4ddaf72b4403638515f1301b3c91c2515531114e869e115a1d11fb0",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.983,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.4,
+   "px_per_unit": 10,
+   "subpaths": 1,
+   "turdsize": 12
+  }
+ },
+ "eov-ocean-sound": {
+  "fallback": "mdiWaveform",
+  "path_chars": 1591,
+  "readable_16": false,
+  "source": "cross-disciplinary/Ocean-sound.png",
+  "source_sha256": "c1370b3c0b4b24eb0ad526cc4abbef29ae9d7488a50481ad9c84241cd72a616f",
+  "trace": {
+   "alphamax": 1.3,
+   "area_kept": 0.926,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 3.0,
+   "px_per_unit": 10,
+   "subpaths": 5,
+   "turdsize": 200
+  }
+ },
+ "eov-ocean-surface-heat-flux": {
+  "fallback": "mdiSunThermometerOutline",
+  "path_chars": 1862,
+  "readable_16": false,
+  "source": "physics/Surface-heat-flux.png",
+  "source_sha256": "479d3c764f054f66d8cb2315b48bbe9927b7ecd70bfa4637ea76daf811815109",
+  "trace": {
+   "alphamax": 1.3,
+   "area_kept": 0.976,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 3.0,
+   "px_per_unit": 10,
+   "subpaths": 6,
+   "turdsize": 200
+  }
+ },
+ "eov-ocean-surface-stress": {
+  "fallback": "mdiWeatherWindy",
+  "path_chars": 1993,
+  "readable_16": false,
+  "source": "physics/Surface-stress.png",
+  "source_sha256": "7d93b24a30b7e27813ec16d4133c7679e0378c4ca86aa47bb0128af3c4c7a300",
+  "trace": {
+   "alphamax": 1.3,
+   "area_kept": 0.983,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 3.0,
+   "px_per_unit": 10,
+   "subpaths": 3,
+   "turdsize": 200
+  }
+ },
+ "eov-oxygen": {
+  "path_chars": 1161,
+  "readable_16": true,
+  "source": "biogeochemistry/Oxygen.png",
+  "source_sha256": "e384d1adee2e1a0674921332c0cb2f5811fb52892396cd12e53d70fa327637ca",
+  "trace": {
+   "alphamax": 1.3,
+   "area_kept": 1.032,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 3.0,
+   "px_per_unit": 10,
+   "subpaths": 6,
+   "turdsize": 200
+  }
+ },
+ "eov-particulate-matter": {
+  "path_chars": 1459,
+  "readable_16": true,
+  "source": "biogeochemistry/Particulate-matter.png",
+  "source_sha256": "d1578326bbba1adb357f2345a63bb38d85533e5b9562e0572853cef1339dbd39",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.987,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.8,
+   "px_per_unit": 10,
+   "subpaths": 5,
+   "turdsize": 25
+  }
+ },
+ "eov-phytoplankton": {
+  "path_chars": 4864,
+  "readable_16": true,
+  "source": "bioeco/Phytoplankton.png",
+  "source_sha256": "fea9c6bef796fa6d762b1dfd1ba6bc6f899bd4aa05df924fe8f3d2024fa85d1d",
+  "trace": {
+   "alphamax": 1.3,
+   "area_kept": 1.099,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 3.0,
+   "px_per_unit": 10,
+   "subpaths": 17,
+   "turdsize": 200
+  }
+ },
+ "eov-sea-ice": {
+  "path_chars": 1659,
+  "readable_16": true,
+  "source": "physics/Sea-ice.png",
+  "source_sha256": "fc9342a5c99240bbc514c015626d183a248d640458e7e9a9be42781a58d3ab87",
+  "trace": {
+   "alphamax": 1.3,
+   "area_kept": 0.977,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 3.0,
+   "px_per_unit": 10,
+   "subpaths": 8,
+   "turdsize": 200
+  }
+ },
+ "eov-sea-state": {
+  "path_chars": 978,
+  "readable_16": true,
+  "source": "physics/Sea-state.png",
+  "source_sha256": "5abcde0bb7909b6fceded4db6ab0574e1d26dba597c35c1852e6ebbebbe5d70d",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.994,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.4,
+   "px_per_unit": 10,
+   "subpaths": 1,
+   "turdsize": 12
+  }
+ },
+ "eov-sea-surface-height": {
+  "fallback": "mdiArrowExpandVertical",
+  "path_chars": 2221,
+  "readable_16": false,
+  "source": "physics/Surface-height.png",
+  "source_sha256": "e6a1794277677933f0d715853338db406ea5b7a12b30d490c6bdd084aa9f8bf0",
+  "trace": {
+   "alphamax": 1.3,
+   "area_kept": 0.984,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 3.0,
+   "px_per_unit": 10,
+   "subpaths": 3,
+   "turdsize": 200
+  }
+ },
+ "eov-sea-surface-salinity": {
+  "fallback": "mdiShakerOutline",
+  "path_chars": 4340,
+  "readable_16": false,
+  "source": "physics/Surface-salinity.png",
+  "source_sha256": "c8eaac6014c9e1990a3a5690c76874a4ba3255f6ba87eb1c1f67dbd4e7b70acc",
+  "trace": {
+   "alphamax": 1.1,
+   "area_kept": 0.946,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 1.2,
+   "px_per_unit": 10,
+   "subpaths": 43,
+   "turdsize": 50
+  }
+ },
+ "eov-sea-surface-temperature": {
+  "fallback": "mdiThermometer",
+  "path_chars": 1041,
+  "readable_16": false,
+  "source": "physics/Surface-temperature.png",
+  "source_sha256": "efd6a5592d370a865d004dac04dcb577040170c696038314443ee877d2829285",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.981,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.4,
+   "px_per_unit": 10,
+   "subpaths": 4,
+   "turdsize": 12
+  }
+ },
+ "eov-sea-turtles": {
+  "path_chars": 2153,
+  "readable_16": true,
+  "source": "bioeco/Sea-turtles.png",
+  "source_sha256": "4e44e9fa476c67ef46ef726348dbe66bb415dcf8d4a00b9513190c9ccc9688c0",
+  "trace": {
+   "alphamax": 1.3,
+   "area_kept": 0.97,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 3.0,
+   "px_per_unit": 10,
+   "subpaths": 18,
+   "turdsize": 200
+  }
+ },
+ "eov-seabirds": {
+  "path_chars": 898,
+  "readable_16": true,
+  "source": "bioeco/Seabirds.png",
+  "source_sha256": "f8bac609bef66b0cf12efd4186d13225b11619da6988b53dd1d8d1123d85b8e9",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.995,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.4,
+   "px_per_unit": 10,
+   "subpaths": 2,
+   "turdsize": 12
+  }
+ },
+ "eov-seagrass": {
+  "path_chars": 3218,
+  "readable_16": true,
+  "source": "bioeco/Seagrass.png",
+  "source_sha256": "bb4517d3e3cd1316efc5ef5d8ebbd95fc23457ad0baa34e3a806a4f155bc80a8",
+  "trace": {
+   "alphamax": 1.3,
+   "area_kept": 0.979,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 3.0,
+   "px_per_unit": 10,
+   "subpaths": 13,
+   "turdsize": 200
+  }
+ },
+ "eov-stable-carbon-isotopes": {
+  "fallback": "mdiAtom",
+  "path_chars": 1416,
+  "readable_16": false,
+  "source": "biogeochemistry/Stable-carbon-isotopes.png",
+  "source_sha256": "1972c131659639a93d29a8c57102dbb2506c0c8d5c7f3ebd06befc5c1af2a98e",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.963,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.4,
+   "px_per_unit": 10,
+   "subpaths": 12,
+   "turdsize": 12
+  }
+ },
+ "eov-subsurface-currents": {
+  "fallback": "mdiArrowRightBold",
+  "path_chars": 534,
+  "readable_16": false,
+  "source": "physics/Subsurface-currents.png",
+  "source_sha256": "1f92c285c9b6b1167cb49d206cbbf96b6a4728697d1101e0bdce885c3a0d6b4c",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.99,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.4,
+   "px_per_unit": 10,
+   "subpaths": 1,
+   "turdsize": 12
+  }
+ },
+ "eov-subsurface-salinity": {
+  "fallback": "mdiShaker",
+  "path_chars": 4142,
+  "readable_16": false,
+  "source": "physics/Subsurface-salinity.png",
+  "source_sha256": "5d3753eaef48c138004f9681b66b78818d852cb56d95c94e42cfd5cb49a92802",
+  "trace": {
+   "alphamax": 1.1,
+   "area_kept": 0.949,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 1.2,
+   "px_per_unit": 10,
+   "subpaths": 40,
+   "turdsize": 50
+  }
+ },
+ "eov-subsurface-temperature": {
+  "fallback": "mdiThermometerLines",
+  "path_chars": 1125,
+  "readable_16": false,
+  "source": "physics/Subsurface-temperature.png",
+  "source_sha256": "5a870176c3a54f33d68bcf1869bbe9342fec3ed88cd1db5094645c0395bbb8ad",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.992,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.4,
+   "px_per_unit": 10,
+   "subpaths": 4,
+   "turdsize": 12
+  }
+ },
+ "eov-surface-currents": {
+  "fallback": "mdiWaves",
+  "path_chars": 607,
+  "readable_16": false,
+  "source": "physics/Surface-currents.png",
+  "source_sha256": "7f3a72cf680471f95e8de17e000c01b237b58b58946bfe48b0236443190469df",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.986,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.4,
+   "px_per_unit": 10,
+   "subpaths": 1,
+   "turdsize": 12
+  }
+ },
+ "eov-transient-tracers": {
+  "fallback": "mdiTestTube",
+  "path_chars": 4672,
+  "readable_16": false,
+  "source": "biogeochemistry/Transient-tracers.png",
+  "source_sha256": "f8e04edfbccd60c78e2544c1e566716625bd1407725f96e65ddd5ee14f8a4914",
+  "trace": {
+   "alphamax": 1.0,
+   "area_kept": 0.888,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 0.4,
+   "px_per_unit": 10,
+   "subpaths": 40,
+   "turdsize": 12
+  }
+ },
+ "eov-zooplankton": {
+  "path_chars": 1448,
+  "readable_16": true,
+  "source": "bioeco/Zooplankton.png",
+  "source_sha256": "b29114c08d8f24b530cd7774e605e7cea45ae76055d3fef4aa0fec9758007c26",
+  "trace": {
+   "alphamax": 1.3,
+   "area_kept": 0.965,
+   "inner_radius": 0.93,
+   "light_min": 150,
+   "opttolerance": 3.0,
+   "px_per_unit": 10,
+   "subpaths": 5,
+   "turdsize": 200
+  }
+ }
+}

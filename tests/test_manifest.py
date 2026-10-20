@@ -94,10 +94,13 @@ def test_categorical_takes_its_classes_from_the_stac(tmp_path):
 
 
 def test_eov_terms_get_glyphs_and_goos_badges():
-  v = m.vocabularies(VOCABS, {"icons": [{"id": "sea-surface-temperature"}]})
+  goos = {"items": [{"id": "sea-surface-temperature", "kind": "eov", "label": "Sea surface temperature (GOOS)",
+                      "webp128": "webp/128/sea-surface-temperature.webp"}]}
+  v = m.vocabularies(VOCABS, goos)
   sst, tdf = v["eov"]["terms"][0], v["eov"]["terms"][1]
   assert sst["glyph"] == "eov-sea-surface-temperature"
   assert sst["badge"] == "goos-eov/webp/128/sea-surface-temperature.webp"
+  assert sst["label"] == "Sea surface temperature (GOOS)"
   assert "badge" not in tdf and v["eov"]["credit"] == "Credit: Global Ocean Observing System (GOOS)"
 
 

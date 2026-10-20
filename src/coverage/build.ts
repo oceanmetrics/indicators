@@ -35,6 +35,7 @@ export interface ManifestIndicator {
 
 export interface CoverageRow {
   place_id: string
+  place_name: string
   coll: string
   indicator: string
   time_grain: Grain
@@ -60,8 +61,8 @@ export interface CoverageRow {
 export const SPARK_PERIODS = 40
 const IMPLEMENTED = new Set<string>(['iea-sd', 'names-pct', 'values'])
 
-const empty = (r: ValueRow): CoverageRow => ({
-  place_id: r.place_id, coll: r.coll, indicator: r.indicator, time_grain: r.time_grain,
+const empty = (r: ValueRow, placeName = r.place_id): CoverageRow => ({
+  place_id: r.place_id, place_name: placeName, coll: r.coll, indicator: r.indicator, time_grain: r.time_grain,
   t0: null, t1: null, n_periods: 0, last_time: null, last_value: null, last_class: null,
   status_method: null, status: null, trend: null, recent_mean: null, recent_from: null, recent_to: null,
   lt_mean: null, lt_sd: null, why: null, sentence: null, spark: '[]',
@@ -69,7 +70,7 @@ const empty = (r: ValueRow): CoverageRow => ({
 
 /** one coverage row for a continuous (place, grain) group */
 export function continuousRow(rows: ValueRow[], ind: ManifestIndicator, placeName: string): CoverageRow {
-  const out = empty(rows[0])
+  const out = empty(rows[0], placeName)
   const grain = rows[0].time_grain
   const series: Point[] = rows
     .filter(r => r.value != null && r.time != null)
@@ -96,7 +97,7 @@ export function continuousRow(rows: ValueRow[], ind: ManifestIndicator, placeNam
 
 /** one coverage row for a categorical (place, grain) group: the last period's largest class */
 export function categoricalRow(rows: ValueRow[], ind: ManifestIndicator, placeName: string): CoverageRow {
-  const out = empty(rows[0])
+  const out = empty(rows[0], placeName)
   const grain = rows[0].time_grain
   const byT = new Map<string, ValueRow[]>()
   for (const r of rows) if (r.time != null && r.value != null) byT.set(r.time, [...(byT.get(r.time) ?? []), r])

@@ -4,11 +4,12 @@
   "title": "One row of coverage.parquet",
   "description": "place x indicator x time grain: the time range, the number of periods, the last value, a short sparkline series, and on the indicator's status_grain row the default status and trend from its status_method. Built by `npm run coverage:build` (src/coverage/), which imports the same status functions as the viewer (src/status/). The Matrix, the report builder and the Scorecard read only this file.",
   "type": "object",
-  "required": ["place_id", "coll", "indicator", "time_grain", "t0", "t1", "n_periods", "last_time", "last_value",
+  "required": ["place_id", "place_name", "coll", "indicator", "time_grain", "t0", "t1", "n_periods", "last_time", "last_value",
                "last_class", "status_method", "status", "trend", "recent_mean", "recent_from", "recent_to",
                "lt_mean", "lt_sd", "why", "sentence", "spark"],
   "properties": {
     "place_id": { "type": "string" },
+    "place_name": { "type": "string", "description": "The place's name in the gazetteer index (its id when the index lacks it), so the Matrix needs no other file." },
     "coll": { "type": "string" },
     "indicator": { "type": "string" },
     "time_grain": { "enum": ["all", "decade", "year", "month", "day"] },
