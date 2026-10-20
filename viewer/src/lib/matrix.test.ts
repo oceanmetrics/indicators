@@ -75,10 +75,21 @@ describe('cellModel', () => {
     expect([m.kind, m.statusIcon]).toEqual(['class', null])
     expect(classText(c, r)).toBe('Tropical Seas 49%')
   })
-  it('no value but values exist for the collection: no data, with the reason', () => {
+  it('a row without a value: no data, with the reason', () => {
     const m = cellModel(sst, place, row({ last_value: null, why: 'gap' }))
     expect([m.kind, m.stateIcon, m.reason]).toEqual(['nodata', 'cell-na', 'gap'])
-    expect(cellModel(sst, place, null).kind).toBe('nodata')
+  })
+  it('no row for an erddap-places indicator is not computed yet, even when its collection has values for other places', () => {
+    // regression (2026-10-20): with the whole gazetteer in the picker, 29 reserves beside the one requested (Wells) said
+    // "no data here" because the noaa_nerrs values file exists; erddap-places computes place by place
+    expect(cellModel(sst, place, null).kind).toBe('live')
+    const ace = { id: 'NERRS:ACE', name: 'Ace Basin', coll: 'noaa_nerrs', valuesColls: ['noaa_nerrs'] }
+    const precip = ind({ id: 'precip', collections: [{ coll: 'noaa_nerrs', places: 1, rows: 2, path: 'p' }] })
+    expect(cellModel(precip, ace, null).kind).toBe('live')
+  })
+  it('no row from a producer that computes whole collections, which has values in this one: no data here', () => {
+    const obis = ind({ id: 'obis', producer: { name: 'obisindicators' }, collections: [{ coll: 'places', places: 1, rows: 1, path: 'p' }] })
+    expect([cellModel(obis, place, null).kind, cellModel(obis, place, null).reason]).toEqual(['nodata', null])
   })
   it('no values for the collection and the producer is erddap-places: on the fly', () => {
     const m = cellModel(sst, { id: 'MRGID:1', name: 'EEZ', coll: 'mr_eez' }, null)
@@ -92,7 +103,7 @@ describe('cellModel', () => {
   it('a place held by two values collections has no data when either has values for the indicator, else on the fly', () => {
     // Pitcairn: grouped under mr_eez, rows in both places and mr_eez
     const pitcairn = { id: 'MRGID:8439', name: 'Pitcairn', coll: 'mr_eez', valuesColls: ['mr_eez', 'places'] }
-    expect(cellModel(sst, pitcairn, null).kind).toBe('nodata')   // sst has values in `places`, which holds Pitcairn
+    expect(cellModel(sst, pitcairn, null).kind).toBe('live')     // erddap-places: no row of its own is not computed
     const sdg = ind({ id: 'sdg', producer: { name: 'other' }, collections: [{ coll: 'mr_eez', places: 1, rows: 1, path: 'p' }] })
     expect(cellModel(sdg, pitcairn, null).kind).toBe('nodata')
     expect(cellModel(sdg, { ...pitcairn, valuesColls: ['places'] }, null).kind).toBe('na')
@@ -130,7 +141,8 @@ describe('words', () => {
     expect(cellAria(sst, place, m)).toBe('Alpha, SST: 26.0 °C in 2020; above its own record; trend up.')
   })
   it('the aria label of every empty state names the state', () => {
-    expect(cellAria(sst, place, cellModel(sst, place, null))).toBe('Alpha, SST: no data here.')
+    const whole = ind({ id: 'obis', short: 'SST', producer: { name: 'obisindicators' }, collections: [{ coll: 'places', places: 1, rows: 1, path: 'p' }] })
+    expect(cellAria(whole, place, cellModel(whole, place, null))).toBe('Alpha, SST: no data here.')
     expect(cellAria(sst, place, cellModel(sst, place, row({ last_value: null, why: 'gap' })))).toBe('Alpha, SST: no data here (gap).')
     const eez = { ...place, coll: 'mr_eez', valuesColls: ['mr_eez'] }
     expect(cellAria(sst, eez, cellModel(sst, eez, null))).toBe('Alpha, SST: not computed yet; open it to compute it or ask for it.')

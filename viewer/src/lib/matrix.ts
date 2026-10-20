@@ -140,8 +140,13 @@ export function cellModel(ind: Indicator, place: Place, row: CoverageRow | null)
       reason: null,
     }
   }
-  if (hasValues(ind, place)) return { kind: 'nodata', row, statusIcon: null, trendIcon: null, stateIcon: 'cell-na', reason: row?.why ?? null }
+  // a row without a value: the place was computed and has no data
+  if (row) return { kind: 'nodata', row, statusIcon: null, trendIcon: null, stateIcon: 'cell-na', reason: row.why ?? null }
+  // no row and erddap-places can compute it: it computes place by place (precomputed or on request), so another place's
+  // values in the same collection say nothing about this one: not computed yet (a reserve beside the one requested, 2026-10-20)
   if (isLiveProducer(ind)) return { kind: 'live', row, statusIcon: null, trendIcon: null, stateIcon: 'cell-live', reason: null }
+  // no row from a producer that computes whole collections (OBIS, eco-indicators, SDG): a place it left out has no data
+  if (hasValues(ind, place)) return { kind: 'nodata', row, statusIcon: null, trendIcon: null, stateIcon: 'cell-na', reason: null }
   return { kind: 'na', row, statusIcon: null, trendIcon: null, stateIcon: null, reason: null }
 }
 
