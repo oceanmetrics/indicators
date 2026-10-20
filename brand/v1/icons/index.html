@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ocean Metrics icons v1</title>
+<style>
+/* ============================================================================
+   Ocean Metrics theme for @marinebon/ui (oceanmetrics/indicators brand/themes)
+   Maps the Ocean Metrics brand v1 palette (oceanmetrics.io/brand/v1, DESIGN.md and
+   static/css/tokens/colors.css of oceanmetrics.github.io) onto the kit's SEMANTIC
+   tokens, so every kit component wears it unchanged. Load it AFTER the kit's
+   tokens.css. Light and dark follow the kit's switch, [data-theme] on <html>.
+   - brand: teal (fill #0c7288, white text 5.6:1 in both themes)
+   - action: the one sun, with dark ink (never white on yellow)
+   - accent / link: teal-bright and teal on light; teal-bright and sky-teal on dark,
+     as DESIGN.md sets links (teal as text on light, sky-teal on dark)
+   - the pipeline colours (dataset, place, method, delivery) stay the kit's: they carry
+     the paper's grammar, not a brand. Their *-ink partners are for glyphs and text
+     on the page ground and reach >= 3:1 in both themes (tests/brand contrast).
+   ========================================================================== */
+
+:root,
+[data-theme="light"] {
+  --om-teal: #0c7288;
+  --om-teal-deep: #0a5c6e;
+  --om-teal-bright: #1aa0bd;
+  --om-sky-teal: #86d6e5;
+  --om-sun: #f5b528;
+  --om-sun-deep: #e0951a;
+  --om-mark-spark: #f5b528;            /* the ensō waterline: fixed in both themes */
+
+  --bg-page:        #f4fafb;           /* foam-bg */
+  --bg-surface:     #ffffff;
+  --bg-tint:        #e6f5f8;           /* foam-tint */
+  --bg-inverse:     #0c4553;           /* deep-navy */
+  --bg-abyss:       #0a2831;           /* night */
+
+  --text-strong:    #082129;
+  --text-heading:   #123a45;
+  --text-body:      #3c5b64;
+  --text-muted:     #5c7880;
+  --text-on-dark:   #eaf7fa;
+  --text-on-dark-muted: #a2c6cf;
+
+  --brand:          #0c7288;
+  --brand-hover:    #0a5c6e;
+  --accent:         #1aa0bd;
+  --accent-hover:   #0c7288;
+  --action:         #f5b528;
+  --action-hover:   #e0951a;
+  --link:           #0c7288;
+  --label-color:    #0c7288;
+
+  --on-brand:       #ffffff;
+  --on-action:      #082129;           /* dark ink on the sun */
+
+  --border:         #d6ebef;
+  --border-strong:  #c2e0e7;
+  --divider:        #e7f4f6;
+  --focus-ring:     #1aa0bd;
+
+  --pane-bg:        #ffffff;
+  --pane-border:    #d6ebef;
+  --popover-bg:     #ffffff;
+  --control-bg:     #ffffff;
+  --control-hover:  #e6f5f8;
+  --selected-bg:    #e4f6fa;
+
+  --pipe-dataset-ink:  #6d4aa7;
+  --pipe-place-ink:    #01375f;
+  --pipe-method-ink:   #15788f;
+  --pipe-delivery-ink: #c4471d;        /* the coral, deepened to 4.6:1 on white */
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --om-mark-spark: #f5b528;
+
+  --bg-page:        #0a2831;           /* night */
+  --bg-surface:     #103a45;
+  --bg-tint:        #12414d;
+  --bg-inverse:     #07222a;
+  --bg-abyss:       #04141a;
+
+  --text-strong:    #f1f9fb;
+  --text-heading:   #e6f4f7;
+  --text-body:      #b7d0d6;
+  --text-muted:     #83a0a7;
+  --text-on-dark:   #eaf7fa;
+  --text-on-dark-muted: #a2c6cf;
+
+  --brand:          #0c7288;
+  --brand-hover:    #43b9d2;
+  --accent:         #43b9d2;
+  --accent-hover:   #86d6e5;
+  --action:         #f5b528;
+  --action-hover:   #ffce4d;
+  --link:           #86d6e5;
+  --label-color:    #86d6e5;
+
+  --on-brand:       #ffffff;
+  --on-action:      #082129;
+
+  --border:         #234853;
+  --border-strong:  #2c5764;
+  --divider:        #173540;
+  --focus-ring:     #43b9d2;
+
+  --pane-bg:        #103a45;
+  --pane-border:    #234853;
+  --popover-bg:     #12414d;
+  --control-bg:     #12414d;
+  --control-hover:  #174a57;
+  --selected-bg:    #1a5462;
+
+  --pipe-dataset-ink:  #b39ae0;
+  --pipe-place-ink:    #7fb0e6;
+  --pipe-method-ink:   #5cc3d6;
+  --pipe-delivery-ink: #f7956f;
+
+  color-scheme: dark;
+}
+</style>
+<link rel="stylesheet" href="icons.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; padding: 16px; background: var(--bg-page); color: var(--text-body); font: 15px/1.45 system-ui, sans-serif; }
+main { max-width: 1100px; margin: 0 auto; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; justify-content: space-between; }
+h1 { margin: 0; font-size: 1.4rem; color: var(--text-strong); }
+h2 { margin: 28px 0 8px; font-size: 1.05rem; color: var(--text-heading); }
+h2 small { color: var(--text-muted); font-weight: 400; }
+button { font: inherit; color: var(--text-strong); background: var(--control-bg); border: 1px solid var(--border-strong); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { background: var(--control-hover); }
+button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.lead { color: var(--text-body); margin: 8px 0 0; }
+.grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 8px; }
+.card { color: var(--text-strong); display: flex; flex-direction: column; gap: 4px; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
+.ico { display: flex; align-items: center; gap: 12px; min-height: 40px; }
+.om-i.s16 { font-size: 16px; }
+.om-i.s24 { font-size: 24px; }
+.om-i.s40 { font-size: 40px; }
+.nm { font-size: 12px; color: var(--text-heading); overflow-wrap: anywhere; }
+.src { font-size: 11px; color: var(--text-muted); overflow-wrap: anywhere; }
+.credits { margin-top: 32px; padding: 12px 16px; background: var(--bg-tint); border: 1px solid var(--border); border-radius: 8px; }
+.credits h2 { margin-top: 0; }
+.credits ul { margin: 0; padding-left: 20px; }
+a { color: var(--link); }
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>Ocean Metrics icons v1 <small>(108 glyphs)</small></h1>
+<button id="theme" type="button" aria-pressed="false">Dark theme</button>
+</header>
+<p class="lead">Every glyph at 16, 24 and 40 px, drawn as a CSS mask in the text colour. The el- row wears the pipeline colours. Source under each name.</p>
+<section><h2>ui: actions <small>26</small></h2><ul class="grid"><li class="card"><span class="ico"><i class="om-i om-i-ui-calendar s16"></i><i class="om-i om-i-ui-calendar s24"></i><i class="om-i om-i-ui-calendar s40"></i></span><span class="nm">ui-calendar</span><span class="src">mdi:mdiCalendarRange</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-check s16"></i><i class="om-i om-i-ui-check s24"></i><i class="om-i om-i-ui-check s40"></i></span><span class="nm">ui-check</span><span class="src">mdi:mdiCheck</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-close s16"></i><i class="om-i om-i-ui-close s24"></i><i class="om-i om-i-ui-close s40"></i></span><span class="nm">ui-close</span><span class="src">mdi:mdiClose</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-collapse s16"></i><i class="om-i om-i-ui-collapse s24"></i><i class="om-i om-i-ui-collapse s40"></i></span><span class="nm">ui-collapse</span><span class="src">mdi:mdiChevronUp</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-copy s16"></i><i class="om-i om-i-ui-copy s24"></i><i class="om-i om-i-ui-copy s40"></i></span><span class="nm">ui-copy</span><span class="src">mdi:mdiContentCopy</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-download s16"></i><i class="om-i om-i-ui-download s24"></i><i class="om-i om-i-ui-download s40"></i></span><span class="nm">ui-download</span><span class="src">mdi:mdiDownloadOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-embed s16"></i><i class="om-i om-i-ui-embed s24"></i><i class="om-i om-i-ui-embed s40"></i></span><span class="nm">ui-embed</span><span class="src">mdi:mdiCodeTags</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-expand s16"></i><i class="om-i om-i-ui-expand s24"></i><i class="om-i om-i-ui-expand s40"></i></span><span class="nm">ui-expand</span><span class="src">mdi:mdiChevronDown</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-external s16"></i><i class="om-i om-i-ui-external s24"></i><i class="om-i om-i-ui-external s40"></i></span><span class="nm">ui-external</span><span class="src">mdi:mdiOpenInNew</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-feedback s16"></i><i class="om-i om-i-ui-feedback s24"></i><i class="om-i om-i-ui-feedback s40"></i></span><span class="nm">ui-feedback</span><span class="src">mdi:mdiMessageAlertOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-filter s16"></i><i class="om-i om-i-ui-filter s24"></i><i class="om-i om-i-ui-filter s40"></i></span><span class="nm">ui-filter</span><span class="src">mdi:mdiFilterOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-github s16"></i><i class="om-i om-i-ui-github s24"></i><i class="om-i om-i-ui-github s40"></i></span><span class="nm">ui-github</span><span class="src">mdi:mdiGithub</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-help s16"></i><i class="om-i om-i-ui-help s24"></i><i class="om-i om-i-ui-help s40"></i></span><span class="nm">ui-help</span><span class="src">mdi:mdiHelpCircleOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-info s16"></i><i class="om-i om-i-ui-info s24"></i><i class="om-i om-i-ui-info s40"></i></span><span class="nm">ui-info</span><span class="src">mdi:mdiInformationOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-link s16"></i><i class="om-i om-i-ui-link s24"></i><i class="om-i om-i-ui-link s40"></i></span><span class="nm">ui-link</span><span class="src">mdi:mdiLinkVariant</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-more s16"></i><i class="om-i om-i-ui-more s24"></i><i class="om-i om-i-ui-more s40"></i></span><span class="nm">ui-more</span><span class="src">mdi:mdiDotsHorizontal</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-next s16"></i><i class="om-i om-i-ui-next s24"></i><i class="om-i om-i-ui-next s40"></i></span><span class="nm">ui-next</span><span class="src">mdi:mdiChevronRight</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-prev s16"></i><i class="om-i om-i-ui-prev s24"></i><i class="om-i om-i-ui-prev s40"></i></span><span class="nm">ui-prev</span><span class="src">mdi:mdiChevronLeft</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-print s16"></i><i class="om-i om-i-ui-print s24"></i><i class="om-i om-i-ui-print s40"></i></span><span class="nm">ui-print</span><span class="src">mdi:mdiPrinterOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-search s16"></i><i class="om-i om-i-ui-search s24"></i><i class="om-i om-i-ui-search s40"></i></span><span class="nm">ui-search</span><span class="src">mdi:mdiMagnify</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-settings s16"></i><i class="om-i om-i-ui-settings s24"></i><i class="om-i om-i-ui-settings s40"></i></span><span class="nm">ui-settings</span><span class="src">mdi:mdiTuneVariant</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-share s16"></i><i class="om-i om-i-ui-share s24"></i><i class="om-i om-i-ui-share s40"></i></span><span class="nm">ui-share</span><span class="src">mdi:mdiShareVariantOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-sort s16"></i><i class="om-i om-i-ui-sort s24"></i><i class="om-i om-i-ui-sort s40"></i></span><span class="nm">ui-sort</span><span class="src">mdi:mdiSortVariant</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-table s16"></i><i class="om-i om-i-ui-table s24"></i><i class="om-i om-i-ui-table s40"></i></span><span class="nm">ui-table</span><span class="src">mdi:mdiTableLarge</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-theme-dark s16"></i><i class="om-i om-i-ui-theme-dark s24"></i><i class="om-i om-i-ui-theme-dark s40"></i></span><span class="nm">ui-theme-dark</span><span class="src">mdi:mdiMoonWaningCrescent</span></li><li class="card"><span class="ico"><i class="om-i om-i-ui-theme-light s16"></i><i class="om-i om-i-ui-theme-light s24"></i><i class="om-i om-i-ui-theme-light s40"></i></span><span class="nm">ui-theme-light</span><span class="src">mdi:mdiWhiteBalanceSunny</span></li></ul></section>
+<section><h2>view: views and layouts <small>11</small></h2><ul class="grid"><li class="card"><span class="ico"><i class="om-i om-i-view-cards s16"></i><i class="om-i om-i-view-cards s24"></i><i class="om-i om-i-view-cards s40"></i></span><span class="nm">view-cards</span><span class="src">mdi:mdiCardsOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-view-dossier s16"></i><i class="om-i om-i-view-dossier s24"></i><i class="om-i om-i-view-dossier s40"></i></span><span class="nm">view-dossier</span><span class="src">mdi:mdiBookOpenPageVariantOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-view-indicator s16"></i><i class="om-i om-i-view-indicator s24"></i><i class="om-i om-i-view-indicator s40"></i></span><span class="nm">view-indicator</span><span class="src">mdi:mdiGauge</span></li><li class="card"><span class="ico"><i class="om-i om-i-view-map s16"></i><i class="om-i om-i-view-map s24"></i><i class="om-i om-i-view-map s40"></i></span><span class="nm">view-map</span><span class="src">mdi:mdiMapOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-view-map-sheet s16"></i><i class="om-i om-i-view-map-sheet s24"></i><i class="om-i om-i-view-map-sheet s40"></i></span><span class="nm">view-map-sheet</span><span class="src">mdi:mdiMapLegend</span></li><li class="card"><span class="ico"><i class="om-i om-i-view-matrix s16"></i><i class="om-i om-i-view-matrix s24"></i><i class="om-i om-i-view-matrix s40"></i></span><span class="nm">view-matrix</span><span class="src">mdi:mdiGridLarge</span></li><li class="card"><span class="ico"><i class="om-i om-i-view-place s16"></i><i class="om-i om-i-view-place s24"></i><i class="om-i om-i-view-place s40"></i></span><span class="nm">view-place</span><span class="src">mdi:mdiMapMarkerOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-view-quad s16"></i><i class="om-i om-i-view-quad s24"></i><i class="om-i om-i-view-quad s40"></i></span><span class="nm">view-quad</span><span class="src">glyph</span></li><li class="card"><span class="ico"><i class="om-i om-i-view-report s16"></i><i class="om-i om-i-view-report s24"></i><i class="om-i om-i-view-report s40"></i></span><span class="nm">view-report</span><span class="src">mdi:mdiFileDocumentOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-view-scorecard s16"></i><i class="om-i om-i-view-scorecard s24"></i><i class="om-i om-i-view-scorecard s40"></i></span><span class="nm">view-scorecard</span><span class="src">mdi:mdiTableCheck</span></li><li class="card"><span class="ico"><i class="om-i om-i-view-small-multiples s16"></i><i class="om-i om-i-view-small-multiples s24"></i><i class="om-i om-i-view-small-multiples s40"></i></span><span class="nm">view-small-multiples</span><span class="src">glyph</span></li></ul></section>
+<section><h2>el: the paper's elements <small>7</small></h2><ul class="grid"><li class="card"><span class="ico"><i class="om-i om-i-el-cite s16"></i><i class="om-i om-i-el-cite s24"></i><i class="om-i om-i-el-cite s40"></i></span><span class="nm">el-cite</span><span class="src">mdi:mdiFormatQuoteOpenOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-el-config s16"></i><i class="om-i om-i-el-config s24"></i><i class="om-i om-i-el-config s40"></i></span><span class="nm">el-config</span><span class="src">mdi:mdiPound</span></li><li class="card"><span class="ico om-pipe-dataset"><i class="om-i om-i-el-dataset s16"></i><i class="om-i om-i-el-dataset s24"></i><i class="om-i om-i-el-dataset s40"></i></span><span class="nm">el-dataset</span><span class="src">mdi:mdiDatabaseOutline</span></li><li class="card"><span class="ico om-pipe-delivery"><i class="om-i om-i-el-delivery s16"></i><i class="om-i om-i-el-delivery s24"></i><i class="om-i om-i-el-delivery s40"></i></span><span class="nm">el-delivery</span><span class="src">mdi:mdiExportVariant</span></li><li class="card"><span class="ico om-pipe-method"><i class="om-i om-i-el-method s16"></i><i class="om-i om-i-el-method s24"></i><i class="om-i om-i-el-method s40"></i></span><span class="nm">el-method</span><span class="src">mdi:mdiFunctionVariant</span></li><li class="card"><span class="ico om-pipe-place"><i class="om-i om-i-el-place s16"></i><i class="om-i om-i-el-place s24"></i><i class="om-i om-i-el-place s40"></i></span><span class="nm">el-place</span><span class="src">mdi:mdiMapMarkerRadiusOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-el-provenance s16"></i><i class="om-i om-i-el-provenance s24"></i><i class="om-i om-i-el-provenance s40"></i></span><span class="nm">el-provenance</span><span class="src">mdi:mdiSourceBranch</span></li></ul></section>
+<section><h2>depth: how deep a reader goes (skimmer, swimmer, diver) <small>3</small></h2><ul class="grid"><li class="card"><span class="ico"><i class="om-i om-i-depth-dive s16"></i><i class="om-i om-i-depth-dive s24"></i><i class="om-i om-i-depth-dive s40"></i></span><span class="nm">depth-dive</span><span class="src">glyph</span></li><li class="card"><span class="ico"><i class="om-i om-i-depth-skim s16"></i><i class="om-i om-i-depth-skim s24"></i><i class="om-i om-i-depth-skim s40"></i></span><span class="nm">depth-skim</span><span class="src">glyph</span></li><li class="card"><span class="ico"><i class="om-i om-i-depth-swim s16"></i><i class="om-i om-i-depth-swim s24"></i><i class="om-i om-i-depth-swim s40"></i></span><span class="nm">depth-swim</span><span class="src">glyph</span></li></ul></section>
+<section><h2>onms: ONMS condition-report sections (not ratings) <small>7</small></h2><ul class="grid"><li class="card"><span class="ico"><i class="om-i om-i-onms-drivers-pressures s16"></i><i class="om-i om-i-onms-drivers-pressures s24"></i><i class="om-i om-i-onms-drivers-pressures s40"></i></span><span class="nm">onms-drivers-pressures</span><span class="src">mdi:mdiThermometerAlert</span></li><li class="card"><span class="ico"><i class="om-i om-i-onms-ecosystem-services s16"></i><i class="om-i om-i-onms-ecosystem-services s24"></i><i class="om-i om-i-onms-ecosystem-services s40"></i></span><span class="nm">onms-ecosystem-services</span><span class="src">mdi:mdiHandHeartOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-onms-habitat s16"></i><i class="om-i om-i-onms-habitat s24"></i><i class="om-i om-i-onms-habitat s40"></i></span><span class="nm">onms-habitat</span><span class="src">glyph</span></li><li class="card"><span class="ico"><i class="om-i om-i-onms-living-resources s16"></i><i class="om-i om-i-onms-living-resources s24"></i><i class="om-i om-i-onms-living-resources s40"></i></span><span class="nm">onms-living-resources</span><span class="src">mdi:mdiFish</span></li><li class="card"><span class="ico"><i class="om-i om-i-onms-maritime-heritage s16"></i><i class="om-i om-i-onms-maritime-heritage s24"></i><i class="om-i om-i-onms-maritime-heritage s40"></i></span><span class="nm">onms-maritime-heritage</span><span class="src">mdi:mdiShipWheel</span></li><li class="card"><span class="ico"><i class="om-i om-i-onms-response s16"></i><i class="om-i om-i-onms-response s24"></i><i class="om-i om-i-onms-response s40"></i></span><span class="nm">onms-response</span><span class="src">mdi:mdiShieldCheckOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-onms-water-quality s16"></i><i class="om-i om-i-onms-water-quality s24"></i><i class="om-i om-i-onms-water-quality s40"></i></span><span class="nm">onms-water-quality</span><span class="src">mdi:mdiWaterOutline</span></li></ul></section>
+<section><h2>eov: essential ocean variables <small>35</small></h2><ul class="grid"><li class="card"><span class="ico"><i class="om-i om-i-eov-dissolved-organic-carbon s16"></i><i class="om-i om-i-eov-dissolved-organic-carbon s24"></i><i class="om-i om-i-eov-dissolved-organic-carbon s40"></i></span><span class="nm">eov-dissolved-organic-carbon</span><span class="src">mdi-fallback:mdiMolecule</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-fish s16"></i><i class="om-i om-i-eov-fish s24"></i><i class="om-i om-i-eov-fish s40"></i></span><span class="nm">eov-fish</span><span class="src">eov-trace</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-hard-coral s16"></i><i class="om-i om-i-eov-hard-coral s24"></i><i class="om-i om-i-eov-hard-coral s40"></i></span><span class="nm">eov-hard-coral</span><span class="src">eov-trace</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-inorganic-carbon s16"></i><i class="om-i om-i-eov-inorganic-carbon s24"></i><i class="om-i om-i-eov-inorganic-carbon s40"></i></span><span class="nm">eov-inorganic-carbon</span><span class="src">mdi-fallback:mdiMoleculeCo2</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-invertebrates s16"></i><i class="om-i om-i-eov-invertebrates s24"></i><i class="om-i om-i-eov-invertebrates s40"></i></span><span class="nm">eov-invertebrates</span><span class="src">eov-trace</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-macroalgae s16"></i><i class="om-i om-i-eov-macroalgae s24"></i><i class="om-i om-i-eov-macroalgae s40"></i></span><span class="nm">eov-macroalgae</span><span class="src">eov-trace</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-mangroves s16"></i><i class="om-i om-i-eov-mangroves s24"></i><i class="om-i om-i-eov-mangroves s40"></i></span><span class="nm">eov-mangroves</span><span class="src">eov-trace</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-marine-debris s16"></i><i class="om-i om-i-eov-marine-debris s24"></i><i class="om-i om-i-eov-marine-debris s40"></i></span><span class="nm">eov-marine-debris</span><span class="src">eov-trace</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-marine-mammals s16"></i><i class="om-i om-i-eov-marine-mammals s24"></i><i class="om-i om-i-eov-marine-mammals s40"></i></span><span class="nm">eov-marine-mammals</span><span class="src">eov-trace</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-microbes s16"></i><i class="om-i om-i-eov-microbes s24"></i><i class="om-i om-i-eov-microbes s40"></i></span><span class="nm">eov-microbes</span><span class="src">mdi-fallback:mdiBacteria</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-nitrous-oxide s16"></i><i class="om-i om-i-eov-nitrous-oxide s24"></i><i class="om-i om-i-eov-nitrous-oxide s40"></i></span><span class="nm">eov-nitrous-oxide</span><span class="src">mdi-fallback:mdiGasCylinder</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-nutrients s16"></i><i class="om-i om-i-eov-nutrients s24"></i><i class="om-i om-i-eov-nutrients s40"></i></span><span class="nm">eov-nutrients</span><span class="src">mdi-fallback:mdiFlaskOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-ocean-bottom-pressure s16"></i><i class="om-i om-i-eov-ocean-bottom-pressure s24"></i><i class="om-i om-i-eov-ocean-bottom-pressure s40"></i></span><span class="nm">eov-ocean-bottom-pressure</span><span class="src">mdi-fallback:mdiGaugeLow</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-ocean-colour s16"></i><i class="om-i om-i-eov-ocean-colour s24"></i><i class="om-i om-i-eov-ocean-colour s40"></i></span><span class="nm">eov-ocean-colour</span><span class="src">mdi-fallback:mdiPaletteOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-ocean-sound s16"></i><i class="om-i om-i-eov-ocean-sound s24"></i><i class="om-i om-i-eov-ocean-sound s40"></i></span><span class="nm">eov-ocean-sound</span><span class="src">mdi-fallback:mdiWaveform</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-ocean-surface-heat-flux s16"></i><i class="om-i om-i-eov-ocean-surface-heat-flux s24"></i><i class="om-i om-i-eov-ocean-surface-heat-flux s40"></i></span><span class="nm">eov-ocean-surface-heat-flux</span><span class="src">mdi-fallback:mdiSunThermometerOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-ocean-surface-stress s16"></i><i class="om-i om-i-eov-ocean-surface-stress s24"></i><i class="om-i om-i-eov-ocean-surface-stress s40"></i></span><span class="nm">eov-ocean-surface-stress</span><span class="src">mdi-fallback:mdiWeatherWindy</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-oxygen s16"></i><i class="om-i om-i-eov-oxygen s24"></i><i class="om-i om-i-eov-oxygen s40"></i></span><span class="nm">eov-oxygen</span><span class="src">eov-trace</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-particulate-matter s16"></i><i class="om-i om-i-eov-particulate-matter s24"></i><i class="om-i om-i-eov-particulate-matter s40"></i></span><span class="nm">eov-particulate-matter</span><span class="src">eov-trace</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-phytoplankton s16"></i><i class="om-i om-i-eov-phytoplankton s24"></i><i class="om-i om-i-eov-phytoplankton s40"></i></span><span class="nm">eov-phytoplankton</span><span class="src">eov-trace</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-sea-ice s16"></i><i class="om-i om-i-eov-sea-ice s24"></i><i class="om-i om-i-eov-sea-ice s40"></i></span><span class="nm">eov-sea-ice</span><span class="src">eov-trace</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-sea-state s16"></i><i class="om-i om-i-eov-sea-state s24"></i><i class="om-i om-i-eov-sea-state s40"></i></span><span class="nm">eov-sea-state</span><span class="src">eov-trace</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-sea-surface-height s16"></i><i class="om-i om-i-eov-sea-surface-height s24"></i><i class="om-i om-i-eov-sea-surface-height s40"></i></span><span class="nm">eov-sea-surface-height</span><span class="src">mdi-fallback:mdiArrowExpandVertical</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-sea-surface-salinity s16"></i><i class="om-i om-i-eov-sea-surface-salinity s24"></i><i class="om-i om-i-eov-sea-surface-salinity s40"></i></span><span class="nm">eov-sea-surface-salinity</span><span class="src">mdi-fallback:mdiShakerOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-sea-surface-temperature s16"></i><i class="om-i om-i-eov-sea-surface-temperature s24"></i><i class="om-i om-i-eov-sea-surface-temperature s40"></i></span><span class="nm">eov-sea-surface-temperature</span><span class="src">mdi-fallback:mdiThermometer</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-sea-turtles s16"></i><i class="om-i om-i-eov-sea-turtles s24"></i><i class="om-i om-i-eov-sea-turtles s40"></i></span><span class="nm">eov-sea-turtles</span><span class="src">eov-trace</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-seabirds s16"></i><i class="om-i om-i-eov-seabirds s24"></i><i class="om-i om-i-eov-seabirds s40"></i></span><span class="nm">eov-seabirds</span><span class="src">eov-trace</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-seagrass s16"></i><i class="om-i om-i-eov-seagrass s24"></i><i class="om-i om-i-eov-seagrass s40"></i></span><span class="nm">eov-seagrass</span><span class="src">eov-trace</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-stable-carbon-isotopes s16"></i><i class="om-i om-i-eov-stable-carbon-isotopes s24"></i><i class="om-i om-i-eov-stable-carbon-isotopes s40"></i></span><span class="nm">eov-stable-carbon-isotopes</span><span class="src">mdi-fallback:mdiAtom</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-subsurface-currents s16"></i><i class="om-i om-i-eov-subsurface-currents s24"></i><i class="om-i om-i-eov-subsurface-currents s40"></i></span><span class="nm">eov-subsurface-currents</span><span class="src">mdi-fallback:mdiArrowRightBold</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-subsurface-salinity s16"></i><i class="om-i om-i-eov-subsurface-salinity s24"></i><i class="om-i om-i-eov-subsurface-salinity s40"></i></span><span class="nm">eov-subsurface-salinity</span><span class="src">mdi-fallback:mdiShaker</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-subsurface-temperature s16"></i><i class="om-i om-i-eov-subsurface-temperature s24"></i><i class="om-i om-i-eov-subsurface-temperature s40"></i></span><span class="nm">eov-subsurface-temperature</span><span class="src">mdi-fallback:mdiThermometerLines</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-surface-currents s16"></i><i class="om-i om-i-eov-surface-currents s24"></i><i class="om-i om-i-eov-surface-currents s40"></i></span><span class="nm">eov-surface-currents</span><span class="src">mdi-fallback:mdiWaves</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-transient-tracers s16"></i><i class="om-i om-i-eov-transient-tracers s24"></i><i class="om-i om-i-eov-transient-tracers s40"></i></span><span class="nm">eov-transient-tracers</span><span class="src">mdi-fallback:mdiTestTube</span></li><li class="card"><span class="ico"><i class="om-i om-i-eov-zooplankton s16"></i><i class="om-i om-i-eov-zooplankton s24"></i><i class="om-i om-i-eov-zooplankton s40"></i></span><span class="nm">eov-zooplankton</span><span class="src">eov-trace</span></li></ul></section>
+<section><h2>place: kinds of place <small>5</small></h2><ul class="grid"><li class="card"><span class="ico"><i class="om-i om-i-place-contrib s16"></i><i class="om-i om-i-place-contrib s24"></i><i class="om-i om-i-place-contrib s40"></i></span><span class="nm">place-contrib</span><span class="src">mdi:mdiVectorPolygon</span></li><li class="card"><span class="ico"><i class="om-i om-i-place-ecoregion s16"></i><i class="om-i om-i-place-ecoregion s24"></i><i class="om-i om-i-place-ecoregion s40"></i></span><span class="nm">place-ecoregion</span><span class="src">glyph</span></li><li class="card"><span class="ico"><i class="om-i om-i-place-eez s16"></i><i class="om-i om-i-place-eez s24"></i><i class="om-i om-i-place-eez s40"></i></span><span class="nm">place-eez</span><span class="src">glyph</span></li><li class="card"><span class="ico"><i class="om-i om-i-place-province s16"></i><i class="om-i om-i-place-province s24"></i><i class="om-i om-i-place-province s40"></i></span><span class="nm">place-province</span><span class="src">glyph</span></li><li class="card"><span class="ico"><i class="om-i om-i-place-sanctuary s16"></i><i class="om-i om-i-place-sanctuary s24"></i><i class="om-i om-i-place-sanctuary s40"></i></span><span class="nm">place-sanctuary</span><span class="src">glyph</span></li></ul></section>
+<section><h2>st: status relative to a place's own record <small>4</small></h2><ul class="grid"><li class="card"><span class="ico"><i class="om-i om-i-st-above s16"></i><i class="om-i om-i-st-above s24"></i><i class="om-i om-i-st-above s40"></i></span><span class="nm">st-above</span><span class="src">glyph</span></li><li class="card"><span class="ico"><i class="om-i om-i-st-below s16"></i><i class="om-i om-i-st-below s24"></i><i class="om-i om-i-st-below s40"></i></span><span class="nm">st-below</span><span class="src">glyph</span></li><li class="card"><span class="ico"><i class="om-i om-i-st-none s16"></i><i class="om-i om-i-st-none s24"></i><i class="om-i om-i-st-none s40"></i></span><span class="nm">st-none</span><span class="src">glyph</span></li><li class="card"><span class="ico"><i class="om-i om-i-st-within s16"></i><i class="om-i om-i-st-within s24"></i><i class="om-i om-i-st-within s40"></i></span><span class="nm">st-within</span><span class="src">glyph</span></li></ul></section>
+<section><h2>tr: trend <small>3</small></h2><ul class="grid"><li class="card"><span class="ico"><i class="om-i om-i-tr-down s16"></i><i class="om-i om-i-tr-down s24"></i><i class="om-i om-i-tr-down s40"></i></span><span class="nm">tr-down</span><span class="src">mdi:mdiArrowBottomRight</span></li><li class="card"><span class="ico"><i class="om-i om-i-tr-flat s16"></i><i class="om-i om-i-tr-flat s24"></i><i class="om-i om-i-tr-flat s40"></i></span><span class="nm">tr-flat</span><span class="src">mdi:mdiArrowRight</span></li><li class="card"><span class="ico"><i class="om-i om-i-tr-up s16"></i><i class="om-i om-i-tr-up s24"></i><i class="om-i om-i-tr-up s40"></i></span><span class="nm">tr-up</span><span class="src">mdi:mdiArrowTopRight</span></li></ul></section>
+<section><h2>cell: Matrix cell states <small>7</small></h2><ul class="grid"><li class="card"><span class="ico"><i class="om-i om-i-cell-live s16"></i><i class="om-i om-i-cell-live s24"></i><i class="om-i om-i-cell-live s40"></i></span><span class="nm">cell-live</span><span class="src">mdi:mdiLightningBoltOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-cell-na s16"></i><i class="om-i om-i-cell-na s24"></i><i class="om-i om-i-cell-na s40"></i></span><span class="nm">cell-na</span><span class="src">mdi:mdiMinusCircleOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-cell-queued s16"></i><i class="om-i om-i-cell-queued s24"></i><i class="om-i om-i-cell-queued s40"></i></span><span class="nm">cell-queued</span><span class="src">mdi:mdiClockOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-cell-ready s16"></i><i class="om-i om-i-cell-ready s24"></i><i class="om-i om-i-cell-ready s40"></i></span><span class="nm">cell-ready</span><span class="src">mdi:mdiCheckCircleOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-cell-request s16"></i><i class="om-i om-i-cell-request s24"></i><i class="om-i om-i-cell-request s40"></i></span><span class="nm">cell-request</span><span class="src">mdi:mdiPlusCircleOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-cell-review s16"></i><i class="om-i om-i-cell-review s24"></i><i class="om-i om-i-cell-review s40"></i></span><span class="nm">cell-review</span><span class="src">mdi:mdiAccountClockOutline</span></li><li class="card"><span class="ico"><i class="om-i om-i-cell-running s16"></i><i class="om-i om-i-cell-running s24"></i><i class="om-i om-i-cell-running s40"></i></span><span class="nm">cell-running</span><span class="src">mdi:mdiProgressClock</span></li></ul></section>
+<section class="credits">
+<h2>Credits</h2>
+<ul>
+<li>Material Design Icons (Pictogrammers, Apache-2.0).</li>
+<li>Bespoke glyphs generated by brand/glyphs.py from primitives on the 24-px grid (MIT, Ocean Metrics).</li>
+<li>eov- glyphs adapted from the GOOS EOV icons (Martín Míguez et al. 2026, Front. Mar. Sci., CC BY): traced, monochrome, rescaled.</li>
+<li>The GOOS colour badges are not part of this set: they are used unmodified, with their credit, beside these glyphs in the indicators viewer.</li>
+</ul>
+</section>
+</main>
+<script>
+(function () {
+  var root = document.documentElement, btn = document.getElementById("theme");
+  function set(t) { root.dataset.theme = t; btn.setAttribute("aria-pressed", String(t === "dark")); btn.textContent = t === "dark" ? "Light theme" : "Dark theme"; }
+  var q = /[?&]theme=(light|dark)/.exec(location.search);
+  set(q ? q[1] : (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+  btn.addEventListener("click", function () { set(root.dataset.theme === "dark" ? "light" : "dark"); });
+})();
+</script>
+</body>
+</html>

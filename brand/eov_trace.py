@@ -369,7 +369,7 @@ REVIEW: dict[str, tuple[bool, str | None]] = {
   "microbes": (False, "mdiBacteria"),
   "nitrous-oxide": (False, "mdiGasCylinder"),
   "nutrients": (False, "mdiFlaskOutline"),
-  "ocean-bottom-pressure": (False, "mdiGauge"),
+  "ocean-bottom-pressure": (False, "mdiGaugeLow"),  # mdiGauge is view-indicator
   "ocean-colour": (False, "mdiPaletteOutline"),
   "ocean-sound": (False, "mdiWaveform"),
   "ocean-surface-heat-flux": (False, "mdiSunThermometerOutline"),

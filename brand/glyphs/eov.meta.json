@@ -197,7 +197,7 @@
   }
  },
  "eov-ocean-bottom-pressure": {
-  "fallback": "mdiGauge",
+  "fallback": "mdiGaugeLow",
   "path_chars": 900,
   "readable_16": false,
   "source": "physics/Bottom-pressure.png",
