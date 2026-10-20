@@ -113,7 +113,7 @@
     <section class="pane" aria-labelledby="bp">
       <h3 id="bp" class="mbon-label">Places <span class="n">{chosenPlaces.length} chosen</span></h3>
       <PlacePicker mode="multi" kicker="Groups and places" {idx} {layers} label={multiLabel(placeGroups(idx, layers), chosenIds)} chosen={chosenIds} ontoggle={toggleP} />
-      <Toggle checked={spec.places.context} label="Context extents" hint="needs the gazetteer's context links (not published yet)" disabled />
+      <Toggle checked={spec.places.context} label="Context region" hint="Also show each place's surrounding region (e.g. Channel Islands within the Santa Barbara Bight). Not scheduled yet: it waits on the gazetteer recording which places lie inside which." disabled />
     </section>
     <section class="pane" aria-labelledby="bi">
       <h3 id="bi" class="mbon-label">Indicators <span class="n">{model.indicators.length} chosen</span></h3>

@@ -147,11 +147,35 @@ opened" (its card, or a "not computed yet" card with the same ways forward), the
 permalink, and `report.json` (Export menu) is the same spec. **Edit** opens the builder: a preset, two trees of tri-state
 checkboxes (places by collection, indicators by category then series; Tab to a box, Space toggles it, the counts are
 places with a value of the places chosen), the layout with its panel budget and, over budget, the fixes (switch layout,
-split into sections, collapse series to leads), the status method, recent window, baseline and years. Layouts drawn today:
-**Cards** (1 to 3 places, a tab per category, the Place view's cards) and **Scorecard** (places x indicators, glyphs and the
-last value; one card per place at 390 px); the others show a notice with their budget. The Matrix toolbar's **Report**
+split into sections, collapse series to leads), the status method, recent window, baseline and years. The **Context
+region** switch is disabled and says what it waits on (the gazetteer recording which places lie inside which); `ctx=1` in
+a link is still read. Every layout is drawn (`viewer/src/lib/report/`, the layouts in `layouts/`), at the skimmer,
+swimmer and diver levels, with `split` sections, in print, in both themes and at 390 px (wide layouts wrap or page by
+section, never scroll sideways):
+
+| layout | what it shows | caps |
+|---|---|---|
+| **Cards** | the Place view's cards, a tab per category | 3 places, 40 panels |
+| **Scorecard** | glyphs and the last value; indicators in rows and places in columns by default (`axes`), one card per row at 390 px | 60 places, 20 indicators |
+| **Small multiples** | per indicator a row of small charts, one per place (the Place view's chart geometry), each with the place, the status and trend glyphs and the last value; the row shares one y axis (the `Shared y axis` / `Free y axis` toggle, spec key `ys=free`) | 3 indicators x 30 places |
+| **Quad plot** | the IEA quad plot: each point is an indicator (a plot per place) or a place (a plot per indicator; one place or one indicator gives one plot) at its recent trend (x) and the departure of its recent mean from its long-term mean (y), in SD units of its own record (`quadPoint()` in `src/status/quad.ts`); dashed guides at ±1 SD, corner captions worded statistically, a status glyph per point, points without coordinates listed with why, hover tooltip, and the plot as a table | 30 panels |
+| **Map sheet** | one indicator as a choropleth over the chosen places with a period slider, a colour-by choice, the legend and the table (the Map view's model and canvas; Marine Regions places are drawn by their own WMS) | 1 indicator |
+| **Dossier** | for each place (a page in print) and indicator: the chart, the status sentence as the figure's caption, the method, the citation, and Reproduce (configuration hash, the Place view, the values file, at the diver level the DuckDB query) | paged, none |
+
+Every layout but the Map sheet has a collapsible **locator map** on top: the chosen places outlined and, when the
+gazetteer's tiles hold their geometry, the map framed to them (a Marine Regions EEZ is drawn by the publisher's WMS and has
+no geometry of ours to frame, so the map keeps its group's extent); the place names show on hover and are listed under it.
+Maps are printed as a picture of themselves, drawn in the light theme when the job starts from Export, Print (Ctrl-P without
+it prints the last picture, in the theme on screen). The MapLibre chunk loads when a map is first shown. The Matrix toolbar's **Report**
 button opens the builder with what the Matrix shows. Cells with no value are listed under the report with a prefilled
 GitHub issue. Print (Export, Print) hides the app chrome, prints the title, permalink and report id, and uses the light theme.
+
+**Export, SanctuaryWatch bundle** builds `sanctuarywatch_<place or report id>.zip` in the browser (a store-only ZIP writer,
+`src/report/zip.ts`, loaded with the export): for every place x indicator whose status is iea-sd or names-pct at the year
+grain, a folder `<place>__<indicator>/` with `data.json`, `settings.json`, `settings.md`, `captions.md`, `alt.txt`,
+`figure.svg` (the report's chart with its colours resolved from the light theme's tokens) and `figure.png` (that SVG at
+2x), plus one `figures.csv`. The text files are built by `src/report/swBundle.ts`, the same functions
+`scripts/sanctuarywatch_bundle.ts` (the daily job) writes with; the pairs left out are listed with why under the report.
 **Embed:** `<base>embed/#card=<place_id>|<indicator>[&method=][&depth=][&vocab=]` renders one card with no chrome and a link
 back to the Place view; `?theme=` and `?brand=` work as in the app, and `main.embed[data-state=done]` marks it drawn.
 
@@ -273,7 +297,15 @@ People" (PPG-26-197).
 `node scripts/size-budget.mjs` after `npm run build`, in gzip: entry JS ≤ 110 kB, all JS except the map chunk ≤ 200 kB,
 the map chunk (MapLibre, pmtiles and the map components) ≤ 330 kB, CSS except the map's ≤ 15 kB, the map's CSS ≤ 15 kB.
 At the first deploy (2026-10-20) the entry was 86.5 kB and the CSS 6.7 kB. The map chunk has its own budget because
-MapLibre is about 230 kB gzip and is loaded only when the Map view is opened. With the two pickers (2026-10-20) the entry is 107.0 kB and the CSS 14.98 kB (107.6 and 15.0 with the place sets: their code is the Map's or lives in the lazy panels, and their rules reuse `om-*` classes): the picker panels and their rules load on the first open, and rules that several components repeated live once in `viewer/src/app.css` as `om-*` classes (gzip is per file, so each copy cost bytes). With the globe and full screen (2026-10-20) the entry is 108.1 kB (the hash key, three icons and the overlay tokens, which live in the inlined theme files) and the CSS 14.99 kB: the `--map-sea` and `--overlay-*` tokens and the Menu rule are in `brand/themes/*.css` (inlined in the JS), not in the entry CSS. Nothing was raised. Raise a budget only with the reason here.
+MapLibre is about 230 kB gzip and is loaded only when the Map view is opened. With the two pickers (2026-10-20) the entry is 107.0 kB and the CSS 14.98 kB (107.6 and 15.0 with the place sets: their code is the Map's or lives in the lazy panels, and their rules reuse `om-*` classes): the picker panels and their rules load on the first open, and rules that several components repeated live once in `viewer/src/app.css` as `om-*` classes (gzip is per file, so each copy cost bytes). Nothing was raised for the pickers. With the globe and full screen (2026-10-20) the entry is 108.1 kB (the hash key, three icons and the overlay tokens, which live in the inlined theme files) and the CSS 14.99 kB: the `--map-sea` and `--overlay-*` tokens and the Menu rule are in `brand/themes/*.css` (inlined in the JS), not in the entry CSS. Nothing was raised. Raise a budget only with the reason here.
+
+With the report layouts and maps (2026-10-20) the entry is 107.9 kB (the spec's `ys` key) and nothing in the entry's CSS changed. The
+budget script now counts three things differently, and one budget is new: (1) `MapCanvas-*` (MapLibre, pmtiles) and `MapTable-*` count
+as the map chunk, because the Map view and the report's two maps share them (MapLibre was inside `MapView-*` before; the map JS is 293.7 kB
+of 330 and its CSS 12.2 kB of 15); (2) the Report view's own lazy styles (`ReportView-*`, `LocatorMap-*`, `MapSheet-*`, `PrintableMap-*`)
+have a **report CSS** budget of 8 kB, now 4.7 kB (they were 2.1 kB inside the 15 kB "CSS but map", which is now 12.9 kB); the six layouts and
+the two maps are new code, loaded only with the report. The other JS (all but the map) is 181.7 kB of 200, the swExport chunk (SVG, PNG, ZIP) 5.7 kB
+loaded on Export.
 
 ## Brand and icons
 

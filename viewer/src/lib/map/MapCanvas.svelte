@@ -41,8 +41,14 @@
     /** 'done' once the map is idle with the data layers on it */
     onstate?: (s: 'loading' | 'done') => void
     label: string
+    /** a small map (the report's locator): no zoom buttons or scale, and the wheel scrolls the page instead of zooming */
+    compact?: boolean
+    /** place ids to frame once their tiles are in (a vector part's features; a reference part has no geometry to frame) */
+    fitIds?: string[] | null
+    /** the place under the pointer: its name from the tiles (null off a place) */
+    onhover?: (name: string | null) => void
   }
-  let { parts, bbox, colors, line, none, nofill, faint, focus, dark, selected, proj = null, marker, onpick, onstate, label }: Props = $props()
+  let { parts, bbox, colors, line, none, nofill, faint, focus, dark, selected, proj = null, marker, onpick, onstate, label, compact = false, fitIds = null, onhover }: Props = $props()
 
   let box: HTMLDivElement | undefined = $state()
   let phase = $state<'loading' | 'done'>('loading')
@@ -73,10 +79,43 @@
     m.once('idle', () => {
       clearInterval(poll)
       // a place selected from a link (not by a click on the map) is framed once its tiles are in; the new view loads more tiles
-      if (frame(m)) return settle(m)
+      if (frame(m) || fitAll(m)) return settle(m)
       setState('done')
     })
     poll = setInterval(() => { if (m.isStyleLoaded() && m.areTilesLoaded()) { clearInterval(poll); setState('done') } }, 400)
+  }
+
+  // the places a report asked to see: framed once their tiles are in, a few tries (a tile may not hold a small place yet)
+  let fitted: string | null = null
+  let fitTries = 0
+  function fitAll(m: maplibregl.Map): boolean {
+    const ids = fitIds
+    if (!ids?.length) return false
+    const key = partsKey(parts) + '|' + ids.join(',')
+    if (key !== fitted) { fitted = key; fitTries = 0 }
+    else if (fitTries < 0) return false
+    const geoms: { coordinates?: unknown }[] = []
+    for (const [i, part] of parts.entries()) {
+      if (part.kind !== 'vector' || !part.layer.source_layer || !m.getSource(sid(i))) continue
+      const want = ids.map(id => featureOf(part, id))
+      for (const f of m.querySourceFeatures(sid(i), { sourceLayer: part.layer.source_layer, filter: ['in', ['get', 'place_id'], ['literal', want]] as never })) geoms.push(f.geometry as { coordinates?: unknown })
+    }
+    const b = geometryBounds(geoms)
+    if (!b) { fitTries = fitTries < 2 ? fitTries + 1 : -1; return false }
+    fitTries = -1
+    m.fitBounds(b, { padding: 28, duration: 0, maxZoom: 9 })
+    return true
+  }
+
+  /** the map as a PNG data URL, read in the frame it is drawn (the buffer is not kept), for a print that cannot hold a live map */
+  export function snap(): Promise<string | null> {
+    const m = map
+    if (!m) return Promise.resolve(null)
+    return new Promise(res => {
+      const t = setTimeout(() => res(null), 4000)
+      m.once('render', () => { clearTimeout(t); try { res(m.getCanvas().toDataURL('image/png')) } catch { res(null) } })
+      m.triggerRepaint()
+    })
   }
 
   // the selection already framed, and the one the reader clicked (which stays where the reader put the camera)
@@ -136,11 +175,13 @@
       },
       // opened on the extent, so no tiles are fetched for a camera the first fit then replaces
       bounds: [[bbox[0], bbox[1]], [bbox[2], bbox[3]]], fitBoundsOptions: { padding: 24, maxZoom: 8 },
-      attributionControl: false, dragRotate: false, pitchWithRotate: false,
+      attributionControl: false, dragRotate: false, pitchWithRotate: false, scrollZoom: !compact,
     })
     m.touchZoomRotate.disableRotation()
-    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
-    m.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left')
+    if (!compact) {
+      m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+      m.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left')
+    }
     // the stylesheet and the layout can arrive after the map is made: follow the box, not only the window
     const ro = new ResizeObserver(() => m.resize())
     ro.observe(box as HTMLDivElement)
@@ -149,7 +190,17 @@
     m.on('mousemove', e => {
       const hit = parts.some((p, i) => (p.kind === 'raster' ? true : !!m.getLayer(`${sid(i)}:fill`) && m.queryRenderedFeatures(e.point, { layers: hitLayers(m, i) }).length > 0))
       m.getCanvas().style.cursor = hit ? 'pointer' : ''
+      if (onhover) {
+        let name: string | null = null
+        parts.forEach((p, i) => {
+          if (name != null || p.kind === 'raster' || !m.getLayer(`${sid(i)}:fill`)) return
+          const n = m.queryRenderedFeatures(e.point, { layers: hitLayers(m, i) })[0]?.properties?.name
+          if (n != null) name = String(n)
+        })
+        onhover(name)
+      }
     })
+    m.on('mouseout', () => onhover?.(null))
     return () => { clearInterval(poll); ro.disconnect(); m.remove(); map = null; ready = false; shown = null }
   })
 
@@ -240,6 +291,7 @@
       m.addLayer({ id: 'pick-ring', type: 'circle', source: 'pick', paint: { 'circle-radius': 9, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-width': 3, 'circle-stroke-color': focus } })
       shown = key
       framed = null
+      fitted = null
       const [w, s, e, n] = bbox
       m.fitBounds([[w, s], [e, n]], { padding: 24, duration: 0, maxZoom: 8 })
       settle(m)
@@ -274,7 +326,7 @@
 
   $effect(() => {
     // every input the drawing reads, so a change redraws; the drawing itself reads no state
-    void [parts, bbox, colors, line, none, nofill, faint, focus, selected, marker, ready]
+    void [parts, bbox, colors, line, none, nofill, faint, focus, selected, marker, ready, fitIds]
     if (ready) untrack(sync)
   })
 </script>
