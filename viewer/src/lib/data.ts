@@ -58,6 +58,8 @@ export interface Indicator {
   producer: { name: string; url?: string; catalog?: string }
   dataset: {
     id: string
+    /** the STAC collection id in the gazetteer (`erddap/<id>`), the name erddap-places gives the dataset in a link */
+    collection?: string
     title: string
     stac?: string
     via?: string

@@ -11,10 +11,20 @@ export const ERDDAP_PLACES_HREF = 'https://oceanmetrics.io/erddap-places/'
 // ids keep their colons (NMS:CINMS), spaces are %20 (erddap-places reads + and %20 as a space)
 const enc = (s: string) => encodeURIComponent(s).replace(/%3A/gi, ':')
 
-/** the erddap-places Statistics lens for a place and one variable of a dataset (its URL grammar: place, dataset, variable) */
-export function erddapPlacesHref(placeId: string, dataset: string, variable: string): string {
-  return `${ERDDAP_PLACES_HREF}#place=${enc(placeId)}&dataset=${enc(dataset)}&variable=${enc(variable)}`
+/**
+ * the erddap-places Statistics lens for a place and one variable of a dataset (its URL grammar: place, dataset, variable).
+ * `collection` is the dataset's STAC collection id (`erddap/dhw_5km`), the name erddap-places gives it; its slash stays literal
+ */
+export function erddapPlacesHref(placeId: string, collection: string, variable: string): string {
+  return `${ERDDAP_PLACES_HREF}#place=${enc(placeId)}&dataset=${enc(collection).replace(/%2F/gi, '/')}&variable=${enc(variable)}`
 }
+
+/**
+ * the name erddap-places gives an indicator's dataset in a link: the manifest's `dataset.collection` (the STAC collection's
+ * own id, whose case may differ from the folder: `erddap/imerg_monthly_global_precip`), else `erddap/<dataset id>`. never
+ * the bare dataset id: erddap-places replaced a dataset it did not recognise with CRW SST (2026-10-20)
+ */
+export const erddapCollection = (ind: Pick<Indicator, 'dataset'>): string => ind.dataset.collection ?? `erddap/${ind.dataset.id}`
 
 export interface RequestInput {
   /** a request for one place and one indicator names all of placeId, placeName, indicatorId and short; one for a whole collection names only the collection (and its title) */
@@ -58,7 +68,7 @@ export const canComputeNow = (ind: Pick<Indicator, 'producer'>) => ind.producer.
 /** the "compute it now" link of an indicator for a place, or null when erddap-places does not make it */
 export function computeHref(ind: Indicator, place: Place): string | null {
   const variable = erddapVariable(ind)
-  return canComputeNow(ind) && variable ? erddapPlacesHref(place.id, ind.dataset.id, variable) : null
+  return canComputeNow(ind) && variable ? erddapPlacesHref(place.id, erddapCollection(ind), variable) : null
 }
 
 export interface GroupCount {

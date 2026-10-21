@@ -175,14 +175,17 @@ def _from_family_producer(ind: str, prov: dict | None) -> bool:
 
 # producer metadata ----
 def erddap_dataset(dataset_id: str, fetch: Callable[[str], dict]) -> dict:
-  """dataset title, providers, licence, DOI, upstream page and classes from erddap/<id>/collection.json"""
+  """dataset title, providers, licence, DOI, upstream page and classes from erddap/<id>/collection.json; `collection` is the
+  collection's own id, the name erddap-places gives the dataset in a link (`erddap/imerg_monthly_global_precip` for the folder
+  and ERDDAP dataset `IMERG_monthly_global_precip`: never built from the folder name)"""
   c = fetch(f"{GAZETTEER}/erddap/{dataset_id}/collection.json")
   links = c.get("links", [])
   doi = next((l["href"] for l in links if "doi.org/" in l.get("href", "")), None)
   via = next((l["href"] for l in links if l.get("rel") == "via"), None)
   license_link = next((l["href"] for l in links if l.get("rel") == "license"), None)
   return {
-    "id": dataset_id, "title": c["title"], "stac": f"{GAZETTEER}/erddap/{dataset_id}/collection.json", "via": via or license_link,
+    "id": dataset_id, **({"collection": c["id"]} if c.get("id") else {}), "title": c["title"],
+    "stac": f"{GAZETTEER}/erddap/{dataset_id}/collection.json", "via": via or license_link,
     "providers": [{k: p[k] for k in ("name", "roles", "url") if k in p} for p in c.get("providers", [])],
     "license": c.get("license", "other"), "citation": c.get("sci:citation"), "doi": doi,
     "_variables": c.get("cube:variables", {}),

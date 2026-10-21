@@ -171,7 +171,7 @@ ask for it by a prefilled issue), **no data here** (the indicator has a values f
 nothing for the place), or a dash (**not offered** for this kind of place).
 
 **From an empty cell** the drawer (and the Place view) offers the way forward, built by `viewer/src/lib/nextSteps.ts`: for an
-erddap-places indicator **Compute it now in erddap-places** (`<base>erddap-places/#place=…&dataset=…&variable=…`) and **Ask to add
+erddap-places indicator **Compute it now in erddap-places** (`<base>erddap-places/#place=…&dataset=erddap/…&variable=…`: the dataset is named by its STAC collection id, the manifest's `dataset.collection`, as erddap-places names it; `nextSteps.catalog.test.ts` checks every such link against the published gazetteer) and **Ask to add
 it to the catalog** (the repo's `indicator-request.yml` issue form, pre-filled: `place`, `collection`, `indicator`); for a cell
 the indicator is not offered for, the place groups it is computed for and the request link; for no data, the reason and the
 dataset's time range. **Place view** (`#view=place&place=<id>&ind=<indicator>`): the place picker (`place` mode) switches place, keeping the indicator when the new place has it, and the indicator picker (`single`) jumps to a card; the indicator opened comes first under "You

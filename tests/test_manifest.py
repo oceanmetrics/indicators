@@ -87,6 +87,19 @@ def test_one_indicator_entry_exactly(tmp_path):
   assert man["version"] == "2026.10.20" and man["contract"] == contract.CONTRACT_VERSION
 
 
+def test_erddap_dataset_names_the_stac_collection_id_erddap_places_links_by():
+  # the "Compute it now" link named the folder (IMERG_monthly_global_precip), while erddap-places names the dataset by the
+  # collection's own id, erddap/imerg_monthly_global_precip (2026-10-21): the id is read from the collection, never built
+  urls = []
+  def fetch(url):
+    urls.append(url)
+    return {"id": "erddap/imerg_monthly_global_precip", "title": "NASA GPM IMERG — monthly global precipitation",
+            "license": "CC0-1.0", "links": [{"rel": "via", "href": "https://erddap/info/IMERG_monthly_global_precip/index.html"}]}
+  d = m.erddap_dataset("IMERG_monthly_global_precip", fetch)
+  assert urls == [f"{m.GAZETTEER}/erddap/IMERG_monthly_global_precip/collection.json"]
+  assert (d["id"], d["collection"]) == ("IMERG_monthly_global_precip", "erddap/imerg_monthly_global_precip")
+
+
 def test_categorical_takes_its_classes_from_the_stac(tmp_path):
   write(tmp_path, ind=BAA, cls=["0", "1"], unit="1")
   man, _ = build(tmp_path, [entry(id=BAA, kind="categorical", status_method="values", series="heat", variable="baa")])

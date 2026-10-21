@@ -3,7 +3,7 @@ import type { CoverageRow } from '../../../src/coverage/build.ts'
 import type { Indicator } from './data.ts'
 import { cellModel, indexCoverage, pickRow } from './matrix.ts'
 import {
-  canComputeNow, COMPUTE_NOTE, computeHref, computedGroups, datasetCoverage, erddapPlacesHref, erddapVariable, REQUEST_NOTE, requestHref,
+  canComputeNow, COMPUTE_NOTE, computeHref, computedGroups, datasetCoverage, erddapCollection, erddapPlacesHref, erddapVariable, REQUEST_NOTE, requestHref,
 } from './nextSteps.ts'
 
 const ind = (o: Partial<Indicator> & { id: string }): Indicator => ({
@@ -14,12 +14,12 @@ const ind = (o: Partial<Indicator> & { id: string }): Indicator => ({
 
 describe('erddapPlacesHref', () => {
   it('writes the place, dataset and variable the erddap-places URL grammar reads, colons kept', () => {
-    expect(erddapPlacesHref('NERRS:WEL', 'dhw_5km', 'CRW_SST'))
-      .toBe('https://oceanmetrics.io/erddap-places/#place=NERRS:WEL&dataset=dhw_5km&variable=CRW_SST')
+    expect(erddapPlacesHref('NERRS:WEL', 'erddap/dhw_5km', 'CRW_SST'))
+      .toBe('https://oceanmetrics.io/erddap-places/#place=NERRS:WEL&dataset=erddap/dhw_5km&variable=CRW_SST')
   })
   it('a place id with a space or other characters is percent-encoded (a space is %20)', () => {
-    expect(erddapPlacesHref('BOEM:OCS-A 0506', 'jplMURSST41', 'analysed_sst'))
-      .toBe('https://oceanmetrics.io/erddap-places/#place=BOEM:OCS-A%200506&dataset=jplMURSST41&variable=analysed_sst')
+    expect(erddapPlacesHref('BOEM:OCS-A 0506', 'erddap/jplMURSST41', 'analysed_sst'))
+      .toBe('https://oceanmetrics.io/erddap-places/#place=BOEM:OCS-A%200506&dataset=erddap/jplMURSST41&variable=analysed_sst')
     expect(erddapPlacesHref('ONMS:florida-keys-national-marine-sanctuary:northern-section', 'd', 'v&x'))
       .toBe('https://oceanmetrics.io/erddap-places/#place=ONMS:florida-keys-national-marine-sanctuary:northern-section&dataset=d&variable=v%26x')
   })
@@ -43,7 +43,21 @@ describe('the compute-now link', () => {
   const sst = ind({ id: 'erddap:dhw_5km:CRW_SST:mean', variable: 'sst' })
   const place = { id: 'NERRS:WEL', name: 'Wells', coll: 'noaa_nerrs' }
   it('an erddap-places indicator links to its dataset and variable', () => {
-    expect(computeHref(sst, place)).toBe('https://oceanmetrics.io/erddap-places/#place=NERRS:WEL&dataset=dhw_5km&variable=CRW_SST')
+    expect(computeHref(sst, place)).toBe('https://oceanmetrics.io/erddap-places/#place=NERRS:WEL&dataset=erddap/dhw_5km&variable=CRW_SST')
+  })
+  // regression: the link named the bare dataset id (dataset=noaa_aoml_seascapes_8day), which erddap-places did not
+  // recognise and replaced with CRW SST without a word (Channel Islands x Seascapes, Albania x IMERG, 2026-10-20)
+  it('regression: the dataset is named by its STAC collection id, as erddap-places names it, never the bare id', () => {
+    const sea = ind({ id: 'erddap:noaa_aoml_seascapes_8day:CLASS:share', dataset: { id: 'noaa_aoml_seascapes_8day', title: 'S', providers: [] } })
+    expect(computeHref(sea, { id: 'NMS:CINMS', name: 'Channel Islands', coll: 'places' }))
+      .toBe('https://oceanmetrics.io/erddap-places/#place=NMS:CINMS&dataset=erddap/noaa_aoml_seascapes_8day&variable=CLASS')
+  })
+  it('the manifest\'s collection id wins: its case may differ from the dataset id (IMERG)', () => {
+    const imerg = ind({ id: 'erddap:IMERG_monthly_global_precip:precipitation:mean',
+      dataset: { id: 'IMERG_monthly_global_precip', collection: 'erddap/imerg_monthly_global_precip', title: 'I', providers: [] } })
+    expect(erddapCollection(imerg)).toBe('erddap/imerg_monthly_global_precip')
+    expect(computeHref(imerg, { id: 'MRGID:5670', name: 'Albanian EEZ', coll: 'mr_eez' }))
+      .toBe('https://oceanmetrics.io/erddap-places/#place=MRGID:5670&dataset=erddap/imerg_monthly_global_precip&variable=precipitation')
   })
   it('regression: the ERDDAP variable comes from the id, never the manifest variable (sst, dic)', () => {
     expect(erddapVariable({ id: 'erddap:cmems_biogeochem_carbon:dissic:mean', variable: 'dic' } as never)).toBe('dissic')
@@ -105,7 +119,7 @@ describe('a place that is not in the coverage at all (a gazetteer place nobody h
     expect(cellModel(ind({ id: 'sdg:x', producer: { name: 'sdg' } }), place, null).kind).toBe('na')
   })
   it('regression: the compute link and the request link are built from the place id and its group alone', () => {
-    expect(computeHref(sst, place)).toBe('https://oceanmetrics.io/erddap-places/#place=MC:monuments:alice-springs&dataset=dhw_5km&variable=CRW_SST')
+    expect(computeHref(sst, place)).toBe('https://oceanmetrics.io/erddap-places/#place=MC:monuments:alice-springs&dataset=erddap/dhw_5km&variable=CRW_SST')
     expect(requestHref({ placeId: place.id, placeName: place.name, collection: place.coll, indicatorId: sst.id, short: 'SST' }))
       .toContain('place=MC:monuments:alice-springs&collection=noaa_marine_monuments&indicator=erddap:dhw_5km:CRW_SST:mean')
   })
