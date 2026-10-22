@@ -25,7 +25,7 @@ const isoDate = (v: unknown): string | null => {
 export async function readValues(path: string): Promise<ValueRow[]> {
   const file = await asyncBufferFromFile(path)
   const rows = (await parquetReadObjects({ file })) as Record<string, unknown>[]
-  return rows.map(r => ({ ...(r as unknown as ValueRow), time: isoDate(r.time), n: r.n == null ? null : Number(r.n) }))
+  return rows.map(r => ({ ...(r as unknown as ValueRow), time: isoDate(r.time), n: r.n == null ? null : Number(r.n), sd: r.sd == null ? null : Number(r.sd) }))
 }
 
 /** a local path for a file or URL: a URL is fetched into the cache (refreshed after a day); `null` for `none` or offline */

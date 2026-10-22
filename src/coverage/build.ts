@@ -16,6 +16,8 @@ export interface ValueRow {
   class: string | null
   value: number | null
   n: number | null
+  /** the SD across the place's cells (contract 1.2; the coverage builder does not use it). a 1.1 file has no such column */
+  sd: number | null
   unit: string
 }
 

@@ -17,7 +17,9 @@ const num = (v: unknown): number | null => (v == null ? null : Number(v))
 
 /** hyparquet returns DATE as a Date and counts as bigint when they are integers: rows carry ISO strings and numbers */
 export function normalizeValueRow(r: Record<string, unknown>): PlaceRow {
-  return { ...r, time: isoDate(r.time), value: num(r.value), n: num(r.n), class: r.class == null ? null : String(r.class) } as PlaceRow
+  // sd (contract 1.2) is kept only where the file has the column: a 1.1 file's rows carry no `sd` key, and the downloads follow
+  return { ...r, time: isoDate(r.time), value: num(r.value), n: num(r.n), ...('sd' in r ? { sd: num(r.sd) } : {}),
+    class: r.class == null ? null : String(r.class) } as PlaceRow
 }
 
 /** every row of a values file, normalized */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parquetReadObjects } from 'hyparquet'
-import { cardModel, coveredIndicators, defaultMethod, fileName, grainsOf, groupCards, indexCoverage, placeCitation, placeCoverage, placeCsv, primaryGrain, seriesOf, toggleGrains } from './place.ts'
+import { cardModel, contractColumns, coveredIndicators, defaultMethod, fileName, grainsOf, groupCards, indexCoverage, placeCitation, placeCoverage, placeCsv, primaryGrain, seriesOf, toggleGrains } from './place.ts'
 import { placeParquet } from './parquetOut.ts'
 import { groupByPlace, normalizeValueRow } from './valuesData.ts'
 import type { PlaceRow } from './valuesData.ts'
@@ -193,6 +193,26 @@ describe('downloads', () => {
     expect(back[0]).toMatchObject({ place_id: 'P:1', time_grain: 'year', time: '2020-01-01', value: 1, n: 12, unit: 'a,b', x_basis: 'x "q"' })
     expect(back[2]).toMatchObject({ time_grain: 'all', time: null, value: null, n: null })
   })
+  it('contract 1.2: CSV puts sd right after n when the rows carry it, null as an empty cell', () => {
+    const r12 = [row({ time: '2020-01-01', value: 1, n: 1, sd: 0.25 }), row({ time: '2021-01-01', value: 2, n: 12, sd: null })]
+    expect(placeCsv(r12)).toBe([
+      'place_id,coll,indicator,time_grain,time,class,value,n,sd,unit',
+      'P:1,places,x:y,year,2020-01-01,,1,1,0.25,degree_C',
+      'P:1,places,x:y,year,2021-01-01,,2,12,,degree_C',
+      '',
+    ].join('\n'))
+  })
+  it('a 1.1 file has no sd column and its downloads have none either', () => {
+    expect(placeCsv(rows).split('\n')[0]).toBe('place_id,coll,indicator,time_grain,time,class,value,n,unit,x_basis')
+    expect(contractColumns(rows)).not.toContain('sd')
+    expect(contractColumns([row({ sd: null })])).toContain('sd')       // a 1.2 file whose sd is null everywhere keeps the column
+  })
+  it('Parquet carries sd as a double when the rows have it and not otherwise', async () => {
+    const withSd = await parquetReadObjects({ file: placeParquet([row({ sd: 0.5 }), row({ time: '2021-01-01', sd: null })]) })
+    expect(withSd.map(r => r.sd)).toEqual([0.5, null])
+    const without = await parquetReadObjects({ file: placeParquet(rows) })
+    expect(Object.keys(without[0])).not.toContain('sd')
+  })
   it('the citation gets the place in its Values clause, or a clause of its own', () => {
     const c = 'Producer. Dataset. https://x. Values: Ocean Metrics Indicators, manifest 2026.10.20, x:y, CC BY 4.0, https://oceanmetrics.io/indicators/'
     expect(placeCitation({ id: 'x:y', citation: c }, 'NMS:FKNMS')).toBe('Producer. Dataset. https://x. Values: Ocean Metrics Indicators, manifest 2026.10.20, x:y, place NMS:FKNMS, CC BY 4.0, https://oceanmetrics.io/indicators/')
@@ -201,6 +221,11 @@ describe('downloads', () => {
 })
 
 describe('reading values', () => {
+  it('keeps sd as a number or null where the file has the column, and no key where it has not', () => {
+    expect(normalizeValueRow({ place_id: 'A:1', time: null, value: 1, n: 1, sd: 0.5 })).toMatchObject({ sd: 0.5 })
+    expect(normalizeValueRow({ place_id: 'A:1', time: null, value: 1, n: 1, sd: null }).sd).toBeNull()
+    expect('sd' in normalizeValueRow({ place_id: 'A:1', time: null, value: 1, n: 1 })).toBe(false)
+  })
   it('normalizes dates and bigint counts, and groups by place', () => {
     const r = normalizeValueRow({ place_id: 'A:1', time: new Date('2020-03-01T00:00:00Z'), value: 1.5, n: 3n, class: null })
     expect(r).toMatchObject({ time: '2020-03-01', n: 3, value: 1.5, class: null })

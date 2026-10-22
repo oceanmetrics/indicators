@@ -217,7 +217,16 @@ function categoricalCard(ind: Indicator, placeName: string, rows: ValueRow[], gr
 
 // ---- downloads and the citation ----
 
-export const CONTRACT_COLUMNS = ['place_id', 'coll', 'indicator', 'time_grain', 'time', 'class', 'value', 'n', 'unit'] as const
+export const CONTRACT_COLUMNS = ['place_id', 'coll', 'indicator', 'time_grain', 'time', 'class', 'value', 'n', 'sd', 'unit'] as const
+
+/**
+ * the contract's columns a download carries: all of them, except `sd` when the rows come from a 1.1 file, which has no
+ * such column (a 1.2 file whose sd is null everywhere has the key, so the column stays)
+ */
+export function contractColumns(rows: readonly object[]): (typeof CONTRACT_COLUMNS)[number][] {
+  const hasSd = rows.some(r => 'sd' in r)
+  return CONTRACT_COLUMNS.filter(c => c !== 'sd' || hasSd)
+}
 
 /** `<place_id>_<indicator>.<ext>` with every ':' (and anything else a file system dislikes) made a '-' */
 export function fileName(placeId: string, indicator: string, ext: 'csv' | 'parquet'): string {
@@ -247,7 +256,7 @@ const csvCell = (v: unknown): string => {
 
 /** plain CSV (RFC 4180, a header row, `\n` line ends): the contract's columns, then any producer columns, all grains */
 export function placeCsv(rows: PlaceRow[]): string {
-  const cols = [...CONTRACT_COLUMNS, ...extraColumns(rows)]
+  const cols = [...contractColumns(rows), ...extraColumns(rows)]
   const lines = [cols.join(',')]
   for (const r of sortRows(rows)) lines.push(cols.map(c => csvCell((r as Record<string, unknown>)[c])).join(','))
   return lines.join('\n') + '\n'

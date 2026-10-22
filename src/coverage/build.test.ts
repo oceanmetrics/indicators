@@ -17,7 +17,7 @@ const BAA: ManifestIndicator = {
 }
 const row = (o: Partial<ValueRow>): ValueRow => ({
   place_id: 'NMS:A', coll: 'places', indicator: SST.id, time_grain: 'year', time: '2020-01-01', class: null,
-  value: 1, n: 12, unit: 'Celsius', ...o,
+  value: 1, n: 12, sd: null, unit: 'Celsius', ...o,
 })
 const years = (y0: number, vs: number[], o: Partial<ValueRow> = {}) =>
   vs.map((v, i) => row({ time: `${y0 + i}-01-01`, value: v, ...o }))
