@@ -25,8 +25,9 @@ provenance fields, what changed from 1.1 and why 1.1 files stay valid) is docume
 [oceanmetrics/extract](https://github.com/oceanmetrics/extract) README "Contract". The validator, writer and reader are
 `om_extract.contract` (every adapter calls `contract.write_values()`; `om_indicators/contract.py` re-exports it); the
 schemas are `values-row` and `values-provenance` in [oceanmetrics/platform](https://github.com/oceanmetrics/platform)
-`packages/catalog/schemas/`. Until extract's next release the dependency is a local or git source
-(`[tool.uv.sources]` in `pyproject.toml`), and the schemas resolve from the sibling `../platform` checkout.
+`packages/catalog/schemas/`. Until extract's next release the dependency is a git source
+(`[tool.uv.sources]` in `pyproject.toml`), and the schemas resolve from `node_modules/@oceanmetrics/catalog/schemas`
+(the npm package `@oceanmetrics/catalog`, installed by `npm install`; no environment variable is needed).
 
 ```sql
 -- every SST value for every sanctuary, straight from the bucket (published daily)
@@ -44,7 +45,7 @@ WHERE time_grain = 'year' ORDER BY place_id, time;
 | `om_indicators/` | Python (uv) | producer adapters (writing through `om_extract.contract`), manifest builder, coverage check, CLI `om-ind` |
 | `tests/` | pytest | one test per rule, exact-row fixtures |
 | `src/coverage/` | TypeScript (Node) | values → `coverage.parquet` |
-| `@oceanmetrics/status` | TypeScript (package) | the status methods (`iea-sd`, `names-pct`, `values`): the **only** implementation, used by the coverage builder and the viewer. It moved to https://github.com/oceanmetrics/platform (`packages/status`, with its tests and the R cross-check against ecoidx) on 2026-10-22; until the npm publish on Day 5 (2026-10-26) it is a local `file:../platform/packages/status` link, so check out `platform` beside this repo and build it (`npm ci && npm run build`) before `npm ci` here |
+| `@oceanmetrics/status` | TypeScript (package) | the status methods (`iea-sd`, `names-pct`, `values`): the **only** implementation, used by the coverage builder and the viewer. It lives in https://github.com/oceanmetrics/platform (`packages/status`, with its tests and the R cross-check against ecoidx) and comes from npm: `npm install` here picks it up, and a change to a status method is made in `oceanmetrics/platform` and released there, then taken here by bumping the version range |
 | `brand/` | Python, Node | icon pipeline (MDI by export name + generated glyphs + traced GOOS EOV glyphs), themes, favicons |
 | `assets/goos-eov/` | PNG, WebP | the GOOS EOV badges, unmodified (see its `SOURCE.md`) |
 | `viewer/` | Svelte 5 + Vite | the Matrix view on `indicators.json` + `coverage.parquet`, with `@marinebon/ui`; one selection (the Select section: places, indicators) shared by the Matrix, Map and Report views; places as rows with `#axes=p`, remove places or indicators with the x on a header (`px=`, `ix=`) and tick them back in a picker |
@@ -53,10 +54,10 @@ WHERE time_grain = 'year' ORDER BY place_id, time;
 ## Commands
 
 ```sh
-uv sync --group dev --group brand && npm ci
+uv sync --group dev --group brand && npm ci   # npm ci also installs @oceanmetrics/status and @oceanmetrics/catalog (the schemas python reads) from npm
 uv sync --group dev --group cmems            # the cmems group (Copernicus Marine Toolbox, xarray, shapely, NetCDF backends) is only for the place producer and its tests
 uv run --group dev pytest -q                 # adapters, manifest, coverage, GOOS badges and traced glyphs
-npm test                                     # status (incl. the ecoidx cross-check), coverage, icons, favicons, viewer
+npm test                                     # coverage, icons, favicons, viewer (the status tests are in oceanmetrics/platform)
 npm run check                                # svelte-check + tsc
 
 # compute one place of a Copernicus Marine indicator (a maintainer, on the Mac mini; see "Requests")

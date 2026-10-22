@@ -12,7 +12,7 @@ The plan is `~/Github/bbest/notes/om/plans_todo/2026-10-19_indicator-matrix_plan
 ## Commands
 
 ```sh
-uv sync --group dev --group brand && npm ci
+uv sync --group dev --group brand && npm ci       # npm ci also installs @oceanmetrics/status and @oceanmetrics/catalog (the schemas python reads) from npm
 uv run --group dev pytest -q                      # adapters, manifest, coverage, GOOS (must be green to commit)
 uv run --group dev pytest -q tests/test_adapter_sdg.py
 npm test                                          # vitest: coverage, icons, favicons, viewer (must be green)
@@ -29,11 +29,13 @@ The catalog build (adapters → manifest → coverage → validate) is in README
 copying `brand/v1/icons/{om-icons.svg,icons.css,index.html}` to `oceanmetrics.github.io/static/brand/v1/icons/`
 (served at https://oceanmetrics.io/brand/v1/icons/) after `npm test` is green; never change a locked glyph.
 
-The status methods are the package `@oceanmetrics/status` (`oceanmetrics/platform`, `packages/status`; moved there
-2026-10-22). Until the npm publish on Day 5 (2026-10-26) it is a local link, `"file:../platform/packages/status"`, so
-`platform` must be checked out beside this repo and built (`cd ../platform && npm ci && npm run build`) before
-`npm ci` here; the workflows check it out the same way. The status tests and the R cross-check of `iea-sd`
-(`fixtures/ecoidx/`) live there now.
+The platform packages come from npm, never from a sibling checkout: `@oceanmetrics/status` (the status methods; source in
+`oceanmetrics/platform`, `packages/status`) and `@oceanmetrics/catalog` (the JSON schemas and the `om-catalog` bin) are
+ordinary dependencies in `package.json`, so `npm ci` / `npm install` here picks them up. `om_extract.schemas` finds the
+values contract's schemas at `node_modules/@oceanmetrics/catalog/schemas` from the working directory, so run Python from the
+repo root after `npm install` and set no `OM_SCHEMAS_DIR`. A change to a status method or a schema is made in
+`oceanmetrics/platform` and released there; bump the version range here and run `npm install` to take it. The status tests
+and the R cross-check of `iea-sd` (`fixtures/ecoidx/`) live there.
 
 In a sandbox set `TMPDIR` to a writable directory or vitest cannot start. `OM_OFFLINE=1` skips tests that read the
 published gazetteer over HTTP.
@@ -94,7 +96,7 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   `tr-up|flat|down` differ in shape, and captions say "relative to its own record".
 - **The contract** is `om_extract.contract` (oceanmetrics/extract, a dependency: a git source pinned to a commit in `[tool.uv.sources]` of
   `pyproject.toml`; bump the `rev` and run `uv lock` to take a newer engine) with its schemas `values-row`
-  and `values-provenance` in `platform` (`packages/catalog/schemas/`); `om_indicators/contract.py` only re-exports it,
+  and `values-provenance` in `platform` (`packages/catalog/schemas/`, installed here as `@oceanmetrics/catalog` from npm); `om_indicators/contract.py` only re-exports it,
   so a change to the contract, its rules or its tests is made in extract, never here. Every adapter writes through
   `contract.write_values()`, which validates rows and provenance and refuses to write on any error; contract 1.2.0
   (the `sd` column, a required `provenance.dataset`, `sources[].item` / `role`) reads a file's own `contract`, so
