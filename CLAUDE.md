@@ -92,8 +92,8 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   (gzip is per file, so a copy in every stylesheet costs): the CSS budget was met that way, not raised.
 - **Statuses are statistical, never better/worse.** No ONMS colours, no ▲ ▬ ▼; glyphs `st-above|within|below`,
   `tr-up|flat|down` differ in shape, and captions say "relative to its own record".
-- **The contract** is `om_extract.contract` (oceanmetrics/extract, a dependency: `[tool.uv.sources]` in `pyproject.toml`,
-  a path source to `../extract-wt-contract` until the orchestrator switches it to a git rev) with its schemas `values-row`
+- **The contract** is `om_extract.contract` (oceanmetrics/extract, a dependency: a git source pinned to a commit in `[tool.uv.sources]` of
+  `pyproject.toml`; bump the `rev` and run `uv lock` to take a newer engine) with its schemas `values-row`
   and `values-provenance` in `platform` (`packages/catalog/schemas/`); `om_indicators/contract.py` only re-exports it,
   so a change to the contract, its rules or its tests is made in extract, never here. Every adapter writes through
   `contract.write_values()`, which validates rows and provenance and refuses to write on any error; contract 1.2.0
