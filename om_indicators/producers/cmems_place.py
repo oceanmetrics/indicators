@@ -332,7 +332,7 @@ def dataset_meta(info: dict) -> dict:
 def build_provenance(*, place_id: str, coll: str, indicator: str, dataset: str, var: str, info: dict, wins: list,
                      series: CellSeries, rows: list[dict], polygon: dict, depth: float | None, toolbox_version: str,
                      created: str, commit: str | None) -> tuple[dict, dict]:
-  """(the provenance embedded in the Parquet, which schema/provenance.schema.json restricts to its own keys, and the
+  """(the provenance embedded in the Parquet, which the platform schema values-provenance restricts to its own keys, and the
   richer provenance.json written beside it)"""
   first, last = min(series.times), max(series.times)
   embedded = {

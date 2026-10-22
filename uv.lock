@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -723,12 +723,37 @@ wheels = [
 ]
 
 [[package]]
+name = "om-extract"
+version = "0.2.0"
+source = { editable = "../extract-wt-contract" }
+dependencies = [
+    { name = "duckdb" },
+    { name = "jsonschema" },
+    { name = "numpy" },
+    { name = "pyarrow" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "duckdb", specifier = ">=1.4" },
+    { name = "jsonschema", specifier = ">=4.23" },
+    { name = "numpy", specifier = ">=1.26" },
+    { name = "pyarrow", specifier = ">=21" },
+    { name = "pyyaml", specifier = ">=6" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8" }]
+
+[[package]]
 name = "om-indicators"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "duckdb" },
     { name = "jsonschema" },
+    { name = "om-extract" },
     { name = "pyarrow" },
     { name = "pyyaml" },
     { name = "requests" },
@@ -756,6 +781,7 @@ dev = [
 requires-dist = [
     { name = "duckdb", specifier = ">=1.4" },
     { name = "jsonschema", specifier = ">=4.23" },
+    { name = "om-extract", editable = "../extract-wt-contract" },
     { name = "pyarrow", specifier = ">=21" },
     { name = "pyyaml", specifier = ">=6" },
     { name = "requests", specifier = ">=2.32" },

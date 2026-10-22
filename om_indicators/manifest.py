@@ -19,7 +19,7 @@ import pyarrow.compute as pc
 import yaml
 
 from . import contract
-from .contract import load_schema
+from .schema import load_schema
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG = ROOT / "config"
@@ -195,7 +195,7 @@ def erddap_dataset(dataset_id: str, fetch: Callable[[str], dict], gazetteer: str
 
 
 def provenance_dataset(d: dict) -> dict:
-  """`erddap_dataset()` as provenance.dataset (contract 1.2): the keys schema/provenance.schema.json allows, so the
+  """`erddap_dataset()` as provenance.dataset (contract 1.2): the keys the platform schema values-provenance allows, so the
   adapter states the same dataset the manifest would look up (the lookup-only `collection`, `stac` and `_variables` stay out)"""
   return {k: d[k] for k in ("id", "title", "via", "providers", "license", "citation", "doi") if k in d}
 

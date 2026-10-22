@@ -9,6 +9,8 @@
 # scripts/build_catalog.sh). no step writes outside <out>; nothing is uploaded (scripts/publish_catalog.sh does that).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# the values contract (om_extract.contract) reads its schemas from the sibling platform checkout, wherever om-extract is installed
+export OM_SCHEMAS_DIR="${OM_SCHEMAS_DIR:-$(cd .. && pwd)/platform/packages/catalog/schemas}"
 OUT="${1:-catalog}"
 rm -rf "$OUT/values" "$OUT/indicators.json" "$OUT/coverage.parquet"
 mkdir -p "$OUT"

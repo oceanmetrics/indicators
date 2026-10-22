@@ -9,6 +9,7 @@ requires-python = ">=3.12"
 dependencies = [
   "duckdb>=1.4",
   "jsonschema>=4.23",
+  "om-extract>=0.2.0",
   "pyarrow>=21",
   "pyyaml>=6",
   "requests>=2.32",
@@ -25,6 +26,11 @@ brand = ["pillow>=11", "potracer>=0.0.4"]
 # or CI. h5netcdf, h5py and netCDF4 are the backends xarray needs to read the toolbox's NetCDF (a first run on the Mac
 # mini failed with "No module named 'h5py'" without them)
 cmems = ["copernicusmarine>=2.0", "xarray>=2024.1", "shapely>=2.0", "numpy>=1.26", "h5netcdf>=1.3", "h5py>=3.10", "netCDF4>=1.7"]
+
+[tool.uv.sources]
+# om_extract.contract is the values contract (oceanmetrics/extract); the contract branch is not pushed yet
+# TODO(orchestrator): switch to git rev after merge
+om-extract = { path = "../extract-wt-contract", editable = true }
 
 [build-system]
 requires = ["hatchling"]

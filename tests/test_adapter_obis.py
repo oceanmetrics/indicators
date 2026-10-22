@@ -48,7 +48,7 @@ def test_unknown_metric_or_eov_raises():
 def test_nine_metrics_by_eight_eovs_are_72_distinct_valid_ids():
   ids = obis.all_indicator_ids()
   assert len(ids) == 72 == len(set(ids))
-  pattern = c.load_schema("values")["properties"]["indicator"]["pattern"]
+  pattern = c.load_schema("values-row")["properties"]["indicator"]["pattern"]
   assert all(re.match(pattern, i) for i in ids)
 
 

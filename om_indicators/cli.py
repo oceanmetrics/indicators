@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 from typing import Callable, Sequence
 
-from om_indicators import contract
+from om_indicators import contract, schema
 
 
 # summaries ----
@@ -171,7 +171,7 @@ def _add_validate(sub: argparse._SubParsersAction) -> None:
         print(e)
     print(f"{n} values files, {len(problems)} with problems")
     cov = Path(a.catalog) / "coverage.parquet"
-    cov_errors = contract.validate_coverage(cov) if cov.exists() else []
+    cov_errors = schema.validate_coverage(cov) if cov.exists() else []
     for e in cov_errors[:50]:
       print(e)
     if cov.exists():

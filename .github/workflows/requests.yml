@@ -95,6 +95,8 @@ jobs:
       NUM: ${{ github.event.issue.number }}
       GH_TOKEN: ${{ github.token }}
       ACTION: ${{ github.event.action }}
+      # the values contract's schemas (om_extract.contract), from the platform checkout beside this one
+      OM_SCHEMAS_DIR: ${{ github.workspace }}/platform/packages/catalog/schemas
     defaults:
       run:
         working-directory: indicators

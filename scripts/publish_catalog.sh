@@ -7,6 +7,8 @@
 # follows a manifest to a file that is not there yet. --delete is scoped to indicators/values/ only.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# the values contract (om_extract.contract) reads its schemas from the sibling platform checkout, wherever om-extract is installed
+export OM_SCHEMAS_DIR="${OM_SCHEMAS_DIR:-$(cd .. && pwd)/platform/packages/catalog/schemas}"
 OUT="${1:-catalog}"
 DRY=""; [ "${2:-}" = "--dry-run" ] && DRY="--dryrun"
 DEST="${INDICATORS_BUCKET:-s3://oceanmetrics.io-public/indicators}"

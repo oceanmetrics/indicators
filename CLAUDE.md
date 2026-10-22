@@ -13,8 +13,8 @@ The plan is `~/Github/bbest/notes/om/plans_todo/2026-10-19_indicator-matrix_plan
 
 ```sh
 uv sync --group dev --group brand && npm ci
-uv run --group dev pytest -q                      # contract, adapters, manifest, GOOS (must be green to commit)
-uv run --group dev pytest -q tests/test_contract.py -k round_trip
+uv run --group dev pytest -q                      # adapters, manifest, coverage, GOOS (must be green to commit)
+uv run --group dev pytest -q tests/test_adapter_sdg.py
 npm test                                          # vitest: coverage, icons, favicons, viewer (must be green)
 npx vitest run src/report/spec.test.ts            # one file
 npm run check                                     # svelte-check + tsc
@@ -89,12 +89,14 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   (gzip is per file, so a copy in every stylesheet costs): the CSS budget was met that way, not raised.
 - **Statuses are statistical, never better/worse.** No ONMS colours, no ▲ ▬ ▼; glyphs `st-above|within|below`,
   `tr-up|flat|down` differ in shape, and captions say "relative to its own record".
-- **The contract** (`schema/values.schema.json`, `om_indicators/contract.py`): every adapter writes through
-  `contract.write_values()`, which validates rows and provenance and refuses to write on any error. Rules beyond
-  JSON Schema (time aligned to its grain, unique keys, one indicator and coll per file, finite values, class on
-  all rows or none, `sd` finite and >= 0 and null where `value` is null or `n` is 0) live in `validate_rows()`, each with a test.
-  Contract 1.2.0 added the `sd` column, a required `provenance.dataset` and `sources[].item` / `role`; the validators read a
-  file's own `contract`, so published 1.1 files (no `sd`, no `dataset`) stay valid.
+- **The contract** is `om_extract.contract` (oceanmetrics/extract, a dependency: `[tool.uv.sources]` in `pyproject.toml`,
+  a path source to `../extract-wt-contract` until the orchestrator switches it to a git rev) with its schemas `values-row`
+  and `values-provenance` in `platform` (`packages/catalog/schemas/`); `om_indicators/contract.py` only re-exports it,
+  so a change to the contract, its rules or its tests is made in extract, never here. Every adapter writes through
+  `contract.write_values()`, which validates rows and provenance and refuses to write on any error; contract 1.2.0
+  (the `sd` column, a required `provenance.dataset`, `sources[].item` / `role`) reads a file's own `contract`, so
+  published 1.1 files stay valid. `schema/` keeps only this repo's own schemas, `indicators` and `coverage`
+  (`om_indicators/schema.py`: `load_schema()`, `validate_coverage()`).
 - **Adapters read published outputs only** and never change a producer repo. The STAC items stay the provenance:
   each values file lists the exact items/files it read in `om:provenance.sources`.
 - **Producers compute, adapters read** (`om_indicators/producers/`). The one producer is `cmems_place.py`: a maintainer
