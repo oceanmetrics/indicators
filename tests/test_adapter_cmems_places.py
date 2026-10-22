@@ -36,7 +36,7 @@ def test_the_places_of_one_indicator_and_collection_become_one_values_file_exact
   rows = sorted(((r["place_id"], r["time"].isoformat(), r["value"], r["n"]) for r in table.to_pylist()))
   assert rows == [("MRGID:5670", "2020-01-01", 11.5, 1.0), ("MRGID:5670", "2020-02-01", 111.5, 1.0), ("MRGID:5670", "2020-03-01", 211.5, 1.0),
                   ("MRGID:5671", "2020-01-01", 12.5, 1.0), ("MRGID:5671", "2020-02-01", 112.5, 1.0), ("MRGID:5671", "2020-03-01", 212.5, 1.0)]
-  assert set(table.column("coll").to_pylist()) == {"mr_eez"} and "x_sd" in table.schema.names
+  assert set(table.column("coll").to_pylist()) == {"mr_eez"} and "sd" in table.schema.names
   assert contract.validate_tree(out) == {}
 
 
@@ -62,7 +62,8 @@ def test_a_collection_another_adapter_already_wrote_is_left_alone_and_listed(tmp
   eco_rows = [{"place_id": "NMS:B", "coll": "places", "indicator": NO3, "time_grain": "year", "time": dt.date(2020, 1, 1),
                "class": None, "value": 1.0, "n": 12.0, "unit": "mmol m-3"}]
   eco_prov = {"producer": {"name": "noaa-onms/eco-indicators", "url": "https://example.org/eco"}, "sources": [{"href": "https://example.org/x"}],
-              "method": "the eco-indicators rows", "code": {"name": "om-indicators", "version": "0", "adapter": "eco"},
+              "method": "the eco-indicators rows",
+              "dataset": {"id": "P", "title": "a product", "providers": [{"name": "CMEMS"}], "license": "other"}, "code": {"name": "om-indicators", "version": "0", "adapter": "eco"},
               "created": "2026-10-20T00:00:00Z", "license": "CC-BY-4.0"}
   eco_path = contract.write_values(eco_rows, out, eco_prov)
   before = eco_path.read_bytes()

@@ -17,10 +17,6 @@ VOCABS = {
                     {"id": "turbulent-diapycnal-fluxes", "label": "Turbulent diapycnal fluxes", "group": "physics"}]},
 }
 CAT = {"onms": "water-quality", "names": "physical-chemical", "eov": "sea-surface-temperature"}
-PROV = {"producer": {"name": "erddap-places", "url": "https://github.com/oceanmetrics/erddap-places"},
-        "sources": [{"href": "https://example.org/item.json"}], "method": "test rows for the manifest",
-        "code": {"name": "om-indicators", "version": "0.1.0", "adapter": "test"},
-        "created": "2026-10-20T00:00:00Z", "license": "CC-BY-4.0"}
 
 
 def entry(**kw):
@@ -38,6 +34,13 @@ def dataset_of(ind_id):
           "license": "CC0-1.0", "citation": None, "doi": None,
           "_variables": {"CRW_SST": {"description": "sea surface temperature"},
                          "CRW_BAA": {"erddap-places:classes": {"0": "No Stress", "1": "Bleaching Watch"}}}}
+
+
+PROV = {"producer": {"name": "erddap-places", "url": "https://github.com/oceanmetrics/erddap-places"},
+        "sources": [{"href": "https://example.org/item.json"}], "method": "test rows for the manifest",
+        "dataset": m.provenance_dataset(dataset_of(None)),     # contract 1.2: every file states its dataset
+        "code": {"name": "om-indicators", "version": "0.1.0", "adapter": "test"},
+        "created": "2026-10-20T00:00:00Z", "license": "CC-BY-4.0"}
 
 
 def write(tmp_path, ind=SST, places=(("NMS:A", (2019, 2020)),), cls=None, coll="places", unit="Celsius"):
@@ -98,6 +101,37 @@ def test_erddap_dataset_names_the_stac_collection_id_erddap_places_links_by():
   d = m.erddap_dataset("IMERG_monthly_global_precip", fetch)
   assert urls == [f"{m.GAZETTEER}/erddap/IMERG_monthly_global_precip/collection.json"]
   assert (d["id"], d["collection"]) == ("IMERG_monthly_global_precip", "erddap/imerg_monthly_global_precip")
+
+
+def test_provenance_dataset_keeps_only_the_keys_the_provenance_schema_allows():
+  d = dataset_of(None) | {"collection": "erddap/dhw_5km"}
+  p = m.provenance_dataset(d)
+  assert set(p) == {"id", "title", "via", "providers", "license", "citation", "doi"}
+  assert "stac" not in p and "_variables" not in p and "collection" not in p
+  assert p["id"] == "dhw_5km" and p["providers"] == d["providers"]
+
+
+def test_erddap_dataset_reads_the_collection_from_the_gazetteer_it_is_given():
+  urls = []
+  def fetch(url):
+    urls.append(url)
+    return {"id": "erddap/x", "title": "X", "links": [{"rel": "via", "href": "https://erddap/info/x"}]}
+  d = m.erddap_dataset("x", fetch, "/data/pub/gazetteer/")
+  assert urls == ["/data/pub/gazetteer/erddap/x/collection.json"] and d["stac"] == urls[0]
+  assert m.provenance_dataset(d) == {"id": "x", "title": "X", "via": "https://erddap/info/x", "providers": [],
+                                     "license": "other", "citation": None, "doi": None}
+
+
+def test_an_erddap_file_that_states_its_dataset_still_gets_the_collection_id_and_variables_from_the_lookup(tmp_path):
+  # contract 1.2 erddap files state the dataset, which has neither the collection id nor cube:variables
+  write(tmp_path, ind=BAA, cls=["0", "1"], unit="1")
+  looked_up = lambda ind_id: dataset_of(ind_id) | {"collection": "erddap/dhw_5km"}
+  man, _ = m.build_manifest(m.scan_values(tmp_path), {BAA: entry(id=BAA, kind="categorical", status_method="values",
+                                                                   series="heat", variable="baa")},
+                            VOCABS, looked_up, "2026.10.20", "2026-10-20T00:00:00Z")
+  (i,) = man["indicators"]
+  assert i["dataset"]["collection"] == "erddap/dhw_5km" and "_variables" not in i["dataset"]
+  assert i["classes"] == {"0": "No Stress", "1": "Bleaching Watch"}
 
 
 def test_categorical_takes_its_classes_from_the_stac(tmp_path):

@@ -7,7 +7,8 @@ import pytest
 from om_indicators import contract, publish
 
 PROV = {"producer": {"name": "places/proto/eez_indicators", "url": "https://github.com/oceanmetrics/places"},
-        "sources": [{"href": "https://unstats.un.org/x"}], "method": "latest year per M49 area, joined to EEZs",
+        "sources": [{"href": "https://unstats.un.org/x"}],
+        "dataset": {"id": "X", "title": "a series", "providers": [{"name": "UN"}], "license": "other"}, "method": "latest year per M49 area, joined to EEZs",
         "code": {"name": "om-indicators", "version": "0.1.0", "adapter": "test"},
         "created": "2026-10-20T00:00:00Z", "license": "CC-BY-4.0"}
 

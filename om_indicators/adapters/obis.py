@@ -86,7 +86,8 @@ def place_rows(years: list[dict], indicators: list[dict], coll: str, snapshot_ye
     for metric, (col, unit) in METRICS.items():
       out[indicator_id(metric, r["eov"])].append({
         "place_id": r["place_id"], "coll": coll, "indicator": indicator_id(metric, r["eov"]), "time_grain": grain,
-        "time": time, "class": None, "value": ep._finite(r[col]), "n": ep._finite(r["n"]), "unit": unit})
+        "time": time, "class": None, "value": ep._finite(r[col]), "n": ep._finite(r["n"]), "sd": None,   # records, not cells: no cell SD
+        "unit": unit})
 
   for r in years:
     if r["year"] < snapshot_year:
@@ -171,7 +172,7 @@ def run(out: Path, release: str | None = None, cache: Path = Path("cache/obis"),
     raise ValueError(f"release {rel} has no place_exact layer (obisindicators 0.9.0 publishes it)")
   snapshot = rj["obis_snapshot"]
   src_release = {"href": base + "release.json", "title": f"obis-h3 {rel} release.json", "updated": rj.get("built_at"),
-                 "end_datetime": snapshot, "checksum": "sha256:" + rel_sha}
+                 "end_datetime": snapshot, "checksum": "sha256:" + rel_sha, "item": None, "role": "manifest"}
   index_path = Path(index) if index else f.cached(GAZETTEER_INDEX, "places_index", None)
 
   summary: dict = {"files": [], "release": rel, "obis_snapshot": snapshot, "worms_version": rj.get("worms_version")}
@@ -182,7 +183,7 @@ def run(out: Path, release: str | None = None, cache: Path = Path("cache/obis"),
       path, sha = _fetch(f, url, Path(cache) / rel / f"{coll}_{name}.parquet")
       tables[name] = pq.read_table(path).to_pylist()
       srcs.append({"href": url, "title": f"obis-h3 {rel} place_exact {coll} {name}", "updated": None,
-                   "end_datetime": snapshot, "checksum": "sha256:" + sha})
+                   "end_datetime": snapshot, "checksum": "sha256:" + sha, "item": None, "role": "data"})
     ep.resolve_places(index_path, {r["place_id"] for r in tables["years"]}, coll)
     by_ind = place_rows(tables["years"], tables["indicators"], coll, int(snapshot[:4]))
     prov = {"producer": {**PRODUCER, "version": rel}, "sources": srcs,

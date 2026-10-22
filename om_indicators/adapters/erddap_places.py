@@ -3,7 +3,9 @@
 reads the STAC collection `gazetteer/stats` (one item per dataset x variable x place, each pointing at a parquet of
 daily rows) and writes one values file per (dataset, variable) through `contract.write_values()`. indicators:
 
-  continuous variable   erddap:<dataset>:<variable>:mean    value = mean_wt (area-weighted daily mean), unit = STAC unit
+  continuous variable   erddap:<dataset>:<variable>:mean    value = mean_wt (area-weighted daily mean), unit = STAC unit,
+                                                            sd = the cell SD (`sd` of the stats file) where the month is one
+                                                            time step (monthly datasets), else null
   categorical variable  erddap:<dataset>:<variable>:share   one row per (period, class), value = area-weighted share
                                                             (frac_area) of the place in that class, unit "1"
 
@@ -16,6 +18,9 @@ period rules (each one a named function below, each tested):
                  step is monthly or coarser; otherwise the record must cover the whole month, i.e. the file's first
                  date <= month start + (step - 1) days and its last date >= month end - (step - 1) days. so the running
                  current month and a backfill's partial first month are dropped. a month with no value gets no row.
+  sd             the stats files carry `sd`, the SD across the mask cells of each time step. a month that is one time step
+                 (n = 1: monthly datasets) keeps it, one to one. a month of several steps (daily, 8-day) and every year get
+                 null: an SD of step means is not the SD across cells. categorical indicators have none.
   year rows      `year_rows()`: only for years with all 12 month rows; value = mean of the 12 monthly values (each month
                  weighs the same), n = sum of the monthly n.
   categorical    `class_month_rows()` / `class_year_rows()`: the same rules per class; a class absent on a step counts 0
@@ -48,7 +53,7 @@ from typing import Any, Callable, Iterable, Sequence
 import pyarrow.parquet as pq
 import requests
 
-from om_indicators import __version__, contract
+from om_indicators import __version__, contract, manifest
 
 DEFAULT_BASE = "https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer/stats/collection.json"
 COLL = "places"
@@ -94,28 +99,33 @@ def _finite(v: Any) -> float | None:
   return v if math.isfinite(v) else None
 
 
-def month_rows(series: Iterable[tuple[dt.date, float | None]]) -> list[dict]:
-  """complete months of a continuous series [(date, value|None)] -> [{time, value, n}] sorted by time."""
-  series = list(series)
+def month_rows(series: Iterable[tuple]) -> list[dict]:
+  """complete months of a continuous series [(date, value|None) or (date, value|None, sd|None)] -> [{time, value, n, sd}]
+  sorted by time. sd is the step's cell SD when the month is one time step (n = 1), else None (an SD of means is not the
+  SD across cells)."""
+  series = [(t[0], t[1], t[2] if len(t) > 2 else None) for t in series]
   if not series:
     return []
-  dates = [d for d, _ in series]
+  dates = [d for d, _, _ in series]
   first, last, step = min(dates), max(dates), native_step(dates)
-  by_month: dict[dt.date, list[float]] = defaultdict(list)
-  for d, v in series:
+  by_month: dict[dt.date, list[tuple[float, float | None]]] = defaultdict(list)
+  for d, v, sd in series:
     v = _finite(v)
     if v is not None:
-      by_month[contract.period_start("month", d)].append(v)
-  return [{"time": m, "value": sum(vs) / len(vs), "n": float(len(vs))}
+      by_month[contract.period_start("month", d)].append((v, _finite(sd)))
+  return [{"time": m, "value": sum(v for v, _ in vs) / len(vs), "n": float(len(vs)),
+           "sd": vs[0][1] if len(vs) == 1 and vs[0][1] is not None and vs[0][1] >= 0 else None}
           for m, vs in sorted(by_month.items()) if month_is_complete(m, first, last, step)]
 
 
 def year_rows(months: Iterable[dict]) -> list[dict]:
-  """years with all 12 month rows -> [{time, value, n}]; value = mean of the monthly values, n = sum of monthly n."""
+  """years with all 12 month rows -> [{time, value, n, sd}]; value = mean of the monthly values, n = sum of monthly n,
+  sd None (an SD of monthly means is not the cell SD)."""
   by_year: dict[int, list[dict]] = defaultdict(list)
   for m in months:
     by_year[m["time"].year].append(m)
-  return [{"time": dt.date(y, 1, 1), "value": sum(m["value"] for m in ms) / 12, "n": sum(m["n"] for m in ms)}
+  return [{"time": dt.date(y, 1, 1), "value": sum(m["value"] for m in ms) / 12, "n": sum(m["n"] for m in ms),
+           "sd": None}
           for y, ms in sorted(by_year.items()) if len({m["time"].month for m in ms}) == 12]
 
 
@@ -162,14 +172,14 @@ def class_year_rows(months: Iterable[dict]) -> list[dict]:
 
 
 # contract rows (pure) ----
-def continuous_rows(place_id: str, indicator: str, unit: str, series: Iterable[tuple[dt.date, float | None]],
+def continuous_rows(place_id: str, indicator: str, unit: str, series: Iterable[tuple],
                     coll: str = COLL) -> list[dict]:
   """month and year contract rows of one place's continuous series."""
   months = month_rows(series)
   out = []
   for grain, rs in (("month", months), ("year", year_rows(months))):
     out += [{"place_id": place_id, "coll": coll, "indicator": indicator, "time_grain": grain, "time": r["time"],
-             "class": None, "value": r["value"], "n": r["n"], "unit": unit} for r in rs]
+             "class": None, "value": r["value"], "n": r["n"], "sd": r["sd"], "unit": unit} for r in rs]
   return out
 
 
@@ -180,7 +190,7 @@ def categorical_rows(place_id: str, indicator: str, rows: Iterable[tuple[dt.date
   out = []
   for grain, rs in (("month", months), ("year", class_year_rows(months))):
     out += [{"place_id": place_id, "coll": coll, "indicator": indicator, "time_grain": grain, "time": r["time"],
-             "class": r["class"], "value": r["value"], "n": r["n"], "unit": "1"} for r in rs]
+             "class": r["class"], "value": r["value"], "n": r["n"], "sd": None, "unit": "1"} for r in rs]
   return out
 
 
@@ -190,8 +200,10 @@ def table_rows(table: Any, place_id: str, indicator: str, unit: str, categorical
     recs = table.select(["date", "class", "frac_area"]).to_pylist()
     steps = [r["date"] for r in recs]
     return categorical_rows(place_id, indicator, [(r["date"], str(int(r["class"])), r["frac_area"]) for r in recs], steps, coll)
-  recs = table.select(["date", "mean_wt"]).to_pylist()
-  return continuous_rows(place_id, indicator, unit, [(r["date"], r["mean_wt"]) for r in recs], coll)
+  # `sd` is the SD across the mask cells of each step; a file written before erddap-places added it has none
+  cols = ["date", "mean_wt"] + (["sd"] if "sd" in table.schema.names else [])
+  recs = table.select(cols).to_pylist()
+  return continuous_rows(place_id, indicator, unit, [(r["date"], r["mean_wt"], r.get("sd")) for r in recs], coll)
 
 
 def read_extra_items(loc: str) -> list[str]:
@@ -433,12 +445,16 @@ def run(out: Path, base: str = DEFAULT_BASE, cache: Path = Path("cache/erddap-pl
         if bad:
           summary["unknown_classes"].append({"item": tag, "classes": bad})
       rows += got
+      # `loc` is the item JSON the collection links (or the requested extra item): the STAC item of this source file
       sources.append({"href": e["loc"], "title": p.get("title"), "updated": p.get("created"),
                       "end_datetime": p.get("end_datetime"),
-                      "checksum": e["item"].get("assets", {}).get("data", {}).get("file:checksum")})
+                      "checksum": e["item"].get("assets", {}).get("data", {}).get("file:checksum"),
+                      "item": e["loc"], "role": "data"})
     if not rows:
       continue
-    prov = {"producer": PRODUCER, "sources": sources,
+    # the original dataset: the same statement the manifest looks up, read from the collection already fetched
+    dataset = manifest.provenance_dataset(manifest.erddap_dataset(ds, lambda _url, ds=ds: datasets[ds], gazetteer))
+    prov = {"producer": PRODUCER, "sources": sources, "dataset": dataset,
             "source_version": f"gazetteer/stats updated {collection.get('updated')}", "method": METHOD,
             "code": {"name": "om-indicators", "version": __version__, "commit": _commit(), "adapter": ADAPTER},
             "license": LICENSE, "created": contract.utc_now()}

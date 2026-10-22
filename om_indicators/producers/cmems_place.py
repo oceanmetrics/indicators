@@ -16,9 +16,9 @@ adapter om_indicators/adapters/cmems_places.py reads it into the catalog.
             0.5), the whole record or --from/--to. a bbox across the antimeridian is split into one window per side
             (`windows()`), as the gazetteer stores such places split at +/-180.
   mean      `cell_means()`: per time step the mean of the cells whose CENTRES fall inside the polygon (boundary
-            included), NaN skipped; the spatial SD (n - 1) goes to x_sd. this is R `terra::extract(r, p, fun = mean,
+            included), NaN skipped; the spatial SD (n - 1) goes to sd. this is R `terra::extract(r, p, fun = mean,
             na.rm = TRUE)`, the method of eco-indicators, so sanctuary and EEZ values share one method.
-  rows      `place_rows()`: the rules of eco_indicators (month = the monthly mean, n = 1, x_sd; year = the mean of 12
+  rows      `place_rows()`: the rules of eco_indicators (month = the monthly mean, n = 1, sd; year = the mean of 12
             months, only for complete years, n = 12), through contract.write_values().
   output    <out>/<dataset>/<var>/<place with ':' as '-'>/{data.parquet, provenance.json}, and <out>/index.json (the list
             of everything published, merged with the published one by `merge_index()`).
@@ -73,7 +73,7 @@ METHOD = (
   "Monthly mean of the cells of a Copernicus Marine Service product whose centres fall inside the place polygon, at the "
   "surface level (0 to 0.51 m), computed on request with the Copernicus Marine Toolbox by "
   "om_indicators.producers.cmems_place (the method of noaa-onms/eco-indicators: terra::extract mean over the polygon, "
-  "with the spatial SD in x_sd). A year is the mean of its 12 monthly means, written only when all 12 months have a value.")
+  "with the cell SD in sd). A year is the mean of its 12 monthly means, written only when all 12 months have a value.")
 
 
 class NeedsMaintainer(RuntimeError):
@@ -239,7 +239,7 @@ def cell_means(arrays: Sequence[Any], geom: Any) -> CellSeries:
 
 
 def place_rows(place_id: str, coll: str, indicator: str, unit: str, series: CellSeries) -> list[dict]:
-  """month and year contract rows of one place (the rules of eco_indicators: n = 1 and x_sd per month; a year is the
+  """month and year contract rows of one place (the rules of eco_indicators: n = 1 and sd per month; a year is the
   mean of 12 months, only when complete)."""
   mean, sd = {}, {}
   for d, v, s in zip(series.times, series.mean, series.sd):
@@ -338,11 +338,15 @@ def build_provenance(*, place_id: str, coll: str, indicator: str, dataset: str, 
   embedded = {
     "producer": {"name": PRODUCER_NAME, "url": REPO_URL, "version": commit},
     "sources": [
+      # the data read is the dataset's subset through the Toolbox (it has no file or STAC item of its own), the product
+      # page is where the dataset is described
+      {"href": f"copernicusmarine:{dataset}", "title": f"{dataset} {var}, Copernicus Marine Toolbox {toolbox_version}",
+       "updated": None, "end_datetime": last.isoformat(), "checksum": None, "item": None, "role": "data"},
       {"href": f"https://data.marine.copernicus.eu/product/{info['product_id']}/description",
-       "title": f"{dataset} {var}, Copernicus Marine Toolbox {toolbox_version}", "updated": None,
-       "end_datetime": last.isoformat(), "checksum": None},
+       "title": f"product {info['product_id']}", "updated": None, "end_datetime": None, "checksum": None, "item": None,
+       "role": "product"},
       {"href": polygon["url"], "title": f"polygon of {place_id} ({polygon['kind']})", "updated": None,
-       "end_datetime": None, "checksum": None},
+       "end_datetime": None, "checksum": None, "item": None, "role": "geometry"},
     ],
     "source_version": f"{dataset} {info.get('version') or ''} {first.isoformat()} to {last.isoformat()}".replace("  ", " "),
     "method": METHOD, "dataset": dataset_meta(info),

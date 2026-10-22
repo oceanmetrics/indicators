@@ -224,7 +224,7 @@ def test_three_months_are_three_month_rows_through_the_contract():
     ("month", date(2020, 1), 11.5, 1.0), ("month", date(2020, 2), 111.5, 1.0), ("month", date(2020, 3), 211.5, 1.0)]
   assert {(r["place_id"], r["coll"], r["indicator"], r["unit"], r["class"]) for r in rows} == {
     ("MRGID:5670", "mr_eez", NO3, "mmol m-3", None)}
-  assert [r["x_sd"] for r in rows] == [pytest.approx(math.sqrt(0.5))] * 3
+  assert [r["sd"] for r in rows] == [pytest.approx(math.sqrt(0.5))] * 3
   assert contract.validate_rows(rows) == []
 
 
@@ -281,7 +281,9 @@ def test_the_provenance_states_the_dataset_the_depth_the_polygon_and_the_run(tmp
   assert p["copernicusmarine_version"] == "2.5.0" and p["code"]["commit"] == "abc1234" and p["run_time"] == "2026-10-20T12:00:00Z"
   assert p["method"] == cp.METHOD and "centres fall inside the place polygon" in p["method"]
   assert p["rows"] == 3 and p["sha256"].startswith("sha256:")
-  assert [s["href"] for s in p["sources"]][1] == "https://geo.example/wfs?mrgid=5670"
+  assert [(s["role"], s["item"]) for s in p["sources"]] == [("data", None), ("product", None), ("geometry", None)]
+  assert p["sources"][2]["href"] == "https://geo.example/wfs?mrgid=5670" and p["sources"][0]["href"] == f"copernicusmarine:{p['dataset_id']}"
+  assert p["sources"][1]["href"].endswith("/product/GLOBAL_MULTIYEAR_BGC_001_029/description")
 
 
 def test_the_index_entry_names_the_files_and_their_checksum(tmp_path):

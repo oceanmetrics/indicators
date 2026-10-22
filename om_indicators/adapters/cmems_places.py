@@ -4,7 +4,7 @@ reads what om_indicators/producers/cmems_place.py published (a maintainer accept
 s3://oceanmetrics.io-public/indicators/producers/cmems/:
 
   index.json                                 every place x indicator published, with the sha256 of its data file
-  <dataset>/<var>/<place>/data.parquet       the contract rows of one place (month and year), x_sd included
+  <dataset>/<var>/<place>/data.parquet       the contract rows of one place (month and year), sd included
   <dataset>/<var>/<place>/provenance.json    how they were made
 
 and writes one values file per (indicator, home collection) at values/indicator=<id>/coll=<coll>/data.parquet, the

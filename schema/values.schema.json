@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://oceanmetrics.io/indicators/schema/v1/values.schema.json",
   "title": "Ocean Metrics indicator value: one row of the value contract",
-  "description": "Every producer writes rows of this shape to values/indicator=<indicator>/coll=<coll>/data.parquet, one file per (indicator, place collection). A row is one value of one indicator for one place over one period. The file's key-value metadata carries its provenance under the key om:provenance (provenance.schema.json). Rules a row-by-row schema cannot state are in om_indicators/contract.py and README.md: `time` is null exactly when `time_grain` is `all`, and otherwise is the first day of its period; (place_id, indicator, time_grain, time, class) is unique within a file; every row of a file has the file's indicator and coll.",
+  "description": "Contract 1.2.0. Every producer writes rows of this shape to values/indicator=<indicator>/coll=<coll>/data.parquet, one file per (indicator, place collection). A row is one value of one indicator for one place over one period. The file's key-value metadata carries its provenance under the key om:provenance (provenance.schema.json). Rules a row-by-row schema cannot state are in om_indicators/contract.py and README.md: `time` is null exactly when `time_grain` is `all`, and otherwise is the first day of its period; (place_id, indicator, time_grain, time, class) is unique within a file; every row of a file has the file's indicator and coll; `sd` is null where `value` is null or where `n` is 0. A file of contract 1.1.x has no `sd` column and stays valid (its rows are read as sd null).",
   "type": "object",
   "required": ["place_id", "coll", "indicator", "time_grain", "time", "class", "value", "n", "unit"],
   "properties": {
@@ -41,6 +41,11 @@
     },
     "n": {
       "description": "Size of what the value summarises, as the indicator's manifest entry defines it (`n_meaning`): native time steps for gridded data, records for OBIS. Null when the producer gives none (e.g. a UN SDG country value).",
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "sd": {
+      "description": "Contract 1.2. The sample standard deviation (n - 1) of the layer's cell values across the place's cells at that time step, in `unit`: the spread inside the place that the area-weighted `value` hides. Finite and >= 0, or null: null where `value` is null, where `n` is 0, and wherever the row summarises several time steps (an SD of means is not the cell SD) or the producer has no cells (OBIS, UN SDG).",
       "type": ["number", "null"],
       "minimum": 0
     },

@@ -1,6 +1,6 @@
 """the value contract: schema, validation, and the one writer every adapter uses.
 
-a contract row is (place_id, coll, indicator, time_grain, time, class, value, n, unit) plus optional x_* producer
+a contract row is (place_id, coll, indicator, time_grain, time, class, value, n, sd, unit) plus optional x_* producer
 columns (schema/values.schema.json). a values file holds one (indicator, coll) at
 values/indicator=<indicator>/coll=<coll>/data.parquet, with its provenance (schema/provenance.schema.json) as JSON in
 the parquet key-value metadata under `om:provenance`. json schema checks one row at a time; the rules that span rows or
@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import math
+import re
 from functools import cache
 from pathlib import Path
 from typing import Any, Iterable
@@ -19,11 +20,18 @@ import jsonschema
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-CONTRACT_VERSION = "1.1.0"
+CONTRACT_VERSION = "1.2.0"
 PROVENANCE_KEY = b"om:provenance"
 SCHEMA_DIR = Path(__file__).resolve().parent.parent / "schema"
 GRAINS = ("all", "decade", "year", "month", "day")
 KEY = ("place_id", "time_grain", "time", "class")
+ROLES = ("data", "geometry", "product", "manifest")
+# contract 1.2 added the sd column, provenance.dataset as required and sources[].item / role; a 1.1 file stays valid
+# without them (validate_table / validate_provenance read the file's own `contract`)
+SD_SINCE = (1, 2)
+# sd is undefined without a time step behind the value: n = 0 means none. (the spec text said n < 2, but a monthly or
+# daily row has n = 1 and carries the SD across the cells of that one step, so n < 2 would null every cell SD)
+SD_MIN_N = 1
 
 # the core columns, in order, with their parquet types ----
 ARROW_SCHEMA = pa.schema([
@@ -35,9 +43,11 @@ ARROW_SCHEMA = pa.schema([
   ("class", pa.string()),
   ("value", pa.float64()),
   ("n", pa.float64()),
+  ("sd", pa.float64()),
   ("unit", pa.string()),
 ])
 CORE = tuple(ARROW_SCHEMA.names)
+SD_COLUMN = "sd"
 
 
 class ContractError(ValueError):
@@ -79,6 +89,19 @@ def period_start(grain: str, d: dt.date) -> dt.date | None:
   raise ValueError(f"unknown time_grain {grain!r}")
 
 
+def _version(contract: Any) -> tuple[int, int] | None:
+  """(major, minor) of a contract version string, None when it is not one."""
+  m = re.fullmatch(r"(\d+)\.(\d+)\.\d+", contract) if isinstance(contract, str) else None
+  return (int(m[1]), int(m[2])) if m else None
+
+
+def _since(contract: Any, since: tuple[int, int]) -> bool:
+  """whether a file of contract version `contract` follows the rules introduced in `since`; an unreadable or absent
+  version counts as the current one."""
+  v = _version(contract) or _version(CONTRACT_VERSION)
+  return v >= since
+
+
 def _as_date(t: Any) -> dt.date | None:
   if t is None or isinstance(t, dt.date) and not isinstance(t, dt.datetime):
     return t
@@ -104,6 +127,8 @@ def validate_rows(rows: Iterable[dict], *, one_file: bool = True) -> list[str]:
       d = None
     as_json = {**r, "time": d.isoformat() if d else None}
     for e in sorted(v.iter_errors(as_json), key=lambda e: list(e.path)):
+      if e.validator == "minimum" and list(e.path) == ["sd"]:
+        continue    # reported below as the sd rule
       where = ".".join(str(p) for p in e.path) or "row"
       errors.append(f"row {i}: {where}: {e.message}")
     g = r.get("time_grain")
@@ -120,6 +145,13 @@ def validate_rows(rows: Iterable[dict], *, one_file: bool = True) -> list[str]:
     n = r.get("n")
     if isinstance(n, float) and not math.isfinite(n):
       errors.append(f"row {i}: n must be finite or null, got {n!r}")
+    sd = r.get("sd")
+    if isinstance(sd, (int, float)) and not (math.isfinite(sd) and sd >= 0):
+      errors.append(f"row {i}: sd must be finite and >= 0 or null, got {sd!r}")
+    if sd is not None and val is None:
+      errors.append(f"row {i}: sd must be null where value is null, got {sd!r}")
+    if sd is not None and n is not None and n < SD_MIN_N:
+      errors.append(f"row {i}: sd must be null where n < {SD_MIN_N} (no time step behind it), got sd {sd!r} with n {n!r}")
     key = (r.get("place_id"), r.get("indicator"), g, d, r.get("class"))
     if key in seen:
       errors.append(f"row {i}: duplicate of row {seen[key]} on (place_id, indicator, time_grain, time, class) = {key[0]}, {key[1]}, {g}, {d}, {key[4]}")
@@ -142,16 +174,26 @@ def validate_rows(rows: Iterable[dict], *, one_file: bool = True) -> list[str]:
 
 
 def validate_provenance(prov: Any) -> list[str]:
-  """every problem with a provenance object."""
-  return [f"provenance: {'.'.join(str(p) for p in e.path) or 'root'}: {e.message}"
-          for e in sorted(_validator("provenance").iter_errors(prov), key=lambda e: list(e.path))]
+  """every problem with a provenance object. from contract 1.2 `dataset` is required (the schema's if/then) and at least
+  one source has the role `data` (explicit, or by default when `role` is absent)."""
+  errors = [f"provenance: {'.'.join(str(p) for p in e.path) or 'root'}: {e.message}"
+            for e in sorted(_validator("provenance").iter_errors(prov), key=lambda e: list(e.path))]
+  if isinstance(prov, dict) and _since(prov.get("contract"), SD_SINCE) and isinstance(prov.get("sources"), list):
+    srcs = [s for s in prov["sources"] if isinstance(s, dict)]
+    if srcs and not any(s.get("role", "data") == "data" for s in srcs):
+      errors.append("provenance: sources: at least one source must have role 'data' (contract 1.2)")
+  return errors
 
 
-def validate_table(table: pa.Table) -> list[str]:
-  """column names and parquet types, then the rows."""
+def validate_table(table: pa.Table, contract: str | None = None) -> list[str]:
+  """column names and parquet types, then the rows. `contract` is the version the file declares (its provenance's
+  `contract`; default the current one): from 1.2 the `sd` column is required, a 1.1 file may lack it."""
   errors: list[str] = []
   names = table.schema.names
+  sd_required = _since(contract, SD_SINCE)
   for f in ARROW_SCHEMA:
+    if f.name == SD_COLUMN and not sd_required and f.name not in names:
+      continue
     if f.name not in names:
       errors.append(f"missing column {f.name!r}")
     elif not table.schema.field(f.name).type.equals(f.type):
@@ -178,7 +220,6 @@ def validate_file(path: Path | str) -> list[str]:
   except Exception as e:  # noqa: BLE001 -- any unreadable file is one error
     return [f"{path}: unreadable parquet: {e}"]
   table = pf.read()
-  errors += validate_table(table)
   meta = pf.schema_arrow.metadata or {}
   if PROVENANCE_KEY not in meta:
     errors.append(f"missing key-value metadata {PROVENANCE_KEY.decode()!r}")
@@ -189,6 +230,7 @@ def validate_file(path: Path | str) -> list[str]:
     except json.JSONDecodeError as e:
       errors.append(f"provenance is not JSON: {e}")
       prov = None
+  errors += validate_table(table, prov.get("contract") if isinstance(prov, dict) else None)
   if prov is not None:
     errors += validate_provenance(prov)
   ind_dir, coll_dir = path.parent.parent.name, path.parent.name
@@ -242,13 +284,14 @@ def to_table(rows: list[dict]) -> pa.Table:
 
 def write_values(rows: list[dict], root: Path | str, provenance: dict) -> Path:
   """validate and write one values file (one indicator, one coll) under `root`; raises ContractError on any problem.
-  `provenance` gets `contract`, `indicator`, `coll` and `rows` filled in when absent."""
+  `provenance` gets `indicator` and `coll` filled in when absent, and `contract` (always the current version) and `rows` set."""
   if not rows:
     raise ContractError(["no rows to write"])
   table = to_table(rows)
   ind, coll = rows[0]["indicator"], rows[0]["coll"]
-  prov = {"contract": CONTRACT_VERSION, "indicator": ind, "coll": coll, **provenance, "rows": table.num_rows}
-  errors = validate_table(table) + validate_provenance(prov)
+  # a writer always writes the current contract: `sd` is all null when the rows carry none (to_table)
+  prov = {"indicator": ind, "coll": coll, **provenance, "contract": CONTRACT_VERSION, "rows": table.num_rows}
+  errors = validate_table(table, CONTRACT_VERSION) + validate_provenance(prov)
   if errors:
     raise ContractError(errors)
   path = values_path(root, ind, coll)

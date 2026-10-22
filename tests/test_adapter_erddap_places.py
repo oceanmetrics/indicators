@@ -1,12 +1,14 @@
 # the erddap-places adapter: daily stats -> month and year rows. one test per rule, exact expected rows.
 import datetime as dt
+import json
 import os
+from pathlib import Path
 
 import pytest
 import requests
 
 from erddap_tree import categorical_table, continuous_table, daterange, entry, make_tree
-from om_indicators import contract as c
+from om_indicators import contract as c, manifest
 from om_indicators.adapters import erddap_places as ep
 
 D = dt.date
@@ -67,7 +69,7 @@ def test_daily_record_gives_exactly_the_complete_2020_months_and_one_year():
   assert [m["value"] for m in months] == pytest.approx(expected, abs=1e-12)
   assert [m["n"] for m in months] == [31, 29, 29, 30, 31, 30, 31, 31, 30, 31, 30, 31]
   years = ep.year_rows(months)
-  assert years == [{"time": D(2020, 1, 1), "value": pytest.approx(sum(expected) / 12, abs=1e-12), "n": 364.0}]
+  assert years == [{"time": D(2020, 1, 1), "value": pytest.approx(sum(expected) / 12, abs=1e-12), "n": 364.0, "sd": None}]
 
 
 def test_eight_day_record():
@@ -103,7 +105,7 @@ def test_monthly_record_keeps_every_month_and_a_year_needs_twelve():
 def test_year_is_the_mean_of_monthly_means_not_of_days():
   # January has 31 days at 10, February 29 days at 20: months weigh the same in the year
   months = [{"time": D(2020, m, 1), "value": 10.0 if m == 1 else 20.0, "n": 31.0 if m == 1 else 29.0} for m in range(1, 13)]
-  assert ep.year_rows(months) == [{"time": D(2020, 1, 1), "value": pytest.approx((10 + 11 * 20) / 12), "n": 31 + 11 * 29}]
+  assert ep.year_rows(months) == [{"time": D(2020, 1, 1), "value": pytest.approx((10 + 11 * 20) / 12), "n": 31 + 11 * 29, "sd": None}]
 
 
 def test_month_with_only_null_values_gets_no_row():
@@ -115,7 +117,7 @@ def test_month_with_only_null_values_gets_no_row():
 
 def test_nan_counts_as_null():
   series = [(d, float("nan") if d.day == 1 else 2.0) for d in daterange(D(2020, 1, 1), D(2020, 1, 31))]
-  assert ep.month_rows(series) == [{"time": D(2020, 1, 1), "value": 2.0, "n": 30.0}]
+  assert ep.month_rows(series) == [{"time": D(2020, 1, 1), "value": 2.0, "n": 30.0, "sd": None}]
 
 
 def test_continuous_rows_are_contract_rows():
@@ -123,7 +125,7 @@ def test_continuous_rows_are_contract_rows():
   assert len(rows) == 13 and c.validate_rows(rows) == []
   assert rows[0] == {"place_id": "NMS:T", "coll": "places", "indicator": "erddap:dhw_5km:CRW_SST:mean",
                      "time_grain": "month", "time": D(2020, 1, 1), "class": None,
-                     "value": pytest.approx(month_value(1)), "n": 31.0, "unit": "Celsius"}
+                     "value": pytest.approx(month_value(1)), "n": 31.0, "sd": None, "unit": "Celsius"}
   assert rows[-1]["time_grain"] == "year" and rows[-1]["time"] == D(2020, 1, 1) and rows[-1]["n"] == 366.0
 
 
@@ -234,6 +236,116 @@ def test_run_lists_empty_files_and_does_not_fail_on_them(tmp_path):
   assert summary["files"][0]["places"] == 1
   _, prov = c.read_values(c.values_path(tmp_path / "cat", "erddap:dhw_5km:CRW_SST:mean", "places"))
   assert len(prov["sources"]) == 2     # the empty file was read too
+
+
+# sd: the cell SD, carried only where a month is one time step ----
+def monthly_series(sd=True):
+  """one value per month of 2020 on the 15th (a monthly dataset, native step 31 days): value = month, cell SD = month / 10."""
+  ds = [D(2020, m, 15) for m in range(1, 13)]
+  return [(d, float(d.month)) for d in ds], ({d: d.month / 10 for d in ds} if sd else None)
+
+
+def test_month_rows_of_a_monthly_dataset_carry_the_cell_sd_one_to_one():
+  series, sd = monthly_series()
+  rows = ep.month_rows([(d, v, sd[d]) for d, v in series])
+  assert [(r["time"].month, r["n"], r["sd"]) for r in rows] == [(m, 1.0, pytest.approx(m / 10)) for m in range(1, 13)]
+
+
+def test_month_rows_of_several_steps_have_no_sd():
+  # an SD of daily means is not the SD across cells
+  rows = ep.month_rows([(d, v, 0.5) for d, v in daily_series()])
+  assert {r["sd"] for r in rows} == {None} and len(rows) == 12
+
+
+def test_year_rows_have_no_sd():
+  series, sd = monthly_series()
+  months = ep.month_rows([(d, v, sd[d]) for d, v in series])
+  assert [y["sd"] for y in ep.year_rows(months)] == [None]
+
+
+def test_a_month_with_one_valid_step_among_null_steps_keeps_that_steps_sd():
+  # n counts the non-null steps, so one step left is still one to one with its stats row
+  series = [(D(2020, 1, d), 4.0 if d == 2 else None, 0.25 if d == 2 else 9.0) for d in range(1, 32)]
+  assert [(r["n"], r["sd"]) for r in ep.month_rows(series)] == [(1.0, 0.25)]
+
+
+def test_a_missing_or_negative_step_sd_is_null():
+  for bad in (None, float("nan"), -1.0):
+    assert [r["sd"] for r in ep.month_rows([(D(2020, 1, 15), 1.0, bad), (D(2020, 2, 15), 2.0, 0.5)])] == [None, 0.5]
+
+
+def test_run_carries_the_stats_sd_of_a_monthly_dataset_and_writes_null_for_daily(tmp_path):
+  series, sd = monthly_series()
+  monthly = entry("monthly_ds", "chl", "NMS:CINMS", continuous_table(series, sd), unit="mg m-3")
+  daily = entry("dhw_5km", "CRW_SST", "NMS:CINMS", continuous_table(daily_series(), {d: 0.5 for d, _ in daily_series()}))
+  base = make_tree(tmp_path / "pub", [monthly, daily])
+  ep.run(tmp_path / "cat", base=base, cache=tmp_path / "cache")
+  assert c.validate_tree(tmp_path / "cat") == {}
+  t, _ = c.read_values(c.values_path(tmp_path / "cat", "erddap:monthly_ds:chl:mean", "places"))
+  by_grain = {g: [r["sd"] for r in t.to_pylist() if r["time_grain"] == g] for g in ("month", "year")}
+  assert by_grain["month"] == [pytest.approx(m / 10) for m in range(1, 13)] and by_grain["year"] == [None]
+  t, _ = c.read_values(c.values_path(tmp_path / "cat", "erddap:dhw_5km:CRW_SST:mean", "places"))
+  assert set(t.column("sd").to_pylist()) == {None}
+
+
+def test_run_writes_null_sd_for_a_stats_file_without_the_column(tmp_path):
+  series, _ = monthly_series(sd=False)
+  base = make_tree(tmp_path / "pub", [entry("monthly_ds", "chl", "NMS:CINMS", continuous_table(series), unit="mg m-3")])
+  ep.run(tmp_path / "cat", base=base, cache=tmp_path / "cache")
+  t, _ = c.read_values(c.values_path(tmp_path / "cat", "erddap:monthly_ds:chl:mean", "places"))
+  assert t.num_rows == 13 and set(t.column("sd").to_pylist()) == {None}
+
+
+def test_categorical_shares_have_no_sd():
+  rows = ep.categorical_rows("NMS:T", "erddap:dhw_5km:CRW_BAA:share", [(d, str(int(k)), s) for d, k, s in two_class_year()])
+  assert rows and {r["sd"] for r in rows} == {None} and c.validate_rows(rows) == []
+
+
+# provenance: the dataset and the STAC item of each source ----
+def test_run_states_the_original_dataset_as_the_manifest_does(tmp_path):
+  base = make_tree(tmp_path / "pub", [sst("NMS:CINMS")])
+  ep.run(tmp_path / "cat", base=base, cache=tmp_path / "cache")
+  _, prov = c.read_values(c.values_path(tmp_path / "cat", "erddap:dhw_5km:CRW_SST:mean", "places"))
+  assert prov["contract"] == "1.2.0"
+  assert prov["dataset"] == {"id": "dhw_5km", "title": "dhw_5km title", "via": "https://erddap/info/dhw_5km/index.html",
+                             "providers": [{"name": "NOAA", "roles": ["producer"]}], "license": "CC0-1.0",
+                             "citation": None, "doi": None}
+  looked_up = manifest.erddap_dataset("dhw_5km", lambda url: json.loads(Path(url).read_text()), str(tmp_path / "pub" / "gazetteer"))
+  assert prov["dataset"] == manifest.provenance_dataset(looked_up)
+
+
+def test_run_states_the_doi_and_citation_of_the_collection(tmp_path):
+  base = make_tree(tmp_path / "pub", [sst("NMS:CINMS")])
+  coll = tmp_path / "pub" / "gazetteer" / "erddap" / "dhw_5km" / "collection.json"
+  d = json.loads(coll.read_text())
+  d["links"].append({"rel": "cite-as", "href": "https://doi.org/10.1234/x"})
+  d["sci:citation"] = "NOAA CRW (2026) Daily 5 km SST"
+  coll.write_text(json.dumps(d))
+  ep.run(tmp_path / "cat", base=base, cache=tmp_path / "cache")
+  _, prov = c.read_values(c.values_path(tmp_path / "cat", "erddap:dhw_5km:CRW_SST:mean", "places"))
+  assert (prov["dataset"]["doi"], prov["dataset"]["citation"]) == ("https://doi.org/10.1234/x", "NOAA CRW (2026) Daily 5 km SST")
+
+
+def test_each_source_names_its_stac_item_and_has_the_role_data(tmp_path):
+  base = make_tree(tmp_path / "pub", [sst("NMS:CINMS"), sst("NMS:FKNMS")])
+  ep.run(tmp_path / "cat", base=base, cache=tmp_path / "cache")
+  _, prov = c.read_values(c.values_path(tmp_path / "cat", "erddap:dhw_5km:CRW_SST:mean", "places"))
+  items = tmp_path / "pub" / "gazetteer" / "stats" / "items"
+  assert [(s["item"], s["role"]) for s in prov["sources"]] == [
+    (str(items / "dhw_5km_CRW_SST_NMS-CINMS.json"), "data"), (str(items / "dhw_5km_CRW_SST_NMS-FKNMS.json"), "data")]
+
+
+def test_the_item_is_the_collections_link_href_not_a_rebuilt_id(tmp_path):
+  # the link may name the item file as it likes: the adapter uses the href, never <dataset>_<variable>_<place>
+  base = make_tree(tmp_path / "pub", [sst("NMS:CINMS")])
+  stats = tmp_path / "pub" / "gazetteer" / "stats"
+  (stats / "items" / "dhw_5km_CRW_SST_NMS-CINMS.json").rename(stats / "items" / "other-name.json")
+  col = json.loads((stats / "collection.json").read_text())
+  col["links"][0]["href"] = "./items/other-name.json"
+  (stats / "collection.json").write_text(json.dumps(col))
+  ep.run(tmp_path / "cat", base=base, cache=tmp_path / "cache")
+  _, prov = c.read_values(c.values_path(tmp_path / "cat", "erddap:dhw_5km:CRW_SST:mean", "places"))
+  assert [s["item"] for s in prov["sources"]] == [str(stats / "items" / "other-name.json")]
 
 
 def test_a_variable_with_only_empty_files_writes_no_file(tmp_path):

@@ -20,11 +20,15 @@ def daterange(start: dt.date, end: dt.date, step: int = 1) -> list[dt.date]:
   return [start + dt.timedelta(days=i) for i in range(0, (end - start).days + 1, step)]
 
 
-def continuous_table(series: list[tuple[dt.date, float | None]]) -> pa.Table:
-  """the published columns of a continuous stats file (only date and mean_wt matter to the adapter)."""
-  return pa.table({"date": pa.array([d for d, _ in series], pa.date32()),
-                   "n": pa.array([None if v is None else 10 for _, v in series], pa.int64()),
-                   "mean_wt": pa.array([v for _, v in series], pa.float64())})
+def continuous_table(series: list[tuple[dt.date, float | None]], sd: dict[dt.date, float | None] | None = None) -> pa.Table:
+  """the published columns of a continuous stats file (date, mean_wt and, when `sd` is given, the SD across the mask
+  cells of each step; only these matter to the adapter)."""
+  cols = {"date": pa.array([d for d, _ in series], pa.date32()),
+          "n": pa.array([None if v is None else 10 for _, v in series], pa.int64()),
+          "mean_wt": pa.array([v for _, v in series], pa.float64())}
+  if sd is not None:
+    cols["sd"] = pa.array([sd.get(d) for d, _ in series], pa.float64())
+  return pa.table(cols)
 
 
 def categorical_table(rows: list[tuple[dt.date, int, float]]) -> pa.Table:
@@ -74,7 +78,10 @@ def make_tree(root: Path, entries: list[dict], index: dict[str, list[str]] | Non
   (stats / "collection.json").write_text(json.dumps({"type": "Collection", "id": "stats", "updated": UPDATED, "links": links}))
   for ds, cube in datasets.items():
     (g / "erddap" / ds).mkdir(parents=True, exist_ok=True)
-    (g / "erddap" / ds / "collection.json").write_text(json.dumps({"type": "Collection", "id": ds, "cube:variables": cube}))
+    (g / "erddap" / ds / "collection.json").write_text(json.dumps({"type": "Collection", "id": ds, "title": f"{ds} title", "license": "CC0-1.0",
+                                                         "providers": [{"name": "NOAA", "roles": ["producer"]}],
+                                                         "links": [{"rel": "via", "href": f"https://erddap/info/{ds}/index.html"}],
+                                                         "cube:variables": cube}))
   if index is None:
     index = {e["place"]: ["places"] for e in entries}
   rows = [(pid, coll) for pid, colls in index.items() for coll in colls]

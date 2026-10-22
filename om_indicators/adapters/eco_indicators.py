@@ -17,7 +17,7 @@ rules (each one a named function below, each tested):
              dropped (`DROPPED`); any other code raises, so a new sanctuary is a decision, not a silent loss.
   variables  `DATASETS`: the physics, biogeochemistry and plankton variables kept, per dataset. the myint (interim)
              physics dataset duplicates the my record and is dropped, as are the `*_uncertainty` and `flags` variables.
-  month      `month_rows()`: value = the monthly mean, n = 1, x_sd = the spatial SD; a month with no mean gets no row.
+  month      `month_rows()`: value = the monthly mean, n = 1, sd = the spatial SD; a month with no mean gets no row.
   year       `year_rows()`: only for years with all 12 month rows; value = mean of the 12 monthly means, n = 12.
   pin        `resolve_commit()`: the latest commit on main that touched data/copernicus.csv (GitHub API, unauthenticated),
              else `--ref`; the files are fetched at that sha (immutable, cached under cache/eco-indicators/<sha>/) and
@@ -81,7 +81,7 @@ METHOD = (
   "monthly means over each sanctuary polygon of Copernicus Marine Service products, extracted by noaa-onms/eco-indicators "
   "(copernicus.qmd: terra::extract mean over the polygon, with the spatial SD); the polygons are noaa-onms/climate-dashboard's "
   "sanctuaries.rds, matched to gazetteer ids by NMS code (CPNMS, Chumash Proposed Action, to NMS:CHNMS; the Monterey Bay "
-  "sub-areas are dropped). month = the monthly mean (n = 1, x_sd = the spatial SD); year = the mean of the 12 monthly "
+  "sub-areas are dropped). month = the monthly mean (n = 1, sd = the spatial SD); year = the mean of the 12 monthly "
   f"means, written only for years with all 12 months. Copernicus Marine Service licence: {CMEMS_LICENCE}")
 
 
@@ -131,18 +131,18 @@ def read_means(text: str) -> dict[tuple[str, str, str], dict[str, dict[dt.date, 
 
 def month_rows(pid: str, ind: str, unit: str, mean: dict[dt.date, float | None], sd: dict[dt.date, float | None],
                coll: str = COLL) -> list[dict]:
-  """month rows of one place and variable: value = the monthly mean, n = 1, x_sd = the spatial SD; no row without a mean.
+  """month rows of one place and variable: value = the monthly mean, n = 1, sd = the spatial SD; no row without a mean.
   `coll` is the sanctuaries' `places` here; the place producer (om_indicators/producers/cmems_place.py) shares these rules
   for any other collection."""
   return [{"place_id": pid, "coll": coll, "indicator": ind, "time_grain": "month", "time": m, "class": None,
-           "value": v, "n": 1.0, "unit": unit, "x_sd": sd.get(m)}
+           "value": v, "n": 1.0, "unit": unit, "sd": sd.get(m)}
           for m, v in sorted(mean.items()) if v is not None]
 
 
 def year_rows(pid: str, ind: str, unit: str, months: list[dict], coll: str = COLL) -> list[dict]:
   """year rows: only years with all 12 month rows; value = the mean of the 12 monthly means, n = 12."""
   return [{"place_id": pid, "coll": coll, "indicator": ind, "time_grain": "year", "time": y["time"], "class": None,
-           "value": y["value"], "n": y["n"], "unit": unit, "x_sd": None}
+           "value": y["value"], "n": y["n"], "unit": unit, "sd": None}
           for y in ep.year_rows(months)]
 
 

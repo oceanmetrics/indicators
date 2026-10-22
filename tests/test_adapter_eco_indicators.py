@@ -118,9 +118,9 @@ def test_month_rows_are_the_monthly_mean_with_n_one_and_the_spatial_sd():
   sd = {D(2020, 1, 1): 0.5, D(2020, 2, 1): 0.6, D(2020, 3, 1): None}
   assert eco.month_rows("NMS:A", THETAO, "degrees_C", mean, sd) == [
     {"place_id": "NMS:A", "coll": "places", "indicator": THETAO, "time_grain": "month", "time": D(2020, 1, 1), "class": None,
-     "value": 10.0, "n": 1.0, "unit": "degrees_C", "x_sd": 0.5},
+     "value": 10.0, "n": 1.0, "unit": "degrees_C", "sd": 0.5},
     {"place_id": "NMS:A", "coll": "places", "indicator": THETAO, "time_grain": "month", "time": D(2020, 3, 1), "class": None,
-     "value": 12.0, "n": 1.0, "unit": "degrees_C", "x_sd": None}]       # a month without a mean has no row
+     "value": 12.0, "n": 1.0, "unit": "degrees_C", "sd": None}]       # a month without a mean has no row
 
 
 def test_year_rows_need_all_12_months_and_average_the_monthly_means():
@@ -128,7 +128,7 @@ def test_year_rows_need_all_12_months_and_average_the_monthly_means():
   months = eco.month_rows("NMS:A", THETAO, "degrees_C", m, {})
   assert eco.year_rows("NMS:A", THETAO, "degrees_C", months) == [
     {"place_id": "NMS:A", "coll": "places", "indicator": THETAO, "time_grain": "year", "time": D(2020, 1, 1), "class": None,
-     "value": 6.5, "n": 12.0, "unit": "degrees_C", "x_sd": None}]       # 2021 has 11 months: no row
+     "value": 6.5, "n": 12.0, "unit": "degrees_C", "sd": None}]       # 2021 has 11 months: no row
 
 
 def test_regression_a_year_with_one_na_month_gets_no_year_row():
@@ -242,9 +242,9 @@ def test_run_writes_exact_rows_for_kept_places_and_variables(tmp_path):
   assert len(chnms) == 13 and chnms[0]["time_grain"] == "year"
   assert chnms[0] == {"place_id": "NMS:CHNMS", "coll": "places", "indicator": THETAO, "time_grain": "year",
                       "time": D(2000, 1, 1), "class": None, "value": pytest.approx(14.0 + 0.065), "n": 12.0,
-                      "unit": "degrees_C", "x_sd": None}
+                      "unit": "degrees_C", "sd": None}
   jan = chnms[1]
-  assert (jan["time_grain"], jan["time"], jan["n"], jan["unit"], jan["x_sd"]) == ("month", D(2000, 1, 1), 1.0, "degrees_C", 0.1)
+  assert (jan["time_grain"], jan["time"], jan["n"], jan["unit"], jan["sd"]) == ("month", D(2000, 1, 1), 1.0, "degrees_C", 0.1)
   assert jan["value"] == pytest.approx(14.01)
 
 
@@ -305,3 +305,14 @@ def test_published_products_match_their_dois_and_titles(tmp_path):
     got = json.loads(f.read_bytes("https://api.datacite.org/dois/" + doi.removeprefix("https://doi.org/")))
     # DataCite's case differs for some (BGC: "Global ocean biogeochemistry hindcast")
     assert got["data"]["attributes"]["titles"][0]["title"].casefold() == titles[product].casefold()
+
+
+def test_year_rows_have_no_sd_and_month_rows_carry_the_spatial_sd_in_the_core_column(tmp_path):
+  raw = make_raw(tmp_path, fixture_rows())
+  eco.run(tmp_path / "out", cache=tmp_path / "cache", raw=str(raw), index=make_index(tmp_path), resolve=resolver)
+  t, p = c.read_values(c.values_path(tmp_path / "out", THETAO, "places"))
+  assert "x_sd" not in t.schema.names and t.schema.names.index("sd") == t.schema.names.index("n") + 1
+  rows = t.to_pylist()
+  assert {r["sd"] for r in rows if r["time_grain"] == "year"} == {None}
+  assert any(r["sd"] is not None for r in rows if r["time_grain"] == "month")
+  assert p["contract"] == "1.2.0" and p["dataset"]["id"] and {s.get("role", "data") for s in p["sources"]} == {"data"}

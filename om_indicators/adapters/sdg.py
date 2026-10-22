@@ -53,7 +53,7 @@ def series_rows(code: str, series: dict, eez: dict[str, dict]) -> list[dict]:
       continue
     rows.append({"place_id": f"MRGID:{key}", "coll": COLL, "indicator": f"sdg:{code}", "time_grain": "year",
                  "time": dt.date(int(v["year"]), 1, 1), "class": None, "value": float(v["value"]), "n": None,
-                 "unit": series["units"], "x_m49": int(v["m49"]), "x_basis": v["basis"]})
+                 "sd": None, "unit": series["units"], "x_m49": int(v["m49"]), "x_basis": v["basis"]})
   return rows
 
 

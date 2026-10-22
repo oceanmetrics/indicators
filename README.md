@@ -31,12 +31,31 @@ One row per (place, indicator, period), in `values/indicator=<id>/coll=<slug>/da
 | `class` | string | categorical indicators only: the class whose area share `value` is |
 | `value` | double | finite or null |
 | `n` | double | what the value summarises (time steps, records; see the manifest's `n_meaning`) |
+| `sd` | double | contract 1.2: the sample standard deviation (n - 1) of the layer's cell values across the place's cells at that time step, in `unit`; finite and >= 0, or null |
 | `unit` | string | |
 | `x_*` | any | optional producer columns |
 
-Each file carries its provenance (producer, the exact sources read, method, code version, created, licence) as JSON
-in the Parquet key-value metadata under `om:provenance`. Schemas: [`schema/`](schema/). Validator and writer:
-[`om_indicators/contract.py`](om_indicators/contract.py).
+Each file carries its provenance (producer, the original dataset, the exact sources read, method, code version,
+created, licence) as JSON in the Parquet key-value metadata under `om:provenance`. Schemas: [`schema/`](schema/).
+Validator and writer: [`om_indicators/contract.py`](om_indicators/contract.py).
+
+**Contract 1.2.0** adds three things to 1.1:
+
+- **`sd`**, the tenth core column, right after `n`. It is the spread inside the place that the area-weighted `value`
+  hides. It is null where `value` is null, where `n` is 0, wherever a row summarises several time steps (an SD of
+  monthly or daily means is not the cell SD: erddap-places writes `sd` only for a month that is one time step, null for
+  daily-to-month rows and for years) and for producers with no cells (OBIS, UN SDG). Copernicus Marine rows carry the
+  spatial SD that was `x_sd` in 1.1.
+- **`dataset`** in the provenance is required: the original dataset (`id`, `title`, `providers`, `license`, `via`,
+  `doi` / `citation` when present). The erddap-places adapter states the same dataset the manifest reads from the
+  ERDDAP collection.
+- **`sources[]`** entries gain `item` (the URL of the STAC Item that describes the source file, or null) and `role`
+  (`data`, the default, `geometry`, `product` or `manifest`). At least one source has the role `data`.
+
+**1.1 files stay readable and valid.** `validate_table()` and `validate_file()` read the file's own `contract`: a 1.1.x
+file needs no `sd` column and no `dataset`, and a 1.2.x file without `sd` fails with `missing column 'sd'`. A reader
+treats a missing `sd` column as null. `write_values()` always writes 1.2.0 and fills `sd` with nulls when the rows
+carry none.
 
 ```sql
 -- every SST value for every sanctuary, straight from the bucket (published daily)

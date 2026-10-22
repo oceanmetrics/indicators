@@ -92,7 +92,9 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
 - **The contract** (`schema/values.schema.json`, `om_indicators/contract.py`): every adapter writes through
   `contract.write_values()`, which validates rows and provenance and refuses to write on any error. Rules beyond
   JSON Schema (time aligned to its grain, unique keys, one indicator and coll per file, finite values, class on
-  all rows or none) live in `validate_rows()`, each with a test.
+  all rows or none, `sd` finite and >= 0 and null where `value` is null or `n` is 0) live in `validate_rows()`, each with a test.
+  Contract 1.2.0 added the `sd` column, a required `provenance.dataset` and `sources[].item` / `role`; the validators read a
+  file's own `contract`, so published 1.1 files (no `sd`, no `dataset`) stay valid.
 - **Adapters read published outputs only** and never change a producer repo. The STAC items stay the provenance:
   each values file lists the exact items/files it read in `om:provenance.sources`.
 - **Producers compute, adapters read** (`om_indicators/producers/`). The one producer is `cmems_place.py`: a maintainer

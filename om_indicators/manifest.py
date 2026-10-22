@@ -71,7 +71,7 @@ PRODUCERS = {
       "code": "https://github.com/oceanmetrics/indicators/blob/main/om_indicators/adapters/eco_indicators.py",
       "continuous": (
         "Monthly means of a Copernicus Marine Service product over each sanctuary polygon, extracted by "
-        "noaa-onms/eco-indicators (mean of the grid cells under the polygon, with the spatial SD in x_sd). A year is the "
+        "noaa-onms/eco-indicators (mean of the grid cells under the polygon, with the cell SD in sd). A year is the "
         "mean of its 12 monthly means, written only when all 12 months have a value. A place outside the sanctuaries is "
         "computed on request by om_indicators.producers.cmems_place from the same product, by the same method (the mean "
         "of the cells whose centres fall inside the place polygon, at the surface level)."),
@@ -174,22 +174,30 @@ def _from_family_producer(ind: str, prov: dict | None) -> bool:
 
 
 # producer metadata ----
-def erddap_dataset(dataset_id: str, fetch: Callable[[str], dict]) -> dict:
+def erddap_dataset(dataset_id: str, fetch: Callable[[str], dict], gazetteer: str = GAZETTEER) -> dict:
   """dataset title, providers, licence, DOI, upstream page and classes from erddap/<id>/collection.json; `collection` is the
   collection's own id, the name erddap-places gives the dataset in a link (`erddap/imerg_monthly_global_precip` for the folder
-  and ERDDAP dataset `IMERG_monthly_global_precip`: never built from the folder name)"""
-  c = fetch(f"{GAZETTEER}/erddap/{dataset_id}/collection.json")
+  and ERDDAP dataset `IMERG_monthly_global_precip`: never built from the folder name). `gazetteer` is the base the
+  collection is read from (the erddap-places adapter passes the one it reads its stats from)"""
+  gazetteer = gazetteer.rstrip("/")
+  c = fetch(f"{gazetteer}/erddap/{dataset_id}/collection.json")
   links = c.get("links", [])
   doi = next((l["href"] for l in links if "doi.org/" in l.get("href", "")), None)
   via = next((l["href"] for l in links if l.get("rel") == "via"), None)
   license_link = next((l["href"] for l in links if l.get("rel") == "license"), None)
   return {
     "id": dataset_id, **({"collection": c["id"]} if c.get("id") else {}), "title": c["title"],
-    "stac": f"{GAZETTEER}/erddap/{dataset_id}/collection.json", "via": via or license_link,
+    "stac": f"{gazetteer}/erddap/{dataset_id}/collection.json", "via": via or license_link,
     "providers": [{k: p[k] for k in ("name", "roles", "url") if k in p} for p in c.get("providers", [])],
     "license": c.get("license", "other"), "citation": c.get("sci:citation"), "doi": doi,
     "_variables": c.get("cube:variables", {}),
   }
+
+
+def provenance_dataset(d: dict) -> dict:
+  """`erddap_dataset()` as provenance.dataset (contract 1.2): the keys schema/provenance.schema.json allows, so the
+  adapter states the same dataset the manifest would look up (the lookup-only `collection`, `stac` and `_variables` stay out)"""
+  return {k: d[k] for k in ("id", "title", "via", "providers", "license", "citation", "doi") if k in d}
 
 
 def sdg_dataset(code: str, sdg_values: dict) -> dict:
@@ -240,7 +248,12 @@ def build_manifest(values: dict[str, dict], entries: dict[str, dict], vocabs: di
     prod = PRODUCERS[fam]
     # the producer's own statement of its dataset (provenance.dataset, contract 1.1) wins over any lookup
     stated = (v.get("prov") or {}).get("dataset")
-    ds = dict(stated) if stated else dataset_of(ind_id)
+    if stated and fam == "erddap":
+      # erddap-places files state the dataset too (contract 1.2), but the manifest also needs what only the collection
+      # holds: the collection id, the STAC link and the variables (classes, descriptions)
+      ds = {**dataset_of(ind_id), **stated}
+    else:
+      ds = dict(stated) if stated else dataset_of(ind_id)
     kind = e.get("kind", "continuous")
     variables = ds.pop("_variables", {})
     out = {

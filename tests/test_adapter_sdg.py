@@ -10,7 +10,7 @@ VALUES = Path(__file__).parent / "fixtures" / "sdg" / "values.json"
 
 def row(code, mrgid, year, value, unit, m49, basis):
   return {"place_id": f"MRGID:{mrgid}", "coll": "mr_eez", "indicator": f"sdg:{code}", "time_grain": "year",
-          "time": dt.date(year, 1, 1), "class": None, "value": value, "n": None, "unit": unit,
+          "time": dt.date(year, 1, 1), "class": None, "value": value, "n": None, "sd": None, "unit": unit,
           "x_m49": m49, "x_basis": basis}
 
 
@@ -74,3 +74,10 @@ def test_provenance_carries_the_dataset(tmp_path):
   assert ds["title"] == "Average proportion of Marine KBAs covered by protected areas (%) (SDG 14.5.1)"
   assert ds["providers"][1]["name"] == "UN Statistics Division, SDG Global Database"
   assert ds["license"] == "other" and prov["contract"] == contract.CONTRACT_VERSION
+
+
+def test_sdg_rows_have_no_sd_and_the_files_state_their_dataset(tmp_path):
+  sdg.run(VALUES, tmp_path)
+  t, p = c.read_values(c.values_path(tmp_path, "sdg:ER_MRN_MPA", "mr_eez"))
+  assert set(t.column("sd").to_pylist()) == {None}              # a country value has no cells
+  assert p["contract"] == "1.2.0" and p["dataset"]["id"] == "ER_MRN_MPA"

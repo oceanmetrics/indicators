@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://oceanmetrics.io/indicators/schema/v1/provenance.schema.json",
-  "title": "Provenance of one contract values file",
-  "description": "JSON stored in the Parquet key-value metadata of every values file under the key `om:provenance`: where the values came from, how they were derived, by which code and when.",
+  "title": "Provenance of one contract values file (contract 1.2.0)",
+  "description": "Contract 1.2.0. JSON stored in the Parquet key-value metadata of every values file under the key `om:provenance`: where the values came from, how they were derived, by which code and when. From contract 1.2 `dataset` (the original dataset) is required, every source may name the STAC item that describes it (`item`) and its `role`, and at least one source has the role `data` (a rule om_indicators/contract.py checks). A 1.1.x file stays valid without them.",
   "type": "object",
   "required": [
     "contract",
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "contract": {
-      "description": "Version of the value contract the file follows (semver; this schema is 1.x).",
+      "description": "Version of the value contract the file follows (semver; this schema is 1.x). Files of 1.2.x and later must carry `dataset`.",
       "type": "string",
       "pattern": "^1\\.\\d+\\.\\d+$"
     },
@@ -96,6 +96,23 @@
               "null"
             ],
             "description": "multihash or sha256 of the input, when known."
+          },
+          "item": {
+            "description": "Contract 1.2. URL of the STAC Item that describes this source file, or null when none exists.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "description": "Contract 1.2. What the source is: `data` (values read; the default when absent), `geometry` (the place polygon), `product` (the upstream product page) or `manifest` (a release listing). At least one source has the role `data`.",
+            "enum": [
+              "data",
+              "geometry",
+              "product",
+              "manifest"
+            ],
+            "default": "data"
           }
         },
         "additionalProperties": false
@@ -152,7 +169,7 @@
       "minimum": 0
     },
     "dataset": {
-      "description": "Optional (contract 1.1): the upstream dataset as the producer states it, for producers without a STAC collection to read it from (e.g. the UN SDG series). The manifest prefers it over any lookup.",
+      "description": "The original dataset the values were derived from, as the producer states it (contract 1.2: required on every file; 1.1: optional, for producers without a STAC collection to read it from). The manifest prefers it over any lookup.",
       "type": "object",
       "required": [
         "id",
@@ -216,5 +233,20 @@
       "additionalProperties": false
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "if": {
+    "properties": {
+      "contract": {
+        "pattern": "^1\\.[2-9]\\."
+      }
+    },
+    "required": [
+      "contract"
+    ]
+  },
+  "then": {
+    "required": [
+      "dataset"
+    ]
+  }
 }

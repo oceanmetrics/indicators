@@ -60,10 +60,10 @@ def test_year_decade_and_all_rows_with_n_records_and_units():
   assert sorted(rows) == sorted(i for i in obis.all_indicator_ids() if i.count(":") == 1)      # eov all only
   base = {"place_id": "MRGID:1", "coll": "mr_eez", "class": None}
   assert rows["obis:species"] == [
-    {**base, "indicator": "obis:species", "time_grain": "year", "time": D(2023, 1, 1), "value": 12, "n": 80.0, "unit": "species"},
-    {**base, "indicator": "obis:species", "time_grain": "year", "time": D(2024, 1, 1), "value": 5, "n": 30.0, "unit": "species"},
-    {**base, "indicator": "obis:species", "time_grain": "decade", "time": D(2020, 1, 1), "value": 15, "n": 110.0, "unit": "species"},
-    {**base, "indicator": "obis:species", "time_grain": "all", "time": None, "value": 40, "n": 400.0, "unit": "species"}]
+    {**base, "indicator": "obis:species", "time_grain": "year", "time": D(2023, 1, 1), "value": 12, "n": 80.0, "sd": None, "unit": "species"},
+    {**base, "indicator": "obis:species", "time_grain": "year", "time": D(2024, 1, 1), "value": 5, "n": 30.0, "sd": None, "unit": "species"},
+    {**base, "indicator": "obis:species", "time_grain": "decade", "time": D(2020, 1, 1), "value": 15, "n": 110.0, "sd": None, "unit": "species"},
+    {**base, "indicator": "obis:species", "time_grain": "all", "time": None, "value": 40, "n": 400.0, "sd": None, "unit": "species"}]
   assert [(r["time_grain"], r["value"], r["n"], r["unit"]) for r in rows["obis:records"]] == [
     ("year", 80.0, 80.0, "records"), ("year", 30.0, 30.0, "records"), ("decade", 110.0, 110.0, "records"), ("all", 400.0, 400.0, "records")]
   assert [r["value"] for r in rows["obis:es50"]] == [9.5, None, 11.25, 20.0]                   # null stays null (n < 50)
@@ -159,13 +159,13 @@ def test_run_default_release_is_latest_json_and_rows_are_exact(tmp_path):
   t, _ = c.read_values(c.values_path(tmp_path / "out", "obis:species", "mr_eez"))
   assert t.to_pylist() == [
     {"place_id": "MRGID:1", "coll": "mr_eez", "indicator": "obis:species", "time_grain": "all", "time": None, "class": None,
-     "value": 10.0, "n": 75.0, "unit": "species"},
+     "value": 10.0, "n": 75.0, "sd": None, "unit": "species"},
     {"place_id": "MRGID:1", "coll": "mr_eez", "indicator": "obis:species", "time_grain": "year", "time": D(2024, 1, 1), "class": None,
-     "value": 9.0, "n": 60.0, "unit": "species"},
+     "value": 9.0, "n": 60.0, "sd": None, "unit": "species"},
     {"place_id": "MRGID:2", "coll": "mr_eez", "indicator": "obis:species", "time_grain": "all", "time": None, "class": None,
-     "value": 4.0, "n": 35.0, "unit": "species"},
+     "value": 4.0, "n": 35.0, "sd": None, "unit": "species"},
     {"place_id": "MRGID:2", "coll": "mr_eez", "indicator": "obis:species", "time_grain": "year", "time": D(2024, 1, 1), "class": None,
-     "value": 4.0, "n": 30.0, "unit": "species"}]                                  # 2026 (the snapshot year) is not a year row
+     "value": 4.0, "n": 30.0, "sd": None, "unit": "species"}]                                  # 2026 (the snapshot year) is not a year row
 
 
 def test_run_provenance_lists_the_release_files_with_checksums(tmp_path):
@@ -180,6 +180,8 @@ def test_run_provenance_lists_the_release_files_with_checksums(tmp_path):
   with open(f"{root}{REL}/place_exact/coll=mr_eez/years.parquet", "rb") as fh:
     assert p["sources"][1]["checksum"] == "sha256:" + hashlib.sha256(fh.read()).hexdigest()
   assert p["sources"][0]["updated"] == "2026-10-12T11:52:30Z"
+  # contract 1.2: release.json is the manifest, the two parquet files are the data; no source has a STAC item
+  assert [(s["role"], s["item"]) for s in p["sources"]] == [("manifest", None), ("data", None), ("data", None)]
   assert p["source_version"] == "OBIS snapshot 2026-10-11, WoRMS 2026-10-01, obis-h3 v20261012"
   assert "3 locations fall in more than one place, adding 10 to a sum of the place totals in mr_eez" in p["method"]
   assert p["dataset"]["id"] == "obis" and p["dataset"]["title"] == "OBIS occurrence data" and p["dataset"]["license"] == "various"
