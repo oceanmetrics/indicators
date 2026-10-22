@@ -34,14 +34,14 @@ jobs:
           repository: oceanmetrics/platform
           ref: main
           path: platform
-      - name: build @oceanmetrics/status (a file link, see the note at the top)
-        working-directory: platform
-        run: npm ci && npm run build
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: indicators/package-lock.json
+      - name: build @oceanmetrics/status (a file link, see the note at the top)
+        working-directory: platform
+        run: npm ci && npm run build
       - run: npm ci
       # tests that read catalog/ or the network skip themselves; the catalog is not in git
       - run: npm test
