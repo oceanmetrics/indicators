@@ -29,8 +29,7 @@ cmems = ["copernicusmarine>=2.0", "xarray>=2024.1", "shapely>=2.0", "numpy>=1.26
 
 [tool.uv.sources]
 # om_extract.contract is the values contract (oceanmetrics/extract); the contract branch is not pushed yet
-# TODO(orchestrator): switch to git rev after merge
-om-extract = { path = "../extract-wt-contract", editable = true }
+om-extract = { git = "https://github.com/oceanmetrics/extract", rev = "7eea6c2bc62d5374281002899ad7dc9503cd6932" }
 
 [build-system]
 requires = ["hatchling"]
