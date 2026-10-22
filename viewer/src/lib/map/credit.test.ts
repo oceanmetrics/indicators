@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { Indicator } from '../data.ts'
-import { basemapCredit, dataCredit, layerCredit, partsCredit, slotCredit } from './credit.ts'
+import { dataCredit, layerCredit, partsCredit, slotCredit, styleCredit } from './credit.ts'
 
 describe('the credit lines', () => {
-  it('the basemap is named for the theme', () => {
-    expect(basemapCredit(false)).toBe('Basemap: Esri Light Gray Canvas (Esri, HERE, Garmin, FAO, NOAA, USGS)')
-    expect(basemapCredit(true)).toContain('Dark Gray Canvas')
+  it('the basemap is credited from its style\'s own attribution: tags dropped, each source once', () => {
+    const carto = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/about-carto/">CARTO</a>'
+    expect(styleCredit({ sources: { protomaps: { attribution: carto } } })).toBe('Basemap: © OpenStreetMap contributors © CARTO')
+    expect(styleCredit({ sources: { a: { attribution: 'GEBCO' }, b: { attribution: 'GEBCO' }, c: { attribution: '© OpenStreetMap contributors' }, d: {} } }))
+      .toBe('Basemap: GEBCO; © OpenStreetMap contributors')
+    expect(styleCredit({ sources: {} })).toBe('')
+    expect(styleCredit(null)).toBe('')
   })
   it('the places carry their layer’s attribution, the title when it has none, nothing without a layer', () => {
     expect(layerCredit({ title: 'T', attribution: 'Flanders Marine Institute (2023).' })).toBe('Places: Flanders Marine Institute (2023).')
@@ -42,8 +46,8 @@ describe('the credit of the parts drawn', () => {
     expect(partsCredit([])).toBe('')
   })
   it('the layer under the map carries its own credit, else its title; nothing without a layer', () => {
-    expect(slotCredit({ title: 'SST from CRW', credit: 'SST from CRW (NOAA Coral Reef Watch (CRW)), drawn by ERDDAP WMS at pae-paha.pacioos.hawaii.edu' }))
-      .toBe('Layer: SST from CRW (NOAA Coral Reef Watch (CRW)), drawn by ERDDAP WMS at pae-paha.pacioos.hawaii.edu')
+    expect(slotCredit({ title: 'SST from CRW', credit: 'SST from CRW (NOAA Coral Reef Watch (CRW)), sliced in the browser from ERDDAP at pae-paha.pacioos.hawaii.edu' }))
+      .toBe('Layer: SST from CRW (NOAA Coral Reef Watch (CRW)), sliced in the browser from ERDDAP at pae-paha.pacioos.hawaii.edu')
     expect(slotCredit({ title: 'SST from CRW' })).toBe('Layer: SST from CRW')
     expect(slotCredit(null)).toBe('')
   })

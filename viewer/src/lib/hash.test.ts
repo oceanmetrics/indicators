@@ -262,7 +262,7 @@ describe('the Map view hash', () => {
     expect(parseHash('#view=map&t=2024-07').t).toBe('2024-07')
   })
   it('the Map keys do not leak into a Matrix hash', () => {
-    expect(serializeHash(st({ color: 'status', cls: 'x', ind: 'a:b', layer: 'erddap:dhw_5km:CRW_SST' }))).toBe('')
+    expect(serializeHash(st({ color: 'status', cls: 'x', ind: 'a:b', layer: 'grid:dhw_5km:CRW_SST' }))).toBe('')
   })
   it('mapHref carries the selection, the vocabulary, the detail level and the method', () => {
     expect(mapHref({ ...from, vocab: 'eov' }, 'erddap:dhw_5km:CRW_SST:mean', 'status')).toBe('#view=map&ind=erddap:dhw_5km:CRW_SST:mean&color=status&vocab=eov')
@@ -386,15 +386,19 @@ describe('t is shared by every view (one period for the Map, its layer and, from
 
 describe('the layer under the map (layer=<kind>:<id>[:<variable>])', () => {
   it('is a Map key, written after proj, round-tripped with its colons readable', () => {
-    const s = st({ view: 'map', ind: 'erddap:dhw_5km:CRW_SST:mean', proj: 'globe', layer: 'erddap:dhw_5km:CRW_SST', t: '2024-07' })
-    expect(serializeHash(s)).toBe('view=map&ind=erddap:dhw_5km:CRW_SST:mean&proj=globe&layer=erddap:dhw_5km:CRW_SST&t=2024-07')
+    const s = st({ view: 'map', ind: 'erddap:dhw_5km:CRW_SST:mean', proj: 'globe', layer: 'grid:dhw_5km:CRW_SST', t: '2024-07' })
+    expect(serializeHash(s)).toBe('view=map&ind=erddap:dhw_5km:CRW_SST:mean&proj=globe&layer=grid:dhw_5km:CRW_SST&t=2024-07')
     expect(parseHash('#' + serializeHash(s))).toEqual(s)
-    expect(parseHash('#view=map&layer=erddap:jplMURSST41mday').layer).toBe('erddap:jplMURSST41mday')
+    expect(parseHash('#view=map&layer=grid:jplMURSST41mday').layer).toBe('grid:jplMURSST41mday')
+  })
+  it('a Day 6 link (layer=erddap:...) opens the same layer, written back as grid:', () => {
+    expect(parseHash('#view=map&layer=erddap:dhw_5km:CRW_SST').layer).toBe('grid:dhw_5km:CRW_SST')
+    expect(serializeHash(parseHash('#view=map&layer=erddap:jplMURSST41mday'))).toBe('view=map&layer=grid:jplMURSST41mday')
   })
   it('an unknown kind or a malformed key is dropped', () => {
     expect(parseHash('#view=map&layer=wms:x:y').layer).toBeNull()
-    expect(parseHash('#view=map&layer=erddap').layer).toBeNull()
-    expect(parseHash('#view=map&layer=erddap:a:b:c').layer).toBeNull()
-    expect(parseHash('#view=map&layer=erddap:a%20b').layer).toBeNull()
+    expect(parseHash('#view=map&layer=grid').layer).toBeNull()
+    expect(parseHash('#view=map&layer=grid:a:b:c').layer).toBeNull()
+    expect(parseHash('#view=map&layer=grid:a%20b').layer).toBeNull()
   })
 })

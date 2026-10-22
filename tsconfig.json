@@ -12,7 +12,8 @@
     "verbatimModuleSyntax": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "checkJs": false
+    "checkJs": false,
+    "paths": { "maplibre-gl": ["./node_modules/maplibre-gl"] }
   },
   "include": ["src/**/*.ts", "viewer/src/**/*.ts", "viewer/src/**/*.svelte", "viewer/vite.config.ts", "vitest.config.ts"]
 }

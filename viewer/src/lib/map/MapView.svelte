@@ -7,11 +7,12 @@
   // the selection, else the first selected one with values in the selected places. the classes, legend and table come from
   // classes.ts (status and trend from @oceanmetrics/status); MapCanvas only draws. all state is the URL hash:
   // #view=map&ind=&pi=&px=&ii=&ix=&place=&color=&t=&cls=&layer=&method=
-  // under the places, the layer the hash's `layer` names (layerSlot.ts; Day 6: an ERDDAP dataset's own WMS) at the same period.
+  // under the places, the layer the hash's `layer` names (layerSlot.ts; the `grid` kind: a slice of the dataset at the step of `t`,
+  // computed in the browser over the places drawn, gridKind.ts). the Period scrubber moves `t` and the window [t - w, t] behind it.
   // the group's members that are not computed are drawn faint (and as a small hollow circle from far away), and a click on one offers
   // the next steps.
-  import { onMount } from 'svelte'
-  import { Button, Notice, Select, Slider } from '@marinebon/ui'
+  import { onMount, untrack } from 'svelte'
+  import { Button, Notice, Select } from '@marinebon/ui'
   import { Icon } from '../../../../src/icons/index.ts'
   import { periodLabel } from '@oceanmetrics/status'
   import type { MethodId } from '@oceanmetrics/status'
@@ -32,11 +33,14 @@
   import { placesWithValueAnywhere } from '../pick/indicatorsTree.ts'
   import { MODE_LABELS, mapModel, periodToT } from './classes.ts'
   import type { MapItem } from './classes.ts'
-  import { basemapCredit, dataCredit, partsCredit, slotCredit } from './credit.ts'
+  import { dataCredit, partsCredit, slotCredit } from './credit.ts'
   import { parseLayerKey, registerSlotKind, slotFor } from './layerSlot.ts'
   import type { LayerSlot } from './layerSlot.ts'
-  import { erddapSlot } from './erddapSlot.ts'
-  import { layerChoices, slotLegendLine } from './erddapWms.ts'
+  import { gridKind } from './gridKind.ts'
+  import type { GridLayerSlot } from './gridKind.ts'
+  import { layerChoices, leftOutLine, slicePlaces, slicePlacesKey, slotLegendLine, stepDate } from './gridLayer.ts'
+  import { defaultWindow } from './timeWindow.ts'
+  import TimeScrubber from './TimeScrubber.svelte'
   import { loadGazetteer } from './gazetteer.ts'
   import type { GazLayer } from './gazetteer.ts'
   import { buildParts, partsBbox } from './parts.ts'
@@ -69,7 +73,8 @@
   let { catalog, view, titles, idx = null, layers: _layers = {}, universe = null, onpatch, onother, onready }: Props = $props()
 
   const t0 = performance.now()
-  registerSlotKind('erddap', erddapSlot)
+  // the grid kind slices the places the map draws now (read when a slot is made; a new set of places makes a new slot)
+  registerSlotKind('grid', gridKind(() => untrack(() => sliceSel)))
   const m = $derived(catalog.manifest)
 
   // ---- what is mapped: the groups of the selection and the indicator ----
@@ -176,29 +181,37 @@
   const bbox = $derived(parts.length ? partsBbox(parts) : ([-180, -85, 180, 85] as [number, number, number, number]))
   $effect(() => { if (built) layerError = built.missing.length && !built.parts.length ? `The gazetteer has no drawable layer for ${built.missing.join(', ')}.` : '' })
 
-  // ---- the period slider ----
+  // ---- the period scrubber: t and the window [t - w, t] (the window is the view's own, not in the hash) ----
   const periods = $derived(model?.periods ?? [])
   const idxNow = $derived(model?.period ? Math.max(0, periods.indexOf(model.period)) : 0)
-  let slider = $state(0)
-  $effect(() => { slider = idxNow })
   const canSlide = $derived(periods.length > 1 && values != null)
   function onslide(i: number) {
     if (!model) return
     const last = i >= periods.length - 1
-    onpatch({ t: last ? null : periodToT(periods[i], model.grain) })
+    onpatch({ t: last ? null : periodToT(periods[Math.max(0, i)], model.grain) })
   }
+  // the window opens at the grain's default and goes back to it when the indicator or the grain changes
+  const winDefault = $derived(model ? defaultWindow(model.grain, periods.length) : 1)
+  let winSet = $state<{ key: string; w: number } | null>(null)
+  const winKey = $derived(`${ind?.id ?? ''}|${model?.grain ?? ''}`)
+  const win = $derived(winSet?.key === winKey ? winSet.w : winDefault)
   const periodWord = (i: number) => (model && periods[i] ? periodLabel(periods[i], model.grain) + (i === periods.length - 1 ? ' (latest)' : '') : '')
 
-  // ---- the layer under the map (the hash's `layer`), at the period shown ----
+  // ---- the layer under the map (the hash's `layer`), at the step of `t` (null: the dataset's latest) ----
+  // the places the slice covers: the polygon places of the parts drawn (gridLayer.ts slicePlaces); the slot is made again when they change
+  const sliceSel = $derived(slicePlaces(parts))
+  const sliceKey = $derived(slicePlacesKey(sliceSel))
+  const slotT = $derived(stepDate(view.t))
   let slot = $state.raw<LayerSlot | null>(null)
   let slotError = $state('')
-  // the slot says when its legend changes (a new period, no tiles); the legend line reads it again
+  // the slot says when its legend changes (a new period, the slice in, an error); the legend line reads it again
   let slotTick = $state(0)
   $effect(() => {
     const spec = parseLayerKey(view.layer)
+    void sliceKey
     slot = null
     slotError = ''
-    if (!spec) return
+    if (!spec || !built) return
     let live = true
     try {
       slotFor(spec, { onchange: () => { if (live) slotTick++ } }).then(
@@ -209,10 +222,22 @@
     return () => { live = false }
   })
   const layerOptions = $derived(layerChoices(m.indicators, ind, view.layer))
+  const slotLegend = $derived.by(() => { void slotTick; return slot?.legend() ?? null })
+  // the places the slice covers: their fills give way to it (MapCanvas), the ones it leaves out keep theirs
+  const sliced = $derived.by(() => {
+    void slotTick
+    if (!slot) return null
+    const out = new Set((slot as GridLayerSlot).leftOut?.() ?? [])
+    return sliceSel.places.map(p => p.id).filter(id => !out.has(id))
+  })
+  const placeName = (id: string) => places?.find(p => p.id === id)?.name ?? idx?.places.find(p => p.id === id)?.name ?? titles(id)
   const slotLine = $derived.by(() => {
     void slotTick
-    const l = slot?.legend()
-    return l && model ? slotLegendLine(l, t => periodLabel(t, model.grain)) : slotError
+    const l = slotLegend
+    if (!l || !model) return slotError
+    const g = slot as GridLayerSlot | null
+    const left = g?.leftOut ? leftOutLine(g.leftOut(), g.without(), placeName) : ''
+    return slotLegendLine(l, t => periodLabel(t, model.grain)) + (left ? ` · ${left}` : '')
   })
 
   // ---- the selected place (the hash's `place`): computed, or a member the group has not computed yet ----
@@ -246,8 +271,10 @@
   $effect(() => { if (drawn === 'done' && !reported) { reported = true; onready?.(Math.round(performance.now() - t0)) } })
 
   const dark = $derived(theme === 'dark')
+  // the basemap's credit, from the attribution of the style MapCanvas set
+  let baseCredit = $state('')
   const credit = $derived(
-    [basemapCredit(dark), partsCredit(parts.map(p => p.home)), slotCredit(slot), ind ? dataCredit(ind) : '']
+    [baseCredit, partsCredit(parts.map(p => p.home)), slotCredit(slot), ind ? dataCredit(ind) : '']
       .filter(Boolean).map(s => s.replace(/\.+$/, '') + '.').join(' '),
   )
   const heading = $derived(
@@ -311,8 +338,8 @@
     {/if}
     <div class="group slide">
       {#if periods.length > 1}
-        <Slider label="Period" bind:value={slider} min={0} max={periods.length - 1} step={1} format={periodWord}
-          disabled={!canSlide} oninput={onslide} ticks={[0, periods.length - 1]} />
+        <TimeScrubber label="Period" n={periods.length} value={idxNow} {win} defaultWin={winDefault} format={periodWord}
+          disabled={!canSlide} onchange={onslide} onwindow={w => (winSet = { key: winKey, w })} />
       {:else}
         <span class="mbon-label">Period</span>
         <span class="one">{model.period ? periodLabel(model.period, model.grain) : '–'}</span>
@@ -336,7 +363,7 @@
       <div class="frame">
         {#if parts.length}
           <MapCanvas {parts} {bbox} {colors} line={lineColor} none={noneColor} nofill={nofillColor} faint={faintColor} focus={focusColor} {dark} selected={selectedId} proj={view.proj} {marker}
-            {onpick} onstate={s => (drawn = s)} label={`Map of ${ind.short} by place`} {slot} slotT={model.period} />
+            {onpick} onstate={s => (drawn = s)} label={`Map of ${ind.short} by place`} {slot} {slotT} {sliced} oncredit={c => (baseCredit = c)} />
           <MapFrameControls target={fsEl} proj={view.proj} onproj={p => onpatch({ proj: p })} bind:mode={full} />
         {:else if layerError}
           <div class="msg"><Notice kind="error">{layerError}</Notice></div>
@@ -350,7 +377,7 @@
     </div>
 
     <aside class="side">
-      <MapLegend {model} unit={ind.unit_label ?? ''} layer={slotLine} />
+      <MapLegend {model} unit={ind.unit_label ?? ''} layer={slotLine} ramp={slotLegend?.ramp ?? null} rampUnit={slotLegend?.units ?? ''} />
       <section class="pick" aria-labelledby="pick-h" aria-live="polite">
         <h2 id="pick-h" class="mbon-label">Selected place</h2>
         {#if selectedId}

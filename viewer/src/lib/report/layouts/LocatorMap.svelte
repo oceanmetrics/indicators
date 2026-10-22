@@ -7,7 +7,7 @@
   import { Notice } from '@marinebon/ui'
   import type { Layers } from '../../data.ts'
   import type { Place } from '../../matrix.ts'
-  import { basemapCredit, partsCredit } from '../../map/credit.ts'
+  import { partsCredit } from '../../map/credit.ts'
   import { loadGazetteer } from '../../map/gazetteer.ts'
   import type { GazLayer } from '../../map/gazetteer.ts'
   import { buildParts, partsBbox } from '../../map/parts.ts'
@@ -40,7 +40,9 @@
   const bbox = $derived(parts.length ? partsBbox(parts) : ([-180, -85, 180, 85] as [number, number, number, number]))
   const fitIds = $derived(places.map(p => p.id))
   const colors = $derived([th.css('--map-seq-3')])
-  const credit = $derived([basemapCredit(th.dark), partsCredit(parts.map(p => p.home))].filter(Boolean).map(s => s.replace(/\.+$/, '') + '.').join(' '))
+  // the basemap's credit, from the attribution of the style the map set
+  let baseCredit = $state('')
+  const credit = $derived([baseCredit, partsCredit(parts.map(p => p.home))].filter(Boolean).map(s => s.replace(/\.+$/, '') + '.').join(' '))
   let hovered = $state<string | null>(null)
   const noop = () => {}
 </script>
@@ -54,7 +56,7 @@
       {:else if parts.length}
         <div class="frame" style:--map-h="var(--locator-h, 15rem)">
           <PrintableMap {parts} {bbox} {colors} line={th.css('--map-line')} none={th.css('--map-none')} nofill={th.css('--bg-tint')} faint={th.css('--map-member')} focus={th.css('--map-focus')}
-            dark={th.dark} selected={null} marker={null} onpick={noop} compact {fitIds} onhover={n => (hovered = n)} label={`Map of the ${places.length} places in this report`} />
+            dark={th.dark} selected={null} marker={null} onpick={noop} oncredit={c => (baseCredit = c)} compact {fitIds} onhover={n => (hovered = n)} label={`Map of the ${places.length} places in this report`} />
           {#if hovered}<p class="hover" role="status">{hovered}</p>{/if}
         </div>
         {#if built?.missing.length}<p class="om-note">The gazetteer has no drawable layer for {built.missing.map(titles).join(', ')}.</p>{/if}

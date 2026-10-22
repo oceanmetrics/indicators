@@ -1,27 +1,32 @@
 <script lang="ts">
-  // the map itself: Esri's keyless gray canvas under the parts of one place group or one place set. a vector part is drawn
-  // from the gazetteer's PMTiles (a fill per class, an outline for every place, and below DOT_MAXZOOM a hollow circle at each
-  // member that is not computed); a derived part (the high seas by FAO area) is the features of another layer, only those
-  // that are its pieces; a reference part (Marine Regions) is drawn by Marine Regions' own WMS, one request per tile, and no
-  // geometry of ours. the parts arrive in drawing order (parts.ts: vector and derived first, reference on top). under them all,
-  // the layer slot (layerSlot.ts: a raster or grid at the period `slotT`; its ids start `slot:`, so clear() removes them and a
-  // click never hits them). this component only draws: the classes, colours and credits come in as props, and a click goes out
-  // as a place id.
+  // the map itself: CARTO's positron or dark-matter basemap through `@oceanmetrics/map` `composeStyle` (the GEBCO sea floor
+  // and the land mask once their tiers exist: `dem: false` until then, VITE_BASEMAP_DEM=1 turns them on) under the parts
+  // of one place group or one place set. a vector part is drawn from the gazetteer's PMTiles (a fill per class, an outline
+  // for every place, and below DOT_MAXZOOM a hollow circle at each member that is not computed); a derived part (the high
+  // seas by FAO area) is the features of another layer, only those that are its pieces; a reference part (Marine Regions)
+  // is drawn by Marine Regions' own WMS, one request per tile, and no geometry of ours. the parts arrive in drawing order
+  // (parts.ts: vector and derived first, reference on top). under them all, the layer slot (layerSlot.ts: a grid slice at
+  // the period `slotT`; its ids start `slot:`), under the first part's fill, else under the basemap's sea surface. what is
+  // the basemap's is the layer ids of the style set (`basemapLayerIds`): clear() removes every other layer, a click tests
+  // the others that are not the slot's, and a theme flip carries them into the next style (`carryLayers`). this component
+  // only draws: the classes, colours and credits come in as props, and a click goes out as a place id.
   import { onMount, untrack } from 'svelte'
-  import maplibregl from 'maplibre-gl'
+  import { addProtocol, importScriptInWorkers, Map as MlMap, NavigationControl, ScaleControl, setWorkerUrl } from 'maplibre-gl'
+  import type { GeoJSONSource, MapMouseEvent, RasterTileSource, StyleSpecification } from 'maplibre-gl'
   import 'maplibre-gl/dist/maplibre-gl.css'
-  import { Protocol } from 'pmtiles'
-  import { ESRI_TILES } from './credit.ts'
+  import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
+  import { basemapLayerIds, baseStyle, composeStyle, seaSurfaceId, setupMapLibre } from '@oceanmetrics/map'
+  import { styleCredit } from './credit.ts'
   import { crossesAntimeridian, crossingMinZoom, geometryBounds, unionBoxes, worldCopies } from './bounds.ts'
   import type { Box4 } from './bounds.ts'
-  import { DOT_IMAGE, classedIds, fillColorExpr, focusFilter, haloWidthExpr, lineColorExpr, lineWidthExpr, memberDotsLayer, onlyFilter } from './paint.ts'
+  import { DOT_IMAGE, classedIds, fillColorExpr, fillOpacityExpr, focusFilter, haloWidthExpr, lineColorExpr, lineWidthExpr, memberDotsLayer, onlyFilter } from './paint.ts'
   import { featureOf, partsKey, placeOf } from './parts.ts'
   import type { MapPart } from './parts.ts'
   import { infoUrl, mrgidOf, onlyMrgids, wmsTileUrl } from './wms.ts'
   import { boxCentre, globeZoom, isWorldScale, projectionSpec } from './frame.ts'
   import type { Proj } from './frame.ts'
   import type { WmsEntry } from './wms.ts'
-  import { clearsLayer, hitsLayer, slotBeforeId } from './layerSlot.ts'
+  import { carryLayers, isSlotLayer, slotBeforeId } from './layerSlot.ts'
   import type { LayerSlot } from './layerSlot.ts'
 
   interface Props {
@@ -55,34 +60,74 @@
     /** the layer under the places, and the period start it draws (null = its latest) */
     slot?: LayerSlot | null
     slotT?: string | null
+    /** the places the slot's slice covers (their fills give way to it); null = none */
+    sliced?: string[] | null
+    /** the basemap's credit line, from the attribution of the style in force (called each time a style is set) */
+    oncredit?: (credit: string) => void
   }
-  let { parts, bbox, colors, line, none, nofill, faint, focus, dark, selected, proj = null, marker, onpick, onstate, label, compact = false, fitIds = null, onhover, slot = null, slotT = null }: Props = $props()
+  let { parts, bbox, colors, line, none, nofill, faint, focus, dark, selected, proj = null, marker, onpick, onstate, label, compact = false, fitIds = null, onhover, slot = null, slotT = null, sliced = null, oncredit }: Props = $props()
 
   let box: HTMLDivElement | undefined = $state()
   let phase = $state<'loading' | 'done'>('loading')
   let ready = $state(false)
-  let map: maplibregl.Map | null = null
+  let map: MlMap | null = null
   // the parts on the map now (a change of groups rebuilds the layers; a class change only repaints them)
   let shown: string | null = null
 
-  // the pmtiles:// protocol, registered once per page
-  const G = globalThis as unknown as { __omPmtiles?: Protocol }
-  if (!G.__omPmtiles) {
-    G.__omPmtiles = new Protocol()
-    maplibregl.addProtocol('pmtiles', G.__omPmtiles.tile)
+  // ---- the basemap: the composed style in force, and what of it is the basemap's ----
+  // the GEBCO tiers are built in build week 2 (2026-11-06 to 11-12); until they answer the map boots and stays on CARTO's own
+  // style (`dem: false`): MapLibre schedules no frame while a source fails, so a composed style with missing tiers stalls `load`
+  const DEM = import.meta.env.VITE_BASEMAP_DEM === '1'
+  let basemap = new Set<string>()
+  let baseSources = new Set<string>()
+  let sea: string | null = null
+  let styledDark: boolean | null = null
+  const themeOf = (d: boolean) => (d ? 'dark' : 'light') as 'dark' | 'light'
+  /** the style of a theme: CARTO's composed (or as it is, dem false) in the projection asked for; a plain sea if CARTO does not answer */
+  async function styleFor(d: boolean, dem: boolean): Promise<StyleSpecification> {
+    const theme = themeOf(d)
+    let base: StyleSpecification
+    try { base = await baseStyle(theme) } catch {
+      const sea = getComputedStyle(document.documentElement).getPropertyValue('--map-sea').trim() || 'transparent'
+      base = { version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': sea } }] }
+    }
+    return { ...composeStyle(base, { theme, dem }), projection: projectionSpec(untrack(() => proj)) }
   }
-
-  // the colour under the basemap (the Arctic cap its tiles do not reach, seen on the globe), from the theme in force
-  const oceanColor = () => getComputedStyle(document.documentElement).getPropertyValue('--map-sea').trim() || 'transparent'
+  function setBasemap(style: StyleSpecification) {
+    basemap = basemapLayerIds(style)
+    baseSources = new Set(Object.keys(style.sources))
+    sea = seaSurfaceId(style)
+    oncredit?.(styleCredit(style))
+  }
+  // a part's layer: anything the basemap does not name; a click or the pointer tests those that are not the slot's
+  const isOurs = (id: string) => !basemap.has(id)
+  const hits = (id: string) => isOurs(id) && !isSlotLayer(id)
+  /** the style as it is mid-change: a diff keeps it loaded, a full reload (a style the diff cannot reach) does not */
+  const styleReady = (m: MlMap) => (m as unknown as { style?: { _loaded?: boolean } }).style?._loaded !== false
+  // a theme flip (or the tiers coming on): the next style, with every layer of ours carried over under the one it sat under
+  let restyleSeq = 0
+  async function restyle(m: MlMap, d: boolean, dem: boolean) {
+    const seq = ++restyleSeq
+    const next = await styleFor(d, dem)
+    if (seq !== restyleSeq || map !== m) return
+    const old = basemap
+    m.setStyle(next, { diff: true, transformStyle: carryLayers(id => !old.has(id)) })
+    setBasemap(next)
+    styledDark = d
+    if (styleReady(m)) setRing(m)
+    else m.once('style.load', () => { setRing(m); untrack(sync) })
+  }
 
   const setState = (s: 'loading' | 'done') => { phase = s; onstate?.(s) }
   const sid = (i: number) => `p${i}`
+  // the features of a part the slice covers (none without a slot)
+  const slicedOf = (part: MapPart) => (slot && sliced ? sliced.map(id => featureOf(part, id)) : null)
   const wid = (i: number) => `w${i}`
 
   // 'done' when the map is idle with its tiles in. idle fires only after a render, and a change that draws nothing new
   // renders nothing, so a slow poll catches what the event would have missed
   let poll: ReturnType<typeof setInterval> | undefined
-  function settle(m: maplibregl.Map) {
+  function settle(m: MlMap) {
     clearInterval(poll)
     m.once('idle', () => {
       clearInterval(poll)
@@ -96,7 +141,7 @@
   // the places a report asked to see: framed once their tiles are in, a few tries (a tile may not hold a small place yet)
   let fitted: string | null = null
   let fitTries = 0
-  function fitAll(m: maplibregl.Map): boolean {
+  function fitAll(m: MlMap): boolean {
     const ids = fitIds
     if (!ids?.length) return false
     const key = partsKey(parts) + '|' + ids.join(',')
@@ -121,7 +166,7 @@
 
   // a camera for a box: on the globe a world-scale box shows the whole sphere in the frame (centred on the box), as the sphere is
   // what the reader came for; anything else is MapLibre's own fit. the box may run east past 180 (the short way round the world)
-  function fitTo(m: maplibregl.Map, b: Box4, opts: { padding: number; duration: 0; maxZoom: number }) {
+  function fitTo(m: MlMap, b: Box4, opts: { padding: number; duration: 0; maxZoom: number }) {
     if (untrack(() => proj) === 'globe' && isWorldScale(b) && box) {
       m.jumpTo({ center: boxCentre(b), zoom: globeZoom(box.clientWidth, box.clientHeight) })
       return
@@ -134,7 +179,7 @@
 
   // one world only: when the frame is wider than the world is at this zoom (a world-wide map in a wide frame) the world is not drawn
   // twice. zoomed in, copies stay on, which is what lets a place over the antimeridian (Hawaii, Samoa, the high seas) be drawn whole
-  function copies(m: maplibregl.Map) {
+  function copies(m: MlMap) {
     if (untrack(() => proj) === 'globe' || !box) return
     const want = worldCopies(m.getZoom(), box.clientWidth, crossing)
     if (m.getRenderWorldCopies() !== want) m.setRenderWorldCopies(want)
@@ -155,7 +200,7 @@
   // the selection already framed, and the one the reader clicked (which stays where the reader put the camera)
   let framed: string | null = null
   let clicked: string | null = null
-  function frame(m: maplibregl.Map): boolean {
+  function frame(m: MlMap): boolean {
     const id = selected
     if (!id || id === framed || id === clicked) return false
     for (const [i, part] of parts.entries()) {
@@ -184,7 +229,7 @@
     g.stroke()
     return g.getImageData(0, 0, RING * 2, RING * 2)
   }
-  function setRing(m: maplibregl.Map) {
+  function setRing(m: MlMap) {
     const img = ringImage(faint)
     if (!img) return
     if (m.hasImage(DOT_IMAGE)) m.removeImage(DOT_IMAGE)
@@ -192,59 +237,63 @@
   }
 
   onMount(() => {
-    const m = new maplibregl.Map({
-      container: box as HTMLDivElement,
-      style: {
-        version: 8,
-        projection: projectionSpec(untrack(() => proj)),
-        sources: {
-          'base-light': { type: 'raster', tiles: [ESRI_TILES.light], tileSize: 256, maxzoom: 16 },
-          'base-dark': { type: 'raster', tiles: [ESRI_TILES.dark], tileSize: 256, maxzoom: 16 },
-        },
-        layers: [
-          { id: 'base-bg', type: 'background', paint: { 'background-color': oceanColor() } },
-          { id: 'base-light', type: 'raster', source: 'base-light', layout: { visibility: 'visible' } },
-          { id: 'base-dark', type: 'raster', source: 'base-dark', layout: { visibility: 'none' } },
-        ],
-      },
-      // opened on the extent, so no tiles are fetched for a camera the first fit then replaces
-      bounds: [[bbox[0], bbox[1]], [bbox[2], bbox[3]]], fitBoundsOptions: { padding: 24, maxZoom: 8 },
-      attributionControl: false, dragRotate: false, pitchWithRotate: false, scrollZoom: !compact,
-    })
-    m.touchZoomRotate.disableRotation()
-    if (!compact) {
-      m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
-      m.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left')
-    }
-    // the stylesheet and the layout can arrive after the map is made: follow the box, not only the window
-    const ro = new ResizeObserver(() => m.resize())
-    ro.observe(box as HTMLDivElement)
-    m.on('load', () => { m.resize(); copies(m); map = m; ready = true })
-    m.on('moveend', () => copies(m))
-    m.on('resize', () => copies(m))
-    m.on('click', e => void click(m, e))
-    m.on('mousemove', e => {
-      const hit = parts.some((p, i) => (p.kind === 'raster' ? true : !!m.getLayer(`${sid(i)}:fill`) && m.queryRenderedFeatures(e.point, { layers: hitLayers(m, i) }).length > 0))
-      m.getCanvas().style.cursor = hit ? 'pointer' : ''
-      if (onhover) {
-        let name: string | null = null
-        parts.forEach((p, i) => {
-          if (name != null || p.kind === 'raster' || !m.getLayer(`${sid(i)}:fill`)) return
-          const n = m.queryRenderedFeatures(e.point, { layers: hitLayers(m, i) })[0]?.properties?.name
-          if (n != null) name = String(n)
-        })
-        onhover(name)
+    let dead = false
+    let ro: ResizeObserver | null = null
+    let made: MlMap | null = null
+    void (async () => {
+      // the setup, once a page: MapLibre's worker module and the pmtiles:// protocol (the three functions, not the namespace,
+      // which would keep every export of maplibre-gl in the bundle)
+      await setupMapLibre({ maplibre: { addProtocol, importScriptInWorkers, setWorkerUrl }, workerUrl, protocols: ['pmtiles'] })
+      const d = untrack(() => dark)
+      const style = await styleFor(d, false)
+      if (dead) return
+      const m = (made = new MlMap({
+        container: box as HTMLDivElement,
+        style,
+        // opened on the extent, so no tiles are fetched for a camera the first fit then replaces
+        bounds: [[bbox[0], bbox[1]], [bbox[2], bbox[3]]], fitBoundsOptions: { padding: 24, maxZoom: 8 },
+        attributionControl: false, dragRotate: false, pitchWithRotate: false, scrollZoom: !compact,
+      }))
+      setBasemap(style)
+      styledDark = d
+      m.touchZoomRotate.disableRotation()
+      if (!compact) {
+        m.addControl(new NavigationControl({ showCompass: false }), 'top-right')
+        m.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left')
       }
-    })
-    m.on('mouseout', () => onhover?.(null))
-    return () => { clearInterval(poll); ro.disconnect(); m.remove(); map = null; ready = false; shown = null; mounted = null }
+      // the stylesheet and the layout can arrive after the map is made: follow the box, not only the window
+      ro = new ResizeObserver(() => m.resize())
+      ro.observe(box as HTMLDivElement)
+      m.on('load', () => {
+        m.resize(); copies(m); map = m; ready = true
+        if (DEM) void restyle(m, untrack(() => dark), true)
+      })
+      m.on('moveend', () => copies(m))
+      m.on('resize', () => copies(m))
+      m.on('click', e => void click(m, e))
+      m.on('mousemove', e => {
+        const hit = parts.some((p, i) => (p.kind === 'raster' ? true : !!m.getLayer(`${sid(i)}:fill`) && m.queryRenderedFeatures(e.point, { layers: hitLayers(m, i) }).length > 0))
+        m.getCanvas().style.cursor = hit ? 'pointer' : ''
+        if (onhover) {
+          let name: string | null = null
+          parts.forEach((p, i) => {
+            if (name != null || p.kind === 'raster' || !m.getLayer(`${sid(i)}:fill`)) return
+            const n = m.queryRenderedFeatures(e.point, { layers: hitLayers(m, i) })[0]?.properties?.name
+            if (n != null) name = String(n)
+          })
+          onhover(name)
+        }
+      })
+      m.on('mouseout', () => onhover?.(null))
+    })()
+    return () => { dead = true; clearInterval(poll); ro?.disconnect(); made?.remove(); map = null; ready = false; shown = null; mounted = null }
   })
 
-  const hitLayers = (m: maplibregl.Map, i: number) => [`${sid(i)}:fill`, `${sid(i)}:dots`].filter(id => hitsLayer(id) && m.getLayer(id))
+  const hitLayers = (m: MlMap, i: number) => [`${sid(i)}:fill`, `${sid(i)}:dots`].filter(id => hits(id) && m.getLayer(id))
 
   // a click asks the parts from the top one down: a reference part (drawn last) answers by Marine Regions' GetFeatureInfo, a
   // vector part by the features under the point. so an EEZ over a high-seas piece is the EEZ, and open sea is the piece.
-  async function click(m: maplibregl.Map, e: maplibregl.MapMouseEvent) {
+  async function click(m: MlMap, e: MapMouseEvent) {
     const { lng, lat } = e.lngLat
     for (let i = parts.length - 1; i >= 0; i--) {
       const part = parts[i]
@@ -269,13 +318,11 @@
     onpick({ placeId: null, lng, lat })
   }
 
-  // ---- the basemap follows the theme ----
+  // ---- the basemap follows the theme: the other theme's style, our layers carried over ----
   $effect(() => {
     const d = dark
-    if (!ready || !map) return
-    map.setPaintProperty('base-bg', 'background-color', oceanColor())
-    map.setLayoutProperty('base-light', 'visibility', d ? 'none' : 'visible')
-    map.setLayoutProperty('base-dark', 'visibility', d ? 'visible' : 'none')
+    if (!ready || !map || d === styledDark) return
+    void restyle(map, d, DEM)
   })
 
   // ---- the projection: flat (mercator) or the globe; the layers stay as they are, MapLibre redraws them ----
@@ -287,27 +334,27 @@
   })
 
   // ---- the data layers ----
-  // everything but the basemap goes, the slot's `slot:` layers with it
-  function clear(m: maplibregl.Map) {
-    for (const l of m.getStyle().layers) if (clearsLayer(l.id)) m.removeLayer(l.id)
-    for (const id of Object.keys(m.getStyle().sources)) if (clearsLayer(id)) m.removeSource(id)
+  // everything the basemap does not name goes, the slot's `slot:` layers with it
+  function clear(m: MlMap) {
+    for (const l of m.getStyle().layers) if (isOurs(l.id)) m.removeLayer(l.id)
+    for (const id of Object.keys(m.getStyle().sources)) if (!baseSources.has(id)) m.removeSource(id)
   }
 
-  // the slot on the map now, mounted under the first part that draws (a vector part's fill, else the first WMS part)
+  // the slot on the map now, mounted under the first part that draws (a vector part's fill, else the first layer of ours),
+  // else under the basemap's sea surface (its land mask, once the tiers are on)
   let mounted: LayerSlot | null = null
   let mountedT: string | null = null
-  function mountSlot(m: maplibregl.Map) {
+  function mountSlot(m: MlMap) {
     mounted?.unmount(m)
     mounted = slot
     mountedT = slotT
-    const drawn = parts.map(p => ({ kind: p.kind, drawn: p.kind === 'vector' ? !!(p.layer.pmtiles && p.layer.source_layer) : !!p.layer.raster }))
-    slot?.mount(m, slotBeforeId(drawn), slotT)
+    slot?.mount(m, slotBeforeId(m.getStyle().layers.map(l => l.id).filter(isOurs), { fallback: sea }), slotT)
     waitSlot(m)
   }
   // a new slot source has asked for no tile yet, so "every tile is in" is true at once: until the map has been idle once since,
   // the slow poll in settle() does not call the map done (the slot's tiles are slow: a WMS draws each one)
   let slotWait = false
-  function waitSlot(m: maplibregl.Map) {
+  function waitSlot(m: MlMap) {
     if (!slot) return
     slotWait = true
     m.once('idle', () => { slotWait = false })
@@ -323,6 +370,8 @@
   function sync() {
     const m = map
     if (!m) return
+    // a style that is still loading (a theme flip the diff could not do) takes no layer: it syncs once it has loaded
+    if (!styleReady(m)) return
     const key = partsKey(parts)
     if (shown !== key) {
       setState('loading')
@@ -335,7 +384,7 @@
           const filter = onlyFilter(part.only)
           const f = filter ? { filter: filter as never } : {}
           m.addSource(sid(i), { type: 'vector', url: `pmtiles://${part.layer.pmtiles}` })
-          m.addLayer({ id: `${sid(i)}:fill`, type: 'fill', source: sid(i), 'source-layer': sl, ...f, paint: { 'fill-color': fillColorExpr(part.classOf, colors) as never, 'fill-opacity': part.opaque ? 1 : 0.85 } })
+          m.addLayer({ id: `${sid(i)}:fill`, type: 'fill', source: sid(i), 'source-layer': sl, ...f, paint: { 'fill-color': fillColorExpr(part.classOf, colors) as never, 'fill-opacity': fillOpacityExpr(part.opaque, slicedOf(part)) as never } })
           m.addLayer({ id: `${sid(i)}:halo`, type: 'line', source: sid(i), 'source-layer': sl, ...f, paint: { 'line-color': none, 'line-width': haloWidthExpr(ids) as never } })
           m.addLayer({ id: `${sid(i)}:line`, type: 'line', source: sid(i), 'source-layer': sl, ...f, paint: { 'line-color': lineColorExpr(part.classOf, colors, none, part.known, faint) as never, 'line-width': lineWidthExpr(ids, part.known) as never } })
           m.addLayer({ id: `${sid(i)}:focus`, type: 'line', source: sid(i), 'source-layer': sl, filter: focusFilter(null) as never, paint: { 'line-color': focus, 'line-width': 3 } })
@@ -366,6 +415,7 @@
         if (!m.getLayer(`${sid(i)}:fill`)) return
         const ids = classedIds(part.classOf)
         m.setPaintProperty(`${sid(i)}:fill`, 'fill-color', fillColorExpr(part.classOf, colors) as never)
+        m.setPaintProperty(`${sid(i)}:fill`, 'fill-opacity', fillOpacityExpr(part.opaque, slicedOf(part)) as never)
         m.setPaintProperty(`${sid(i)}:line`, 'line-color', lineColorExpr(part.classOf, colors, none, part.known, faint) as never)
         m.setPaintProperty(`${sid(i)}:line`, 'line-width', lineWidthExpr(ids, part.known) as never)
         m.setPaintProperty(`${sid(i)}:halo`, 'line-color', none)
@@ -375,12 +425,12 @@
         const dots = memberDotsLayer(sid(i), part.layer.source_layer ?? '', part.known, part.only)
         if (m.getLayer(`${sid(i)}:dots`)) m.setFilter(`${sid(i)}:dots`, (dots.filter ?? null) as never)
       } else if (part.layer.raster) {
-        const src = m.getSource(wid(i)) as (maplibregl.RasterTileSource & { setTiles?: (t: string[]) => void }) | undefined
+        const src = m.getSource(wid(i)) as (RasterTileSource & { setTiles?: (t: string[]) => void }) | undefined
         src?.setTiles?.([wmsUrl(part)])
       }
     })
     m.setPaintProperty('pick-ring', 'circle-stroke-color', focus)
-    const pick = m.getSource('pick') as maplibregl.GeoJSONSource | undefined
+    const pick = m.getSource('pick') as GeoJSONSource | undefined
     pick?.setData({ type: 'FeatureCollection', features: marker ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [marker.lng, marker.lat] } }] : [] })
     setState('loading')
     settle(m)
@@ -388,7 +438,7 @@
 
   $effect(() => {
     // every input the drawing reads, so a change redraws; the drawing itself reads no state
-    void [parts, bbox, colors, line, none, nofill, faint, focus, selected, marker, ready, fitIds, slot, slotT]
+    void [parts, bbox, colors, line, none, nofill, faint, focus, selected, marker, ready, fitIds, slot, slotT, sliced]
     if (ready) untrack(sync)
   })
 </script>

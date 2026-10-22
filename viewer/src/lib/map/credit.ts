@@ -1,15 +1,19 @@
-// the credit lines under the map: the basemap, the layer that draws the places, and the indicator's dataset.
+// the credit lines under the map: the basemap (its style's own attribution), the layer that draws the places, the layer
+// under them, and the indicator's dataset.
 // plain strings, so a test can pin them.
 import type { Indicator } from '../data.ts'
 import type { GazLayer } from './gazetteer.ts'
 
-export const ESRI_TILES = {
-  light: 'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-  dark: 'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-}
-
-export function basemapCredit(dark: boolean): string {
-  return `Basemap: Esri ${dark ? 'Dark' : 'Light'} Gray Canvas (Esri, HERE, Garmin, FAO, NOAA, USGS)`
+/** a style's own attribution (every source's, once each), as the credit line says it: tags dropped, entities read */
+export function styleCredit(style: { sources?: Record<string, { attribution?: string } | unknown> } | null | undefined): string {
+  const seen = new Set<string>()
+  for (const src of Object.values(style?.sources ?? {})) {
+    const a = (src as { attribution?: unknown })?.attribution
+    if (typeof a !== 'string') continue
+    const text = a.replace(/<[^>]*>/g, '').replace(/&copy;/g, '©').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
+    if (text) seen.add(text)
+  }
+  return seen.size ? `Basemap: ${[...seen].join('; ')}` : ''
 }
 
 /** the places layer's own credit (Marine Regions' for `mr_*`, which it draws from its own WMS) */

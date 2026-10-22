@@ -8,7 +8,7 @@
   import type { Catalog, Indicator } from '../../data.ts'
   import type { MapColor } from '../../hash.ts'
   import type { ColumnGroup, CoverageIndex, Place } from '../../matrix.ts'
-  import { basemapCredit, dataCredit, partsCredit } from '../../map/credit.ts'
+  import { dataCredit, partsCredit } from '../../map/credit.ts'
   import { MODE_LABELS, mapModel, periodToT } from '../../map/classes.ts'
   import { loadGazetteer } from '../../map/gazetteer.ts'
   import type { GazLayer } from '../../map/gazetteer.ts'
@@ -77,7 +77,9 @@
   const periodWord = (i: number) => (model && periods[i] ? periodLabel(periods[i], model.grain) + (i === periods.length - 1 ? ' (latest)' : '') : '')
   const canSlide = $derived(periods.length > 1 && values != null)
 
-  const credit = $derived([basemapCredit(th.dark), partsCredit(parts.map(p => p.home)), ind ? dataCredit(ind) : ''].filter(Boolean).map(s => s.replace(/\.+$/, '') + '.').join(' '))
+  // the basemap's credit, from the attribution of the style the map set
+  let baseCredit = $state('')
+  const credit = $derived([baseCredit, partsCredit(parts.map(p => p.home)), ind ? dataCredit(ind) : ''].filter(Boolean).map(s => s.replace(/\.+$/, '') + '.').join(' '))
   const sub = $derived(ind && model ? `${ind.title} · by ${MODE_LABELS[model.color].toLowerCase()}${model.period ? ` · ${periodLabel(model.period, model.grain)}` : ''}` : '')
   const noop = () => {}
 </script>
@@ -119,7 +121,7 @@
         {#if parts.length}
           <div class="frame" style:--map-h="min(58dvh, 34rem)">
             <PrintableMap {parts} {bbox} {colors} line={th.css('--map-line')} none={th.css(model.none)} nofill={th.css('--bg-tint')} faint={th.css('--map-member')} focus={th.css('--map-focus')}
-              dark={th.dark} selected={null} marker={null} onpick={noop} {fitIds} label={`Map of ${ind.short} over the places of this report`} />
+              dark={th.dark} selected={null} marker={null} onpick={noop} oncredit={c => (baseCredit = c)} {fitIds} label={`Map of ${ind.short} over the places of this report`} />
           </div>
         {:else if layerError}
           <Notice kind="error">{layerError}</Notice>

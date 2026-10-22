@@ -24,6 +24,18 @@ export function fillColorExpr(classOf: Map<string, number>, colors: string[], fa
 }
 
 /**
+ * fill-opacity of a vector part: 0.85, fully opaque for a part a reference group is drawn over (`opaque`), and none over
+ * the layer slot for the places the slice covers (`sliced`: their feature ids; null = no slot): the slice is masked to the
+ * places themselves, so a fill would hide it. their class stays on the outline (lineColorExpr, 2.5 px with its halo), in
+ * the legend and in the table; a place the slice leaves out (over its cell budget) keeps its fill
+ */
+export function fillOpacityExpr(opaque: boolean, sliced: readonly string[] | null): Expr {
+  if (opaque) return 1
+  if (!sliced) return 0.85
+  return sliced.length ? ['match', ['get', 'place_id'], [...sliced].sort(), 0, 0.85] : 0.85
+}
+
+/**
  * line-color: a classed place is outlined in its class colour, so one too small to show a fill at this zoom still
  * shows its class; a place that is computed but has no class gets the `none` outline; any other member of the collection
  * (`known` lists the computed ones) gets the faint one. with no `known` list every unclassed place gets `none`.

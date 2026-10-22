@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DOT_IMAGE, DOT_MAXZOOM, TRANSPARENT, classedIds, fillColorExpr, focusFilter, lineColorExpr, lineWidthExpr, haloWidthExpr, memberDotsLayer, onlyFilter } from './paint.ts'
+import { DOT_IMAGE, fillOpacityExpr, DOT_MAXZOOM, TRANSPARENT, classedIds, fillColorExpr, focusFilter, lineColorExpr, lineWidthExpr, haloWidthExpr, memberDotsLayer, onlyFilter } from './paint.ts'
 
 const classOf = new Map([['NMS:B', 1], ['NMS:A', 0], ['NMS:C', 1]])
 
@@ -75,5 +75,17 @@ describe('the hollow circles of the members that are not computed', () => {
   it('a derived part limits the circles to its pieces', () => {
     expect(memberDotsLayer('p', 'x', ['A'], ['A', 'B']).filter).toEqual(['all', ['in', ['get', 'place_id'], ['literal', ['A', 'B']]], ['!', ['in', ['get', 'place_id'], ['literal', ['A']]]]])
     expect(memberDotsLayer('p', 'x', [], ['B', 'A']).filter).toEqual(['in', ['get', 'place_id'], ['literal', ['A', 'B']]])
+  })
+})
+
+describe('the fill over a layer slot', () => {
+  it('is 0.85, opaque under a reference group, and none for the places the slice covers', () => {
+    expect(fillOpacityExpr(false, null)).toBe(0.85)
+    expect(fillOpacityExpr(true, null)).toBe(1)
+    expect(fillOpacityExpr(true, ['NMS:A'])).toBe(1)
+    expect(fillOpacityExpr(false, ['NMS:B', 'NMS:A'])).toEqual(['match', ['get', 'place_id'], ['NMS:A', 'NMS:B'], 0, 0.85])
+  })
+  it('a place the slice leaves out keeps its fill (regression: PMNM over the budget lost its fill and showed nothing)', () => {
+    expect(fillOpacityExpr(false, [])).toBe(0.85)
   })
 })
