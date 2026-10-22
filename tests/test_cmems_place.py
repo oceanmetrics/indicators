@@ -44,19 +44,35 @@ def test_a_vector_place_is_one_row_of_the_published_parquet():
   assert geom.equals(TWO_CELLS) and src == {"kind": "vector", "url": "https://storage.example/gazetteer/places/places.parquet"}
 
 
-def test_a_reference_place_is_the_publishers_single_feature():
+def test_a_reference_place_is_the_publishers_single_feature(tmp_path):
+  """without a private copy (tmp_path holds none) the publisher's WFS answers"""
   asked = []
   feature = {"type": "Feature", "geometry": shapely.geometry.mapping(TWO_CELLS)}
   resp = types.SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"features": [feature]})
-  geom, src = cp.fetch_geometry("MRGID:5670", LAYERS["layers"][0], http_get=lambda url, timeout: asked.append(url) or resp)
+  geom, src = cp.fetch_geometry("MRGID:5670", LAYERS["layers"][0], http_get=lambda url, timeout: asked.append(url) or resp,
+                                internal_dir=tmp_path)
   assert asked == ["https://geo.example/wfs?CQL_FILTER=mrgid=5670"]
   assert geom.equals(TWO_CELLS) and src["kind"] == "reference"
 
 
-def test_a_reference_place_the_publisher_does_not_serve_is_an_error():
+def test_a_reference_place_the_publisher_does_not_serve_is_an_error(tmp_path):
   resp = types.SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"features": []})
   with pytest.raises(ValueError, match="is not served by"):
-    cp.fetch_geometry("MRGID:1", LAYERS["layers"][0], http_get=lambda url, timeout: resp)
+    cp.fetch_geometry("MRGID:1", LAYERS["layers"][0], http_get=lambda url, timeout: resp, internal_dir=tmp_path)
+
+
+def test_a_reference_place_is_read_from_the_private_copy_when_this_machine_holds_it(tmp_path):
+  """issue #3 (Albanian EEZ, 2026-10-21): the run masks with the private full-resolution parquet, the copy erddap-places
+  reads, and never asks the publisher; the provenance names the product's DOI, not the local path"""
+  (tmp_path / "mr_eez").mkdir()
+  (tmp_path / "mr_eez" / "places.parquet").write_bytes(b"")
+  layer = {**LAYERS["layers"][0], "raster": {**LAYERS["layers"][0]["raster"], "link": "https://doi.org/10.14284/632"}}
+  seen = []
+  geom, src = cp.fetch_geometry("MRGID:5670", layer, internal_dir=tmp_path,
+                                wkb_reader=lambda url, pid: seen.append((url, pid)) or shapely.to_wkb(TWO_CELLS),
+                                http_get=lambda url, timeout: pytest.fail("the publisher was asked"))
+  assert seen == [(str(tmp_path / "mr_eez" / "places.parquet"), "MRGID:5670")]
+  assert geom.equals(TWO_CELLS) and src == {"kind": "reference", "url": "https://doi.org/10.14284/632", "copy": "internal"}
 
 
 def test_a_derived_layer_needs_a_maintainer():

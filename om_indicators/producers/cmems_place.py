@@ -7,8 +7,9 @@ Marine login. the output folder is published under s3://oceanmetrics.io-public/i
 adapter om_indicators/adapters/cmems_places.py reads it into the catalog.
 
   polygon   fetched at run time, never stored in this repo: a vector collection's one row of the published
-            gazetteer/<coll>/places.parquet; a reference collection's (Marine Regions, `mr_*`) from the publisher's
-            single-feature service in layers.json (`raster.feature_url`), as erddap-places does. a derived collection
+            gazetteer/<coll>/places.parquet; a reference collection's (Marine Regions, `mr_*`) one row of the build
+            machine's private full-resolution copy (`PLACES_INTERNAL`/<coll>/places.parquet, as erddap-places reads it),
+            else the publisher's single-feature service in layers.json (`raster.feature_url`). a derived collection
             (fao_high_seas) or a reference one with tiles only needs a maintainer: `NeedsMaintainer`.
   subset    the Copernicus Marine Toolbox, the polygon's bbox buffered by one grid cell, the surface layer only (depth
             0 to 0.51 m, the first level of the BGC multiyear dataset is 0.506 m; noaa-onms/eco-indicators asks 0 to
@@ -36,6 +37,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -59,6 +61,9 @@ LAYERS_URL = GAZETTEER + "index/layers.json"
 PUBLIC_BASE = "https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/producers/cmems/"
 DEST = "s3://oceanmetrics.io-public/indicators/producers/cmems"
 LICENSE = "CC-BY-4.0"
+# the build machine's private copies of the reference collections (the places repo's publish_collections.sh): never
+# published, read in place; provenance names the product's DOI, not this path
+PLACES_INTERNAL = Path(os.environ.get("PLACES_INTERNAL") or Path.home() / "data" / "oceanmetrics" / "places-internal")
 DEPTH_RANGE = (0.0, 0.51)           # the surface level only: 0.506 m in the BGC dataset, 0.494 m in the physics one
 MAX_VALUES = 50_000_000             # grid values of one job (cells of the windows x time steps) before --max-values
 PLACE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*:[A-Za-z0-9_.\-]+$")
@@ -122,9 +127,11 @@ def feature_url(template: str, place_id: str) -> str:
 
 
 def fetch_geometry(place_id: str, layer: dict | None, *, wkb_reader: Callable[[str, str], bytes] = read_wkb,
-                   http_get: Callable[..., Any] | None = None) -> tuple[Any, dict]:
+                   http_get: Callable[..., Any] | None = None, internal_dir: Path | None = None) -> tuple[Any, dict]:
   """(the place polygon as a shapely geometry, where it came from). raises NeedsMaintainer for a layer whose polygon
-  is not fetchable at run time."""
+  is not fetchable at run time. a reference collection is read from the private copy in `internal_dir` (default
+  PLACES_INTERNAL) when this machine holds it: the same geometry erddap-places masks with and the gazetteer's derived
+  tables are built from; its provenance link is the product (`raster.link`, the DOI), never the local path."""
   import shapely
   import shapely.geometry
   kind = geometry_kind(layer)
@@ -132,6 +139,11 @@ def fetch_geometry(place_id: str, layer: dict | None, *, wkb_reader: Callable[[s
     url = layer.get("parquet") or f"{GAZETTEER}{layer['collection']}/places.parquet"
     return shapely.from_wkb(wkb_reader(url, place_id)), {"kind": "vector", "url": url}
   if kind == "reference":
+    coll = layer.get("collection") or layer.get("slug")
+    own = (internal_dir or PLACES_INTERNAL) / coll / "places.parquet"
+    if own.exists():
+      link = layer["raster"].get("link") or feature_url(layer["raster"]["feature_url"], place_id)
+      return shapely.from_wkb(wkb_reader(str(own), place_id)), {"kind": "reference", "url": link, "copy": "internal"}
     import requests
     url = feature_url(layer["raster"]["feature_url"], place_id)
     r = (http_get or requests.get)(url, timeout=120)

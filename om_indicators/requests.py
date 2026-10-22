@@ -201,7 +201,7 @@ def classify(form: dict[str, str], manifest: dict, layers: dict, place_row: Call
     return Triage("needs-review", reasons + [f"{ind['short']} comes from {ind['producer']['name']}, which runs only by hand (whole collections, snapshot runs)"], links=links)
   layer = next((l for l in layers.get("layers", []) if (l.get("collection") or l.get("slug")) == coll), None)
   # erddap-places reads a place's polygon from our published parquet (vector) or, for a reference collection such as
-  # the Marine Regions EEZs, one feature at a time from the publisher's own service (`raster.feature_url`)
+  # the Marine Regions EEZs, from the Mac mini's private full-resolution copy (it refuses one it does not hold)
   if geometry_kind(layer) is None:
     return Triage("needs-review", reasons + [f"the geometry of {coll} is neither published nor served one place at a time, so the run needs a maintainer"], links=links)
   parts = ind_id.split(":")
