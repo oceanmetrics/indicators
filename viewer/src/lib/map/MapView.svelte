@@ -5,15 +5,15 @@
   // selection is a part of the map, layered as a place set is (parts.ts), with one legend, one table and one colour scale across all
   // their places; a group chosen in part is drawn restricted to its chosen places. the indicator is the hash's `ind` when it is in
   // the selection, else the first selected one with values in the selected places. the classes, legend and table come from
-  // classes.ts (status and trend from src/status); MapCanvas only draws. all state is the URL hash:
+  // classes.ts (status and trend from @oceanmetrics/status); MapCanvas only draws. all state is the URL hash:
   // #view=map&ind=&pi=&px=&ii=&ix=&place=&color=&t=&cls=&method=
   // the group's members that are not computed are drawn faint (and as a small hollow circle from far away), and a click on one offers
   // the next steps.
   import { onMount } from 'svelte'
   import { Button, Notice, Select, Slider } from '@marinebon/ui'
   import { Icon } from '../../../../src/icons/index.ts'
-  import { periodLabel } from '../../../../src/status/index.ts'
-  import type { MethodId } from '../../../../src/status/index.ts'
+  import { periodLabel } from '@oceanmetrics/status'
+  import type { MethodId } from '@oceanmetrics/status'
   import { expandIndicators } from '../../../../src/report/spec.ts'
   import type { Catalog, Layers } from '../data.ts'
   import { groupHref, mapToMatrixHref, placeHref } from '../hash.ts'

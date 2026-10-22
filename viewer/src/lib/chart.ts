@@ -1,8 +1,8 @@
 // chart geometry for the Place view's time series, in plain functions: scales, ticks, the long-term band, the shaded
 // recent window and stacked class shares. the SVG components only draw what these return. nothing here computes a
-// status or a number's words: the band and the window come from a StatusResult (src/status), the labels from fmt().
-import { fmt, nextPeriod, periodX } from '../../../src/status/index.ts'
-import type { Grain, Point, StatusResult } from '../../../src/status/index.ts'
+// status or a number's words: the band and the window come from a StatusResult (@oceanmetrics/status), the labels from fmt().
+import { fmt, nextPeriod, periodX } from '@oceanmetrics/status'
+import type { Grain, Point, StatusResult } from '@oceanmetrics/status'
 
 export interface Tick { v: number; label: string }
 

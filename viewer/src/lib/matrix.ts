@@ -1,8 +1,8 @@
 // the Matrix's rules, in plain functions: which coverage row fills a cell, what state the cell is in, how columns
 // group by vocabulary and rows by collection, and the words a cell speaks. the status itself is never computed here:
-// it is read from the coverage row, which src/coverage/ built with src/status/.
-import { fmt, periodLabel } from '../../../src/status/index.ts'
-import type { Grain, Status, Trend } from '../../../src/status/index.ts'
+// it is read from the coverage row, which src/coverage/ built with @oceanmetrics/status.
+import { fmt, periodLabel } from '@oceanmetrics/status'
+import type { Grain, Status, Trend } from '@oceanmetrics/status'
 import { shownGrainOrder } from '../../../src/coverage/build.ts'
 import type { CoverageRow } from '../../../src/coverage/build.ts'
 import { GROUP_ORDER } from './data.ts'

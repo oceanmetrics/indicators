@@ -131,7 +131,7 @@ describe('valuesCollOf: the values file comes from the coverage row, never from 
 describe('words', () => {
   const sst = ind({ id: 'sst', short: 'SST' })
   const place = { id: 'NMS:A', name: 'Alpha', coll: 'places' }
-  it('formats a value with src/status fmt, the manifest decimals and the unit label', () => {
+  it('formats a value with @oceanmetrics/status fmt, the manifest decimals and the unit label', () => {
     expect(valueText(sst, row({ last_value: 26.04 }))).toBe('26.0 °C')
     expect(valueText(ind({ id: 'ph', unit_label: '', decimals: 3 }), row({ last_value: 8.1234 }))).toBe('8.123')
     expect(valueText(sst, row({ last_value: -1.25 }))).toBe('−1.3 °C')

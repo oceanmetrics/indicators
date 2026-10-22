@@ -1,13 +1,13 @@
 <script lang="ts">
   // one indicator for the place: title with its category glyph (and the GOOS badge for the EOV grouping), the status
-  // sentence and glyphs from src/status computed here in the browser, the chart, a grain toggle and a method switch,
+  // sentence and glyphs from @oceanmetrics/status computed here in the browser, the chart, a grain toggle and a method switch,
   // a table, downloads of this place's rows, the citation and the four elements. loads only its own values file;
   // its loading and its errors are its own.
   import { Button } from '@marinebon/ui'
   import { Icon } from '../../../src/icons/index.ts'
   import type { IconName } from '../../../src/icons/index.ts'
-  import { fmt, periodLabel } from '../../../src/status/index.ts'
-  import type { MethodId, Grain } from '../../../src/status/index.ts'
+  import { fmt, periodLabel } from '@oceanmetrics/status'
+  import type { MethodId, Grain } from '@oceanmetrics/status'
   import type { CoverageRow } from '../../../src/coverage/build.ts'
   import type { Catalog, Indicator, Term, VocabId } from './data.ts'
   import { badgeUrl, valuesUrl } from './delivery.ts'

@@ -16,7 +16,7 @@
 //   3 indicators), Quad plot (indicators or places as points: recent trend against recent mean, in SD units, ≤ 30), Map sheet
 //   (one indicator as a choropleth with a time slider) and Dossier (paged for print: figure, caption, method, citation and
 //   Reproduce for every place and indicator). every report also carries a locator map (except the Map sheet, which is one).
-import type { Grain, MethodId, Status, Trend } from '../status/index.ts'
+import type { Grain, MethodId, Status, Trend } from '@oceanmetrics/status'
 import { DEFAULT_ORDER, isDefaultOrder, orderFromParams, orderParams } from './order.ts'
 import type { OrderSpec } from './order.ts'
 

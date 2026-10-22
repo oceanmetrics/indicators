@@ -1,8 +1,8 @@
 // sparkline geometry from a coverage row's `spark` JSON: `{"t0", "g", "v": [...]}` (consecutive periods from t0 at
 // grain g, null for a gap; src/coverage/build.ts encodeSpark) or the older [[period start, value], ...]. axis-free, so
 // only the line and its last point are drawn. periods are placed by calendar position (a gap shows as a gap).
-import { nextPeriod, periodX } from '../../../src/status/index.ts'
-import type { Grain } from '../../../src/status/index.ts'
+import { nextPeriod, periodX } from '@oceanmetrics/status'
+import type { Grain } from '@oceanmetrics/status'
 
 export type SparkPoint = [string, number | null]
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   // the Place view: every indicator that has coverage for one place, one card each, grouped by the chosen vocabulary
   // (leads first, "more in this series" collapsed). each card reads only its own values file and computes its status
-  // in the browser with src/status. the view is a permalink: #view=place&place=<id>[&coll=][&vocab=][&method=][&ind=].
+  // in the browser with @oceanmetrics/status. the view is a permalink: #view=place&place=<id>[&coll=][&vocab=][&method=][&ind=].
   // with `ind=` the indicator the reader opened comes first ("You opened"): its card, or, when the place has no values
   // for it, a "not computed yet" card with the ways forward. a breadcrumb leads back to the Matrix cell it came from.
   import { onMount, tick, untrack } from 'svelte'

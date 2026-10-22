@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { assess, completeGrid } from '../../../../../src/status/index.ts'
-import type { Point } from '../../../../../src/status/index.ts'
+import { assess, completeGrid } from '@oceanmetrics/status'
+import type { Point } from '@oceanmetrics/status'
 import type { Indicator } from '../../data.ts'
 import type { Place } from '../../matrix.ts'
 import type { CardModel } from '../../place.ts'

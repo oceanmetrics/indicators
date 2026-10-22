@@ -2,7 +2,7 @@
   // the class shares of a categorical indicator as stacked columns per period (a stacked area at month grain, where
   // the columns are one pixel wide), with a legend of the top classes and "other". tokens only for colour.
   import { stackChart, OTHER_KEY } from './chart.ts'
-  import { fmt } from '../../../src/status/index.ts'
+  import { fmt } from '@oceanmetrics/status'
   import type { CardModel } from './place.ts'
 
   let { model }: { model: CardModel } = $props()

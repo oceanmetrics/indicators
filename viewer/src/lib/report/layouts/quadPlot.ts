@@ -1,6 +1,6 @@
 // the Quad plot layout's rules, in plain functions: which plots a report has (what the points are), the square domain in
 // SD units, where the labels go so they do not sit on each other, and the rows of the table that reads the same plot.
-// the coordinates and the words are src/status/quad.ts; nothing here computes a status.
+// the coordinates and the words are @oceanmetrics/status (quad.ts); nothing here computes a status.
 import type { Indicator } from '../../data.ts'
 import type { Place } from '../../matrix.ts'
 import type { Axes } from './smallMultiples.ts'

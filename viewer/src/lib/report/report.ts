@@ -1,6 +1,6 @@
 // the report's model, in plain functions: which places and indicators a spec chooses in this catalog, how they group,
 // what the layout's budget says, which cells are empty and the request that asks for them, and the exceptions-first
-// order. the status itself is never computed here (src/status, through scorecard.ts and place.ts).
+// order. the status itself is never computed here (@oceanmetrics/status, through scorecard.ts and place.ts).
 import { budget, coverageCounts, expandIndicators, expandPlaces, LAYOUTS, seriesLeads } from '../../../../src/report/spec.ts'
 import type { Budget, ReportSpec } from '../../../../src/report/spec.ts'
 import type { Catalog, Indicator, VocabId } from '../data.ts'

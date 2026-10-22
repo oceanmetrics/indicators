@@ -2,8 +2,8 @@
 // same geometry as the Place view's TimeChart (chart.ts: the line, the long-term band or percentile band, the mean line, the
 // shaded recent window), with every colour written in as an attribute (a file has no stylesheet and no theme) from a palette the
 // caller resolved from the theme's tokens. plain function, no DOM. the title and the alt text ride along as <title> and <desc>.
-import { completeGrid } from '../../../../src/status/index.ts'
-import type { MethodId, Point, StatusResult } from '../../../../src/status/index.ts'
+import { completeGrid } from '@oceanmetrics/status'
+import type { MethodId, Point, StatusResult } from '@oceanmetrics/status'
 import { lineChart, overlayOf } from '../chart.ts'
 
 /** colours as `#rrggbb` (or any CSS colour), resolved from the light theme's tokens by the caller */

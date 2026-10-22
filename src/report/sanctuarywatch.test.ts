@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { assess } from '../status/index.ts'
-import type { MethodId } from '../status/index.ts'
+import { assess } from '@oceanmetrics/status'
+import type { MethodId } from '@oceanmetrics/status'
 import { STAGING_COLUMNS, swCaptions, swDataJson, swFiguresCsv, swFolder, swSettings, swSettingsMd, swStagingRow } from './sanctuarywatch.ts'
 import type { SwFigure } from './sanctuarywatch.ts'
 

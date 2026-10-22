@@ -1,7 +1,7 @@
 <script lang="ts">
   // one small panel of Small multiples: the same chart geometry as the Place view's TimeChart (chart.ts: the line, the
   // long-term band, the shaded recent window), drawn small and optionally on a y range shared with its row. colours are
-  // tokens. role="img" with the alt text from src/status as its name.
+  // tokens. role="img" with the alt text from @oceanmetrics/status as its name.
   import { lineChart, overlayOf } from '../../chart.ts'
   import type { CardModel } from '../../place.ts'
 

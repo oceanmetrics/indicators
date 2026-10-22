@@ -1,3 +1,4 @@
+# until Day 5 (2026-10-26) the status package is a file: link to a sibling checkout of oceanmetrics/platform
 # build the viewer and publish it to GitHub Pages at https://oceanmetrics.io/indicators/ (the org site's custom
 # domain serves project pages under it). the viewer reads the published catalog from the bucket at run time.
 name: pages
@@ -21,12 +22,26 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: indicators
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: indicators
+      - uses: actions/checkout@v4
+        with:
+          repository: oceanmetrics/platform
+          ref: main
+          path: platform
+      - name: build @oceanmetrics/status (a file link, see the note at the top)
+        working-directory: platform
+        run: npm ci && npm run build
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
+          cache-dependency-path: indicators/package-lock.json
       - run: npm ci
       # tests that read catalog/ or the network skip themselves; the catalog is not in git
       - run: npm test
@@ -40,7 +55,7 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: viewer/dist
+          path: indicators/viewer/dist
 
   deploy:
     needs: build

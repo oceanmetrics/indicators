@@ -5,7 +5,7 @@
   import { onMount } from 'svelte'
   import { Icon } from '../../../src/icons/index.ts'
   import type { IconName } from '../../../src/icons/index.ts'
-  import { spanLabel } from '../../../src/status/index.ts'
+  import { spanLabel } from '@oceanmetrics/status'
   import type { Catalog, Indicator, VocabId } from './data.ts'
   import { configHash, configLines, badgeUrl } from './delivery.ts'
   import { EOV_GLYPH_CREDIT, GOOS_CREDIT, STATUS_NOTE } from './credits.ts'

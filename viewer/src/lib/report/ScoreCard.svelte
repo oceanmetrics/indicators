@@ -1,12 +1,12 @@
 <script lang="ts">
   // the Scorecard layout: places x indicators, each cell a status glyph and a trend glyph (the value too from the
   // swimmer level on). statuses are read from the coverage rows; when the spec's method, window, baseline or years differ
-  // from an indicator's own, they are recomputed here from the place's values with src/status. with a status method on,
+  // from an indicator's own, they are recomputed here from the place's values with @oceanmetrics/status. with a status method on,
   // places and indicators are sorted exceptions first. `axes` says which are the rows (indicators by default, as the Matrix
   // has them). on a phone the table becomes one card per row: per indicator, or per place.
   import { onMount } from 'svelte'
   import { Icon } from '../../../../src/icons/index.ts'
-  import type { StatusResult } from '../../../../src/status/index.ts'
+  import type { StatusResult } from '@oceanmetrics/status'
   import type { ReportSpec } from '../../../../src/report/spec.ts'
   import { isDefaultAxis } from '../../../../src/report/order.ts'
   import type { Catalog, Indicator } from '../data.ts'

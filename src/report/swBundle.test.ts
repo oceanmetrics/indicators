@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assess } from '../status/index.ts'
+import { assess } from '@oceanmetrics/status'
 import { swCaptions, swDataJson, swFiguresCsv, swSettings, swStagingRow } from './sanctuarywatch.ts'
 import type { SwFigure } from './sanctuarywatch.ts'
 import { swBundleFiles, swFigureFiles } from './swBundle.ts'

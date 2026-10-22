@@ -1,3 +1,4 @@
+# until Day 5 (2026-10-26) the status package is a file: link to a sibling checkout of oceanmetrics/platform
 # indicator requests (plan §4, Phase 6): an issue from the form .github/ISSUE_TEMPLATE/indicator-request.yml is
 # triaged on a GitHub runner (om_indicators/requests.py: label auto / already / needs-review, and a comment saying
 # why), and an `auto` job runs on the self-hosted macmini runner: erddap-places computes the one place, publishes it,
@@ -94,11 +95,25 @@ jobs:
       NUM: ${{ github.event.issue.number }}
       GH_TOKEN: ${{ github.token }}
       ACTION: ${{ github.event.action }}
+    defaults:
+      run:
+        working-directory: indicators
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: indicators
+      - uses: actions/checkout@v4
+        with:
+          repository: oceanmetrics/platform
+          ref: main
+          path: platform
+      - name: build @oceanmetrics/status (a file link, see the note at the top)
+        working-directory: platform
+        run: npm ci && npm run build
       - uses: actions/download-artifact@v4
         with:
           name: triage
+          path: indicators
       - name: check the job again
         run: |
           export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
@@ -121,7 +136,7 @@ jobs:
         if: steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems'
         with:
           repository: oceanmetrics/erddap-places
-          path: erddap-places
+          path: indicators/erddap-places
       - name: compute the place (erddap-places precompute)
         if: steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems'
         run: |

@@ -13,7 +13,7 @@
 // - every colour comes in through `colors`, resolved by the caller from the theme tokens (hex lives only in
 //   brand/themes): the line, the reference lines, the evaluation window, and `off` for the colour fields of the
 //   options left off (the plugin's form wants a colour there even then).
-import type { MethodId, Point, StatusResult } from '../status/index.ts'
+import type { MethodId, Point, StatusResult } from '@oceanmetrics/status'
 
 export interface SwFigure {
   indicator: { id: string; title: string; short: string; unit?: string; decimals?: number; citation?: string | null; method?: string }

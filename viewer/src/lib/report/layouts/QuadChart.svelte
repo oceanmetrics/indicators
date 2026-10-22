@@ -2,12 +2,12 @@
   // one quad plot (the IEA quad plot): each point is an indicator (or a place) at its recent trend (x) and the departure of
   // its recent mean from its long-term mean (y), both in SD units of its own record. dashed guides at ±1 SD, the corner
   // captions say where a point is in words (statistical, never better or worse), and each marker is the status glyph of the
-  // point. the coordinates and words are src/status/quad.ts. points with no coordinates are listed under the chart with why,
+  // point. the coordinates and words are @oceanmetrics/status (quad.ts). points with no coordinates are listed under the chart with why,
   // and a table (details) carries every number for those who do not read the plot.
   import { CORE_PATHS, Icon } from '../../../../../src/icons/index.ts'
   import type { IconName } from '../../../../../src/icons/index.ts'
-  import { QUADRANT_SHORT, QUADRANT_WORDS, fmt, quadAlt, quadPoint, quadWhy, quadWords, quadrantOf } from '../../../../../src/status/index.ts'
-  import type { QuadPoint } from '../../../../../src/status/index.ts'
+  import { QUADRANT_SHORT, QUADRANT_WORDS, fmt, quadAlt, quadPoint, quadWhy, quadWords, quadrantOf } from '@oceanmetrics/status'
+  import type { QuadPoint } from '@oceanmetrics/status'
   import { scaleLinear } from '../../chart.ts'
   import { STATUS_WORDS, TREND_WORDS } from '../../matrix.ts'
   import type { CardModel } from '../../place.ts'

@@ -3,8 +3,8 @@
   // the Matrix drawer and the Place view's cards. `row` is anything with a coverage row's statistics (a CoverageRow,
   // or a card's own result when the reader chose another method), so the Method element tells what is on screen.
   import { Icon } from '../../../src/icons/index.ts'
-  import { fmt, spanLabel } from '../../../src/status/index.ts'
-  import type { Grain } from '../../../src/status/index.ts'
+  import { fmt, spanLabel } from '@oceanmetrics/status'
+  import type { Grain } from '@oceanmetrics/status'
   import { gazetteerPlaceHref } from './data.ts'
   import type { Catalog, Indicator } from './data.ts'
   import { datasetLink, duckdbSnippet, licenceText, valuesUrl } from './delivery.ts'

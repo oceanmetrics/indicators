@@ -1,10 +1,10 @@
 <script lang="ts">
   // the Map sheet layout: one indicator as a choropleth over the chosen places, with a period slider. it is the Map view's
-  // model (map/classes.ts: classes, legend and table; status and trend only through src/status) and canvas (MapCanvas, the
+  // model (map/classes.ts: classes, legend and table; status and trend only through @oceanmetrics/status) and canvas (MapCanvas, the
   // gazetteer's PMTiles, and Marine Regions' own WMS for reference places: no geometry of ours), on the chosen places only.
   // on paper the map is a picture of itself at the period shown, with the legend and the table beside it.
   import { Button, Notice, Select, Slider } from '@marinebon/ui'
-  import { periodLabel } from '../../../../../src/status/index.ts'
+  import { periodLabel } from '@oceanmetrics/status'
   import type { Catalog, Indicator } from '../../data.ts'
   import type { MapColor } from '../../hash.ts'
   import type { ColumnGroup, CoverageIndex, Place } from '../../matrix.ts'

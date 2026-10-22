@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://oceanmetrics.io/indicators/schema/v1/coverage.schema.json",
   "title": "One row of coverage.parquet",
-  "description": "place x indicator x time grain: the time range, the number of periods, the last value, a short sparkline series, and on the indicator's status_grain row the default status and trend from its status_method. Built by `npm run coverage:build` (src/coverage/), which imports the same status functions as the viewer (src/status/). The Matrix, the report builder and the Scorecard read only this file.",
+  "description": "place x indicator x time grain: the time range, the number of periods, the last value, a short sparkline series, and on the indicator's status_grain row the default status and trend from its status_method. Built by `npm run coverage:build` (src/coverage/), which imports the same status functions as the viewer (@oceanmetrics/status). The Matrix, the report builder and the Scorecard read only this file.",
   "type": "object",
   "required": ["place_id", "place_name", "coll", "indicator", "time_grain", "t0", "t1", "n_periods", "last_time", "last_value",
                "last_class", "status_method", "status", "trend", "recent_mean", "recent_from", "recent_to",

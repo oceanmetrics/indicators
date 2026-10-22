@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { lineChart, niceStep, niceTicks, overlayOf, scaleLinear, stackChart, stackShares, yearTicks, OTHER_KEY } from './chart.ts'
-import { periodX } from '../../../src/status/index.ts'
-import type { StatusResult } from '../../../src/status/index.ts'
+import { periodX } from '@oceanmetrics/status'
+import type { StatusResult } from '@oceanmetrics/status'
 
 const result = (o: Partial<StatusResult>): StatusResult => ({
   method: 'iea-sd', status: 'above', trend: 'flat', n: 15, t0: '2005-01-01', t1: '2019-01-01', recentMean: 20, recentFrom: '2015-01-01',

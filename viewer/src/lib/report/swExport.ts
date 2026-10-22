@@ -3,7 +3,7 @@
 // src/report/swBundle.ts's (the same functions the job uses); figure.svg is the report's own chart (figureSvg.ts: chart.ts's
 // geometry with colours resolved from the light theme) and figure.png that svg drawn at 2x in a canvas. `planSwBundle` is
 // plain (which figures, which are left out and why, the files); `buildSwZip` adds the browser's part: the palette, the PNGs, the
-// archive. the status, sentence and alt text are the card model's (src/status).
+// archive. the status, sentence and alt text are the card model's (@oceanmetrics/status).
 import type { ReportSpec } from '../../../../src/report/spec.ts'
 import { specId } from '../../../../src/report/spec.ts'
 import { swFolder } from '../../../../src/report/sanctuarywatch.ts'

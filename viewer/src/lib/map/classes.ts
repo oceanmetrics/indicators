@@ -1,11 +1,10 @@
 // the Map view's rules, in plain functions: which colouring modes an indicator offers, the periods a slider walks,
 // and for each place its value, status, trend and class under a mode. a status or trend is never computed here:
-// assess() in src/status does it, on the place's series cut at the period shown, with the options the coverage
+// assess() in @oceanmetrics/status does it, on the place's series cut at the period shown, with the options the coverage
 // builder uses, so at the latest period the map and the coverage row cannot disagree. the colours are token names
 // (`--map-seq-3`); the components resolve them against the theme.
-import { assess, fmt, grainNoun, periodLabel } from '../../../../src/status/index.ts'
-import type { Grain, MethodId, Status, Trend } from '../../../../src/status/index.ts'
-import { quantile7 } from '../../../../src/status/stats.ts'
+import { assess, fmt, grainNoun, periodLabel, quantile7 } from '@oceanmetrics/status'
+import type { Grain, MethodId, Status, Trend } from '@oceanmetrics/status'
 import type { CoverageRow } from '../../../../src/coverage/build.ts'
 import type { IconName } from '../../../../src/icons/index.ts'
 import type { Indicator } from '../data.ts'

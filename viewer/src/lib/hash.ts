@@ -20,7 +20,7 @@
 //   grain, from, to, asof, title).
 // defaults are left out. `?brand=` and `?theme=` are query switches, never hash keys.
 import type { VocabId } from './data.ts'
-import type { Grain, MethodId } from '../../../src/status/index.ts'
+import type { Grain, MethodId } from '@oceanmetrics/status'
 import { DEFAULT_SPEC, specFromParams, specParams } from '../../../src/report/spec.ts'
 import type { ReportSpec } from '../../../src/report/spec.ts'
 import { ORDER_KEYS, ORDER_LISTS } from '../../../src/report/order.ts'

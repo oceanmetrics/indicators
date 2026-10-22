@@ -1,9 +1,9 @@
 // the Place view's rules, in plain functions: which coverage rows are a place's, how its indicator cards group by
 // vocabulary and series, what a card shows for a grain and a status method, the CSV text and the file names.
-// the status, trend, sentence and alt text are never computed here: assess() in src/status does it, on the
+// the status, trend, sentence and alt text are never computed here: assess() in @oceanmetrics/status does it, on the
 // place's rows, in the browser, with the options the coverage builder used, so a card's default equals its coverage row.
-import { assess, categoricalAlt, categoricalSentence, completeGrid, noValues, periodLabel } from '../../../src/status/index.ts'
-import type { Grain, MethodId, Point, Status, StatusResult, Trend } from '../../../src/status/index.ts'
+import { assess, categoricalAlt, categoricalSentence, completeGrid, noValues, periodLabel } from '@oceanmetrics/status'
+import type { Grain, MethodId, Point, Status, StatusResult, Trend } from '@oceanmetrics/status'
 import type { CoverageRow } from '../../../src/coverage/build.ts'
 import type { Indicator, Term, Vocab, VocabId } from './data.ts'
 import { METHOD_IDS } from './hash.ts'
@@ -171,7 +171,7 @@ const EMPTY: Omit<CardModel, 'sentence' | 'alt' | 'requested'> = {
   kind: 'empty', grain: null, grains: [], method: 'values', status: null, trend: null, result: null, series: [], stack: null, stat: null, n: 0, last: null,
 }
 
-/** what a card shows for a place's rows of one indicator: the status, sentence and alt text by src/status, the series, the stack */
+/** what a card shows for a place's rows of one indicator: the status, sentence and alt text by @oceanmetrics/status, the series, the stack */
 export function cardModel(ind: Indicator, placeName: string, rows: ValueRow[], opts: CardOptions = {}): CardModel {
   const requested = opts.method ?? defaultMethod(ind)
   const present = grainsOf(rows)

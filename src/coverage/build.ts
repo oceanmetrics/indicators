@@ -1,8 +1,8 @@
 // coverage: place x indicator x grain -> time range, periods, last value, a sparkline, and on the indicator's
-// status_grain row its default status and trend (schema/coverage.schema.json). the status comes from src/status/,
+// status_grain row its default status and trend (schema/coverage.schema.json). the status comes from @oceanmetrics/status,
 // the same module the viewer runs, so a cell in the Matrix and a card in a report cannot disagree.
-import { assess, categoricalSentence, completeGrid, periodLabel } from '../status/index.ts'
-import type { Grain, MethodId, Point } from '../status/index.ts'
+import { assess, categoricalSentence, completeGrid, periodLabel } from '@oceanmetrics/status'
+import type { Grain, MethodId, Point } from '@oceanmetrics/status'
 import { bboxCentre } from './centre.ts'
 import type { Bbox, Centre } from './centre.ts'
 

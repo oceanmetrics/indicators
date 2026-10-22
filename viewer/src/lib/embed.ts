@@ -4,7 +4,7 @@
 import { DEPTHS, METHOD_IDS } from './hash.ts'
 import type { Depth } from './hash.ts'
 import type { VocabId } from './data.ts'
-import type { MethodId } from '../../../src/status/index.ts'
+import type { MethodId } from '@oceanmetrics/status'
 
 export interface EmbedState {
   place: string

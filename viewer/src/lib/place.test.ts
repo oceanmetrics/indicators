@@ -93,7 +93,7 @@ describe('grains and series', () => {
 
 describe('a card’s model', () => {
   const rows = years(VALS)
-  it('the default is the manifest’s method: status, trend, sentence and alt text from src/status', () => {
+  it('the default is the manifest’s method: status, trend, sentence and alt text from @oceanmetrics/status', () => {
     const m = cardModel(ind({}), 'Test Place', rows)
     expect(m.method).toBe('iea-sd')
     expect(m.status).toBe('above')

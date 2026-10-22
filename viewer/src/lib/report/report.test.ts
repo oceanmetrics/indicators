@@ -195,7 +195,7 @@ describe('a spec that differs from the indicator default', () => {
     expect(needsRecompute(SDG, row({ indicator: 'sdg' }), spec({ style: { ...DEFAULT_SPEC.style, status: 'names-pct' } }))).toBe(false)
     expect(needsRecompute(SST, row({ time_grain: 'month' }), spec({ style: { ...DEFAULT_SPEC.style, status: 'names-pct' } }))).toBe(false)
   })
-  it('recomputes with src/status: the window decides the status', () => {
+  it('recomputes with @oceanmetrics/status: the window decides the status', () => {
     expect(recomputeStatus(SST, place, values(), DEFAULT_SPEC).status).toBe('above')
     // a 12-year window over a record whose last 5 years are high: the recent mean is closer to the long-term mean
     const wide = recomputeStatus(SST, place, values(), spec({ style: { ...DEFAULT_SPEC.style, recent: 18 } }))

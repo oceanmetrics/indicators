@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { assess, completeGrid } from '../../../../src/status/index.ts'
+import { assess, completeGrid } from '@oceanmetrics/status'
 import { lineChart, overlayOf } from '../chart.ts'
 import { figureSvg, PALETTE_TOKENS } from './figureSvg.ts'
 import type { FigureIn, FigurePalette } from './figureSvg.ts'

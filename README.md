@@ -53,9 +53,8 @@ WHERE time_grain = 'year' ORDER BY place_id, time;
 | `config/` | YAML | `indicators.yml` (categories, series, lead, preferred, kind, min_periods), the vocabularies, and `place_sets.yml` (named lists of place groups: the manifest's `place_sets`) |
 | `om_indicators/` | Python (uv) | contract validator and writer, producer adapters, manifest builder, CLI `om-ind` |
 | `tests/` | pytest | one test per rule, exact-row fixtures |
-| `src/status/` | TypeScript | the status methods (`iea-sd`, `names-pct`, `values`): the **only** implementation, used by the coverage builder and the viewer |
 | `src/coverage/` | TypeScript (Node) | values → `coverage.parquet` |
-| `fixtures/ecoidx/` | R | runs ecoidx `PlotTimeSeries()` on the CCIEA example data: the cross-check for `iea-sd` |
+| `@oceanmetrics/status` | TypeScript (package) | the status methods (`iea-sd`, `names-pct`, `values`): the **only** implementation, used by the coverage builder and the viewer. It moved to https://github.com/oceanmetrics/platform (`packages/status`, with its tests and the R cross-check against ecoidx) on 2026-10-22; until the npm publish on Day 5 (2026-10-26) it is a local `file:../platform/packages/status` link, so check out `platform` beside this repo and build it (`npm ci && npm run build`) before `npm ci` here |
 | `brand/` | Python, Node | icon pipeline (MDI by export name + generated glyphs + traced GOOS EOV glyphs), themes, favicons |
 | `assets/goos-eov/` | PNG, WebP | the GOOS EOV badges, unmodified (see its `SOURCE.md`) |
 | `viewer/` | Svelte 5 + Vite | the Matrix view on `indicators.json` + `coverage.parquet`, with `@marinebon/ui`; one selection (the Select section: places, indicators) shared by the Matrix, Map and Report views; places as rows with `#axes=p`, remove places or indicators with the x on a header (`px=`, `ix=`) and tick them back in a picker |
@@ -80,7 +79,7 @@ uv run om-ind eco-indicators --out catalog   # noaa-onms/eco-indicators at the l
 uv run om-ind cmems-places --out catalog     # places a maintainer accepted from a request (the Copernicus Marine place producer's published folder)
 uv run om-ind obis --out catalog             # the latest obis-h3 release's place_exact layer (--release v20261012 pins one)
 uv run om-ind manifest --out catalog         # catalog/indicators.json
-npm run coverage:build -- catalog            # catalog/coverage.parquet (statuses from src/status; place_coll from the gazetteer index, see `--gazetteer-index`, `--layers`)
+npm run coverage:build -- catalog            # catalog/coverage.parquet (statuses from `@oceanmetrics/status`; place_coll from the gazetteer index, see `--gazetteer-index`, `--layers`)
 uv run om-ind validate catalog               # every values file and coverage.parquet against the schemas
 
 npm run dev                                  # the viewer on http://localhost:5181/, reading catalog/
@@ -92,7 +91,6 @@ python3 brand/glyphs.py                      # bespoke glyphs from primitives ->
 npm run icons:paths && npm run icons:build   # src/icons/icon-paths.ts; brand/v1/icons/{om-icons.svg, icons.css, index.html}
 npm run icons:sheet                          # contact sheet screenshots -> docs/shots/icons_*.png
 node brand/build-favicons.mjs                # brand/favicons/{oceanmetrics,mbon}/ incl. head.html to paste verbatim
-Rscript fixtures/ecoidx/build_iea_sd_fixtures.R ~/Github/noaa-iea/ecoidx   # the iea-sd cross-check
 ```
 
 ## Matrix view
@@ -194,7 +192,7 @@ section, never scroll sideways):
 | **Cards** | the Place view's cards, a tab per category | 3 places, 40 panels |
 | **Scorecard** | glyphs and the last value; indicators in rows and places in columns by default (`axes`), one card per row at 390 px | 60 places, 20 indicators |
 | **Small multiples** | per indicator a row of small charts, one per place (the Place view's chart geometry), each with the place, the status and trend glyphs and the last value; the row shares one y axis (the `Shared y axis` / `Free y axis` toggle, spec key `ys=free`) | 3 indicators x 30 places |
-| **Quad plot** | the IEA quad plot: each point is an indicator (a plot per place) or a place (a plot per indicator; one place or one indicator gives one plot) at its recent trend (x) and the departure of its recent mean from its long-term mean (y), in SD units of its own record (`quadPoint()` in `src/status/quad.ts`); dashed guides at ±1 SD, corner captions worded statistically, a status glyph per point, points without coordinates listed with why, hover tooltip, and the plot as a table | 30 panels |
+| **Quad plot** | the IEA quad plot: each point is an indicator (a plot per place) or a place (a plot per indicator; one place or one indicator gives one plot) at its recent trend (x) and the departure of its recent mean from its long-term mean (y), in SD units of its own record (`quadPoint()` in `@oceanmetrics/status`); dashed guides at ±1 SD, corner captions worded statistically, a status glyph per point, points without coordinates listed with why, hover tooltip, and the plot as a table | 30 panels |
 | **Map sheet** | one indicator as a choropleth over the chosen places with a period slider, a colour-by choice, the legend and the table (the Map view's model and canvas; Marine Regions places are drawn by their own WMS) | 1 indicator |
 | **Dossier** | for each place (a page in print) and indicator: the chart, the status sentence as the figure's caption, the method, the citation, and Reproduce (configuration hash, the Place view, the values file, at the diver level the DuckDB query) | paged, none |
 
@@ -236,7 +234,7 @@ back to the Place view; `?theme=` and `?brand=` work as in the app, and `main.em
 
 `#view=map` colours one indicator over **the places of the selection** (the Select section above the tabs): by its
 value (five quantile classes), its departure from the place's own mean (in SD), its status or trend (iea-sd or names-pct, computed by
-`src/status` as of the period shown), the length of its record, or, for a categorical indicator, its largest class or the share of
+`@oceanmetrics/status` as of the period shown), the length of its record, or, for a categorical indicator, its largest class or the share of
 one class. A slider walks the periods. Hash keys: `ind` (the indicator: the hash's when it is in the selection, else the first selected one with
 values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` (the place selected), `color` (`value|departure|status|trend|record|class|share`), `t`
 (`2024` or `2024-07`; none = each place's latest), `cls` (the class `share` maps), `grain`, `proj` (`globe`; absent = the flat map) and `method`.

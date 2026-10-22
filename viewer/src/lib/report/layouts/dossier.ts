@@ -31,5 +31,5 @@ export function reproduceOf(ind: Indicator, place: Place, manifestVersion: strin
   return { config, hash: configHash(config), valuesUrl, sql: valuesUrl ? duckdbSnippet(valuesUrl, place.id) : null }
 }
 
-/** the caption of a figure: "Figure 3. <the status sentence>" (the sentence as src/status words it) */
+/** the caption of a figure: "Figure 3. <the status sentence>" (the sentence as @oceanmetrics/status words it) */
 export const figureCaption = (n: number, sentence: string): string => `Figure ${n}. ${sentence}`

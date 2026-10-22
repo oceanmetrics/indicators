@@ -1,6 +1,6 @@
 // what the data-drawing layouts (Small multiples, Quad plot, Dossier) and the SanctuaryWatch export need of one
 // place x indicator: its values file read, and the card model (status, trend, sentence, alt text, series) under the
-// report's style. the status itself is cardModel()'s, which is assess() in src/status: the same model the Place view's
+// report's style. the status itself is cardModel()'s, which is assess() in @oceanmetrics/status: the same model the Place view's
 // card draws, so a panel here and a card there cannot disagree.
 import type { ReportSpec } from '../../../../src/report/spec.ts'
 import type { Catalog, Indicator } from '../data.ts'

@@ -1,7 +1,7 @@
 // the Small multiples layout's rules, in plain functions: which panels a report has and how they are rowed, the y range a
 // row shares, and the words under a panel. a panel is a place x indicator drawn small; the chart geometry is chart.ts
-// and the status is the card model's (src/status), so nothing here computes either.
-import { fmt, periodLabel } from '../../../../../src/status/index.ts'
+// and the status is the card model's (@oceanmetrics/status), so nothing here computes either.
+import { fmt, periodLabel } from '@oceanmetrics/status'
 import { overlayOf } from '../../chart.ts'
 import type { Indicator } from '../../data.ts'
 import type { Place } from '../../matrix.ts'

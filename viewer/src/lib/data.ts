@@ -2,7 +2,7 @@
 // Matrix: coverage carries each place's name, so no gazetteer file is read. plain functions, tested without a browser.
 import { parquetReadObjects } from 'hyparquet'
 import type { CoverageRow } from '../../../src/coverage/build.ts'
-import type { Grain, MethodId } from '../../../src/status/index.ts'
+import type { Grain, MethodId } from '@oceanmetrics/status'
 
 export type VocabId = 'onms' | 'names' | 'eov'
 export const VOCAB_IDS: VocabId[] = ['onms', 'names', 'eov']

@@ -3,7 +3,7 @@
   // with places in rows, for each place. a row of one indicator shares one y axis by default (one range for every panel, so
   // the heights compare) or gives each panel its own (the `ys=free` key of the spec; a toggle here). each panel has the
   // place, the status and trend glyphs and the last value. the charts are the Place view's geometry (chart.ts) on the card
-  // model (src/status), so a panel and a card cannot disagree.
+  // model (@oceanmetrics/status), so a panel and a card cannot disagree.
   import { Button } from '@marinebon/ui'
   import { Icon } from '../../../../../src/icons/index.ts'
   import type { IconName } from '../../../../../src/icons/index.ts'

@@ -1,9 +1,9 @@
 // one Scorecard cell: the glyphs, the last value and the accessible name of a place x indicator. the status is read from
-// the coverage row (src/coverage, built with src/status) when the spec asks what the indicator's own default already
+// the coverage row (src/coverage, built with @oceanmetrics/status) when the spec asks what the indicator's own default already
 // is; when the spec's method, window, baseline or years differ, it is recomputed from the place's values with assess()
-// in src/status, as the Place view does. nothing here computes a status.
-import { assess } from '../../../../src/status/index.ts'
-import type { MethodId, StatusResult } from '../../../../src/status/index.ts'
+// in @oceanmetrics/status, as the Place view does. nothing here computes a status.
+import { assess } from '@oceanmetrics/status'
+import type { MethodId, StatusResult } from '@oceanmetrics/status'
 import { DEFAULT_SPEC, exceptionRank } from '../../../../src/report/spec.ts'
 import type { ReportSpec } from '../../../../src/report/spec.ts'
 import type { CoverageRow } from '../../../../src/coverage/build.ts'
@@ -51,7 +51,7 @@ export function needsRecompute(ind: Indicator, row: CoverageRow | null, spec: Re
   return m !== defaultMethod(ind) || recentFor(ind, spec) !== ind.recent || spec.style.baseline != null || spec.time.from != null || spec.time.to != null
 }
 
-/** the status of a place's values under the spec's style (src/status assess), on the years the spec keeps */
+/** the status of a place's values under the spec's style (@oceanmetrics/status assess), on the years the spec keeps */
 export function recomputeStatus(ind: Indicator, place: Place, rows: Pick<ValueRow, 'time_grain' | 'time' | 'value'>[], spec: ReportSpec): StatusResult {
   const series = clipYears(seriesOf(rows, ind.status_grain), spec.time.from, spec.time.to)
   const ctx = { title: ind.short, place: place.name, unit: ind.unit_label ?? '', decimals: ind.decimals ?? 2 }

@@ -1,3 +1,4 @@
+# until Day 5 (2026-10-26) the status package is a file: link to a sibling checkout of oceanmetrics/platform
 # build the indicator catalog from what the producers publish and sync it to s3://oceanmetrics.io-public/indicators/
 #
 # runs on the self-hosted `macmini` runner (the oceanmetrics org runner that also runs erddap-places `stats` and
@@ -31,8 +32,21 @@ jobs:
     timeout-minutes: 60
     env:
       AWS_DEFAULT_REGION: us-east-1
+    defaults:
+      run:
+        working-directory: indicators
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: indicators
+      - uses: actions/checkout@v4
+        with:
+          repository: oceanmetrics/platform
+          ref: main
+          path: platform
+      - name: build @oceanmetrics/status (a file link, see the note at the top)
+        working-directory: platform
+        run: npm ci && npm run build
       - name: host tools
         run: |
           export PATH=/opt/homebrew/bin:$PATH

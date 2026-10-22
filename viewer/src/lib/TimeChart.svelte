@@ -1,7 +1,7 @@
 <script lang="ts">
   // the time series of a card as plain SVG: points and line, and for iea-sd the long-term mean line with the ±1 SD
   // band, for names-pct the median with the 10th to 90th percentile band, the recent window shaded behind it. all
-  // geometry is chart.ts; colours are tokens. role="img" with the alt text from src/status as its name.
+  // geometry is chart.ts; colours are tokens. role="img" with the alt text from @oceanmetrics/status as its name.
   import { lineChart, overlayOf } from './chart.ts'
   import type { CardModel } from './place.ts'
 

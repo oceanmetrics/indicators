@@ -1,6 +1,6 @@
 // the SanctuaryWatch bundle for one place (plan §7, Phase 4): a folder per figure (data.json, settings.json and
 // settings.md, captions.md, alt.txt, and with --png the figure.png and figure.svg from the embed route) plus one
-// figures.csv for the whole set. the status is assessed exactly as the coverage builder does (src/status), and the
+// figures.csv for the whole set. the status is assessed exactly as the coverage builder does (@oceanmetrics/status), and the
 // bundle's text and data come from src/report/sanctuarywatch.ts, which the viewer's Export uses too.
 //   node --experimental-strip-types scripts/sanctuarywatch_bundle.ts --place NMS:CINMS [--catalog catalog]
 //     [--out <catalog>/sanctuarywatch] [--viewer https://oceanmetrics.io/indicators/] [--png]
@@ -10,8 +10,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { asyncBufferFromFile, parquetReadObjects } from 'hyparquet'
-import { assess } from '../src/status/index.ts'
-import type { MethodId, Point } from '../src/status/index.ts'
+import { assess } from '@oceanmetrics/status'
+import type { MethodId, Point } from '@oceanmetrics/status'
 import { readValues } from '../src/coverage/cli.ts'
 import type { ManifestIndicator } from '../src/coverage/build.ts'
 import { swFolder } from '../src/report/sanctuarywatch.ts'

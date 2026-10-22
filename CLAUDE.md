@@ -15,20 +15,25 @@ The plan is `~/Github/bbest/notes/om/plans_todo/2026-10-19_indicator-matrix_plan
 uv sync --group dev --group brand && npm ci
 uv run --group dev pytest -q                      # contract, adapters, manifest, GOOS (must be green to commit)
 uv run --group dev pytest -q tests/test_contract.py -k round_trip
-npm test                                          # vitest: status, coverage, icons, favicons, viewer (must be green)
-npx vitest run src/status/ecoidx.test.ts          # one file
+npm test                                          # vitest: coverage, icons, favicons, viewer (must be green)
+npx vitest run src/report/spec.test.ts            # one file
 npm run check                                     # svelte-check + tsc
 npm run dev                                       # viewer on http://localhost:5181/ (reads catalog/)
 node viewer/scripts/shoot.mjs [--only <name>]     # screenshots -> docs/shots/; look at them
 node viewer/scripts/shoot.mjs --url https://oceanmetrics.io/indicators/ --out docs/shots/live   # the deployed site
 node viewer/scripts/keys.mjs [--url <site>]       # keyboard: cell -> drawer -> Esc -> focus back; place link -> Place view; default matrix (indicators in rows) cell round trip, places-as-rows (#axes=p), remove button -> xp=/xi=; the order: Alt+arrow and the Move buttons, a drag, grouping off, the Order control
 npm run icons:paths && npm run icons:build && npm run icons:sheet   # after any change to brand/ sources
-Rscript fixtures/ecoidx/build_iea_sd_fixtures.R ~/Github/noaa-iea/ecoidx   # regenerate the iea-sd cross-check
 ```
 
 The catalog build (adapters → manifest → coverage → validate) is in README.md "Commands". The icon set is published by
 copying `brand/v1/icons/{om-icons.svg,icons.css,index.html}` to `oceanmetrics.github.io/static/brand/v1/icons/`
 (served at https://oceanmetrics.io/brand/v1/icons/) after `npm test` is green; never change a locked glyph.
+
+The status methods are the package `@oceanmetrics/status` (`oceanmetrics/platform`, `packages/status`; moved there
+2026-10-22). Until the npm publish on Day 5 (2026-10-26) it is a local link, `"file:../platform/packages/status"`, so
+`platform` must be checked out beside this repo and built (`cd ../platform && npm ci && npm run build`) before
+`npm ci` here; the workflows check it out the same way. The status tests and the R cross-check of `iea-sd`
+(`fixtures/ecoidx/`) live there now.
 
 In a sandbox set `TMPDIR` to a writable directory or vitest cannot start. `OM_OFFLINE=1` skips tests that read the
 published gazetteer over HTTP.
@@ -38,14 +43,15 @@ published gazetteer over HTTP.
 ```
 producer outputs (published) ──► om_indicators/adapters/*.py ──► contract.write_values() ──► catalog/values/indicator=<id>/coll=<slug>/data.parquet
 config/indicators.yml + vocab + producer STAC ──► om_indicators/manifest.py ──► catalog/indicators.json
-values + indicators.json ──► src/coverage/build.ts (imports src/status/) ──► catalog/coverage.parquet
-indicators.json + coverage.parquet ──► viewer/ (imports src/status/, src/icons/)
+values + indicators.json ──► src/coverage/build.ts (imports @oceanmetrics/status) ──► catalog/coverage.parquet
+indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/status, src/icons/)
 ```
 
-- **One implementation per status method.** `src/status/` (TypeScript, no DOM) is the only place a status, trend,
-  sentence or alt text is computed. The coverage builder (Node) and the viewer import it, as the erddap-places
-  precompute imports the app's modules. Python never computes a status. R appears only in `fixtures/ecoidx/`, to run
-  the real ecoidx `PlotTimeSeries()` and record what it draws; vitest asserts `iea-sd` matches every series.
+- **One implementation per status method.** The method lives in `@oceanmetrics/status` (TypeScript, no DOM) in
+  `oceanmetrics/platform` (`packages/status`), and nothing else computes a status, trend, sentence or alt text: not this
+  repo, not Python. The coverage builder (Node) and the viewer import the package. Its tests, including the R
+  cross-check of `iea-sd` against the real ecoidx `PlotTimeSeries()`, are in `platform`; a change to a method is made
+  there, not here.
 - **`src/report/` is the report spec** (rules, expansion, layout caps and the panel budget, report id), shared by the viewer's Report view and the Node figure job; the tri-state trees, presets and layouts are in `viewer/src/lib/report/`, and the embed route is `viewer/embed/` + `viewer/src/embed.ts`.
 - **`iea-sd` is ported from ecoidx `PlotTimeSeries()`, not `plot_ts()`.** `plot_ts()` compares the recent mean
   itself with 1 SD rather than its departure from the long-term mean (`R/plot.R:167-168`), and its +/− captions are
@@ -71,7 +77,7 @@ indicators.json + coverage.parquet ──► viewer/ (imports src/status/, src/i
   centre, `src/coverage/centre.ts`) are the only way places are ordered by position: never recompute them elsewhere. The default order is left out of `report.json`.
 - **The Map view** (`viewer/src/lib/map/`): every group of the selection is a layered part (`selection.ts`: a group chosen in part is
   restricted to its places); classes, legends and the table come from `classes.ts` (status and trend
-  only through `src/status`); reference collections (Marine Regions `mr_*`) are drawn by Marine Regions' own WMS
+  only through `@oceanmetrics/status`); reference collections (Marine Regions `mr_*`) are drawn by Marine Regions' own WMS
   (`wms.ts`: an SLD plus `ENV`, one request per tile) and never from geometry we host. The map's groups are the selection's (`place_coll ?? coll`, `pick.ts`), read from every values file that holds their places; a group's members that are not
   computed are drawn faint in a vector group, and below zoom 7 also as a small hollow circle (`paint.ts`). Several groups (a **place set**, or any selection) are
   drawn by layering them (`parts.ts`: vector and derived groups first, WMS on top, one legend and scale), a **derived**
