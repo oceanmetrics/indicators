@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Indicator } from '../data.ts'
-import { basemapCredit, dataCredit, layerCredit, partsCredit } from './credit.ts'
+import { basemapCredit, dataCredit, layerCredit, partsCredit, slotCredit } from './credit.ts'
 
 describe('the credit lines', () => {
   it('the basemap is named for the theme', () => {
@@ -40,5 +40,11 @@ describe('the credit of the parts drawn', () => {
   it('the title stands in for a missing attribution, and nothing gives nothing', () => {
     expect(partsCredit([{ title: 'T', attribution: '', source_link: null }])).toBe('Places: T')
     expect(partsCredit([])).toBe('')
+  })
+  it('the layer under the map carries its own credit, else its title; nothing without a layer', () => {
+    expect(slotCredit({ title: 'SST from CRW', credit: 'SST from CRW (NOAA Coral Reef Watch (CRW)), drawn by ERDDAP WMS at pae-paha.pacioos.hawaii.edu' }))
+      .toBe('Layer: SST from CRW (NOAA Coral Reef Watch (CRW)), drawn by ERDDAP WMS at pae-paha.pacioos.hawaii.edu')
+    expect(slotCredit({ title: 'SST from CRW' })).toBe('Layer: SST from CRW')
+    expect(slotCredit(null)).toBe('')
   })
 })

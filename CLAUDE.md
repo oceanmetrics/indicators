@@ -69,7 +69,8 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   (`viewer/src/lib/selection.ts`, the Select section above the tabs) is shared by the Matrix, Map, Report and Place views: the report spec's
   own `places` and `indicators` rules, in the hash as `pi`, `px` (place ids, `coll:<slug>`, `set:<id>`; default `coll:places`) and `ii`, `ix`
   (`*` = leads, `all`, `cat:`, `series:`, ids). The old keys (`colls`, `xp`, `xi`, `ai`, `leads`, a Map's `coll`) are read as the same selection on
-  parse. Other hash keys: `q`, `vocab`, `depth`, `cell`, `axes=p`, `empty=1`, and the order `ps pg po is ig io` (README "Matrix view"). The place picker lists every polygon
+  parse. Other hash keys: `q`, `vocab`, `depth`, `cell`, `axes=p`, `empty=1`, `t` (shared by every view since 2026-10-22; the Map reads it, the Matrix from
+  build week 3), the Map's `layer=<kind>:<id>[:<variable>]` (the layer slot, `map/layerSlot.ts`), and the order `ps pg po is ig io` (README "Matrix view"). The place picker lists every polygon
   collection of the gazetteer; the gazetteer's places are read lazily (`gazetteerPlaces.ts`), never for the default selection.
 - **The order of places and indicators** (`src/report/order.ts`, `ReportSpec.order`) is part of the shared selection: sort key, grouping on or off and a custom id list
   per axis (`ps pg po` / `is ig io`; `po`/`io` lead with `g:<group id>` entries). One tested ordering function serves the Matrix (`selectionRows`, `groupColumns`), the Report (`buildReport`), the Map's
@@ -82,7 +83,9 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   computed are drawn faint in a vector group, and below zoom 7 also as a small hollow circle (`paint.ts`). Several groups (a **place set**, or any selection) are
   drawn by layering them (`parts.ts`: vector and derived groups first, WMS on top, one legend and scale), a **derived**
   group as the features of its `via` layer matched by `display_id`; a click answers from the top part down. Reference
-  geometry (Marine Regions) is never hosted by us, in a set as anywhere: the EEZs stay Marine Regions' own WMS.
+  geometry (Marine Regions) is never hosted by us, in a set as anywhere: the EEZs stay Marine Regions' own WMS. Under the places sits the **layer slot**
+  (`map/layerSlot.ts`: one `LayerSlot` per hash `layer`, made by the factory of its kind, ids prefixed `slot:`, mounted under the first part); the
+  `erddap` kind (`erddapWms.ts` rules, `erddapSlot.ts` wiring) is provisional until the `@oceanmetrics/map` renderer of build week 2 (2026-11-06 to 11-12).
 - **The pickers** (`viewer/src/lib/pick/`): one place picker and one indicator picker for every view, the rules in plain
   `.ts` (`places.ts`, `placesTree.ts`, `indicators.ts`, `indicatorsTree.ts`; the `*Tree` files and the panels load on the
   first open, so keep them out of the entry). Shared look-alike CSS lives once in `viewer/src/app.css` as `om-*` classes

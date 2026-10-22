@@ -1,7 +1,7 @@
 // screenshots with the real catalog: the Matrix (matrix_<brand>_<theme>[_390].png, places as rows matrix_*_placerows*,
 // the place and indicator pickers open matrix_*_places_picker and matrix_*_indicators_picker, the Select section select_*, a group
 // nothing is computed for uncomputed_*, the drawer), the Place view (place_<place>_<brand>_<theme>[_390].png), the
-// Map view (map_<indicator>_<color>_<theme>[_390].png), the Report view (report_*: the Scorecard, the Cards report, the
+// Map view (map_<indicator>_<color>_<theme>[_390].png; the layer under it map_layer_*), the Report view (report_*: the Scorecard, the Cards report, the
 // open builder over budget, the print preview, Small multiples, the Quad plot, the Map sheet and the Dossier), the order of the rows
 // and columns (order_*: the Order control open, a flat north-to-south order in both orientations, a custom order, a drag in progress with
 // its drop bar and a refused drop, the move buttons on focus) and the embed route (embed_*).
@@ -34,6 +34,7 @@ const MAP = { width: 1440, height: 1500, deviceScaleFactor: 2 }
 const MAP_PHONE = { width: 390, height: 2400, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
 const SST = 'view=map&ind=erddap:dhw_5km:CRW_SST:mean&pi=coll:places'
 const MPA = 'view=map&ind=sdg:ER_MRN_MPA&pi=coll:mr_eez&color=value'
+const LAYER = SST + '&grain=month&t=2024-07&layer=erddap:dhw_5km:CRW_SST'
 const FKNMS = 'view=place&place=NMS:FKNMS'
 const FKNMS_SST = 'cell=NMS:FKNMS|erddap:dhw_5km:CRW_SST:mean'
 // the way forward from an empty cell: Wells (a NERRS reserve) has no sea surface temperature computed (not computed yet), and the
@@ -206,6 +207,10 @@ const SHOTS = [
   ['map_sst_status_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, SST + '&color=status'],
   ['map_sst_status_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, SST + '&color=status'],
   ['map_sst_departure_oceanmetrics_light', 'oceanmetrics', 'light', MAP, SST + '&color=departure'],
+  // the layer under the map (Day 6: the dataset's own ERDDAP WMS, until the renderer of build week 2) at a month of 2024
+  ['map_layer_sst_oceanmetrics_light', 'oceanmetrics', 'light', MAP, LAYER],
+  ['map_layer_sst_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, LAYER],
+  ['map_layer_sst_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, LAYER],
   ['map_sdg1451_value_oceanmetrics_light', 'oceanmetrics', 'light', MAP, MPA],
   ['map_sdg1451_value_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, MPA],
   // OBIS, the CoastWatch OBIS replacement: species of fish per EEZ, by year and by decade
@@ -371,6 +376,12 @@ try {
     }
     // a Place view is ready when it has cards and none is still loading
     if (hash.includes('view=map')) await page.waitForSelector('.map[data-state=done]', { timeout: 60000 })
+    // the layer under the map arrives after its collection is read, and its WMS tiles after that: the legend names it, then the map is idle again
+    if (hash.includes('layer=')) {
+      await page.waitForFunction(() => /Layer:/.test(document.querySelector('.legend')?.textContent ?? ''), { timeout: 30000 })
+      await new Promise(r => setTimeout(r, 300))
+      await page.waitForSelector('.map[data-state=done]', { timeout: 90000 })
+    }
     if (hash.includes('view=place')) await page.waitForFunction(() => document.querySelector('article.card') && !document.querySelector('article.card[aria-busy="true"]'), { timeout: 30000 })
     await page.evaluate(() => document.fonts.ready)
     // the globe asks for more tiles after the map first says it is idle: give it a few seconds
@@ -380,7 +391,8 @@ try {
     // the legend is shot on its own
     const legend = name.startsWith('legend_') ? await page.$('#legend') : null
     if (legend) await legend.screenshot({ path: resolve(OUT, name + '.png') })
-    else await page.screenshot({ path: resolve(OUT, name + '.png'), fullPage: !name.includes('_full') && !hash.includes('cell=') && !hash.includes('view=place') && !hash.includes('view=report') && !embed })
+    // a full-page shot resizes the viewport, so the map (62dvh) asks for new tiles: a layer's slow WMS tiles would be missing from it
+    else await page.screenshot({ path: resolve(OUT, name + '.png'), fullPage: !name.includes('_full') && !hash.includes('cell=') && !hash.includes('view=place') && !hash.includes('view=report') && !hash.includes('layer=') && !embed })
     // a page-level sideways scroll is a layout bug at any width
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     console.log(name, overflow > 0 ? `PAGE OVERFLOW ${overflow}px` : 'ok', errors.length ? errors : '')

@@ -10,8 +10,10 @@
     model: MapModel
     /** the unit, for value legends that name it in their title */
     unit?: string
+    /** the line of the layer under the map (its title, period and source), or nothing */
+    layer?: string
   }
-  let { model, unit = '' }: Props = $props()
+  let { model, unit = '', layer = '' }: Props = $props()
   const none = $derived(model.items.filter(i => i.k == null).length)
 </script>
 
@@ -35,6 +37,7 @@
   {#if model.color === 'status' || model.color === 'trend'}
     <p class="note">Relative to each place’s own record, not better or worse.</p>
   {/if}
+  {#if layer}<p class="note">{layer}</p>{/if}
 </section>
 
 <style>

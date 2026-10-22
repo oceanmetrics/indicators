@@ -3,8 +3,10 @@
   // from the gazetteer's PMTiles (a fill per class, an outline for every place, and below DOT_MAXZOOM a hollow circle at each
   // member that is not computed); a derived part (the high seas by FAO area) is the features of another layer, only those
   // that are its pieces; a reference part (Marine Regions) is drawn by Marine Regions' own WMS, one request per tile, and no
-  // geometry of ours. the parts arrive in drawing order (parts.ts: vector and derived first, reference on top). this
-  // component only draws: the classes, colours and credits come in as props, and a click goes out as a place id.
+  // geometry of ours. the parts arrive in drawing order (parts.ts: vector and derived first, reference on top). under them all,
+  // the layer slot (layerSlot.ts: a raster or grid at the period `slotT`; its ids start `slot:`, so clear() removes them and a
+  // click never hits them). this component only draws: the classes, colours and credits come in as props, and a click goes out
+  // as a place id.
   import { onMount, untrack } from 'svelte'
   import maplibregl from 'maplibre-gl'
   import 'maplibre-gl/dist/maplibre-gl.css'
@@ -19,6 +21,8 @@
   import { boxCentre, globeZoom, isWorldScale, projectionSpec } from './frame.ts'
   import type { Proj } from './frame.ts'
   import type { WmsEntry } from './wms.ts'
+  import { clearsLayer, hitsLayer, slotBeforeId } from './layerSlot.ts'
+  import type { LayerSlot } from './layerSlot.ts'
 
   interface Props {
     parts: MapPart[]
@@ -48,8 +52,11 @@
     fitIds?: string[] | null
     /** the place under the pointer: its name from the tiles (null off a place) */
     onhover?: (name: string | null) => void
+    /** the layer under the places, and the period start it draws (null = its latest) */
+    slot?: LayerSlot | null
+    slotT?: string | null
   }
-  let { parts, bbox, colors, line, none, nofill, faint, focus, dark, selected, proj = null, marker, onpick, onstate, label, compact = false, fitIds = null, onhover }: Props = $props()
+  let { parts, bbox, colors, line, none, nofill, faint, focus, dark, selected, proj = null, marker, onpick, onstate, label, compact = false, fitIds = null, onhover, slot = null, slotT = null }: Props = $props()
 
   let box: HTMLDivElement | undefined = $state()
   let phase = $state<'loading' | 'done'>('loading')
@@ -83,7 +90,7 @@
       if (frame(m) || fitAll(m)) return settle(m)
       setState('done')
     })
-    poll = setInterval(() => { if (m.isStyleLoaded() && m.areTilesLoaded()) { clearInterval(poll); setState('done') } }, 400)
+    poll = setInterval(() => { if (!slotWait && m.isStyleLoaded() && m.areTilesLoaded()) { clearInterval(poll); setState('done') } }, 400)
   }
 
   // the places a report asked to see: framed once their tiles are in, a few tries (a tile may not hold a small place yet)
@@ -230,10 +237,10 @@
       }
     })
     m.on('mouseout', () => onhover?.(null))
-    return () => { clearInterval(poll); ro.disconnect(); m.remove(); map = null; ready = false; shown = null }
+    return () => { clearInterval(poll); ro.disconnect(); m.remove(); map = null; ready = false; shown = null; mounted = null }
   })
 
-  const hitLayers = (m: maplibregl.Map, i: number) => [`${sid(i)}:fill`, `${sid(i)}:dots`].filter(id => m.getLayer(id))
+  const hitLayers = (m: maplibregl.Map, i: number) => [`${sid(i)}:fill`, `${sid(i)}:dots`].filter(id => hitsLayer(id) && m.getLayer(id))
 
   // a click asks the parts from the top one down: a reference part (drawn last) answers by Marine Regions' GetFeatureInfo, a
   // vector part by the features under the point. so an EEZ over a high-seas piece is the EEZ, and open sea is the piece.
@@ -280,9 +287,30 @@
   })
 
   // ---- the data layers ----
+  // everything but the basemap goes, the slot's `slot:` layers with it
   function clear(m: maplibregl.Map) {
-    for (const l of m.getStyle().layers) if (!l.id.startsWith('base-')) m.removeLayer(l.id)
-    for (const id of Object.keys(m.getStyle().sources)) if (!id.startsWith('base-')) m.removeSource(id)
+    for (const l of m.getStyle().layers) if (clearsLayer(l.id)) m.removeLayer(l.id)
+    for (const id of Object.keys(m.getStyle().sources)) if (clearsLayer(id)) m.removeSource(id)
+  }
+
+  // the slot on the map now, mounted under the first part that draws (a vector part's fill, else the first WMS part)
+  let mounted: LayerSlot | null = null
+  let mountedT: string | null = null
+  function mountSlot(m: maplibregl.Map) {
+    mounted?.unmount(m)
+    mounted = slot
+    mountedT = slotT
+    const drawn = parts.map(p => ({ kind: p.kind, drawn: p.kind === 'vector' ? !!(p.layer.pmtiles && p.layer.source_layer) : !!p.layer.raster }))
+    slot?.mount(m, slotBeforeId(drawn), slotT)
+    waitSlot(m)
+  }
+  // a new slot source has asked for no tile yet, so "every tile is in" is true at once: until the map has been idle once since,
+  // the slow poll in settle() does not call the map done (the slot's tiles are slow: a WMS draws each one)
+  let slotWait = false
+  function waitSlot(m: maplibregl.Map) {
+    if (!slot) return
+    slotWait = true
+    m.once('idle', () => { slotWait = false })
   }
 
   function wmsEntries(part: MapPart): WmsEntry[] {
@@ -317,6 +345,8 @@
           m.addLayer({ id: wid(i), type: 'raster', source: wid(i), paint: { 'raster-fade-duration': 0 } })
         }
       })
+      // the slot goes in once the parts are there, so the layer it goes under exists
+      mountSlot(m)
       m.addSource('pick', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       m.addLayer({ id: 'pick-ring', type: 'circle', source: 'pick', paint: { 'circle-radius': 9, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-width': 3, 'circle-stroke-color': focus } })
       shown = key
@@ -327,7 +357,9 @@
       settle(m)
       return
     }
-    // same parts: repaint
+    // same parts: repaint; a new slot is mounted, the same one draws the period asked for
+    if (mounted !== slot) mountSlot(m)
+    else if (slot && mountedT !== slotT) { mountedT = slotT; slot.update(slotT); waitSlot(m) }
     setRing(m)
     parts.forEach((part, i) => {
       if (part.kind === 'vector') {
@@ -356,7 +388,7 @@
 
   $effect(() => {
     // every input the drawing reads, so a change redraws; the drawing itself reads no state
-    void [parts, bbox, colors, line, none, nofill, faint, focus, selected, marker, ready, fitIds]
+    void [parts, bbox, colors, line, none, nofill, faint, focus, selected, marker, ready, fitIds, slot, slotT]
     if (ready) untrack(sync)
   })
 </script>

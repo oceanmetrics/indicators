@@ -238,8 +238,8 @@ describe('the Matrix edit keys (flip, show empty)', () => {
 
 describe('the Map view hash', () => {
   const map = st({ view: 'map', ind: 'obis:species', pi: ['coll:mr_eez'], color: 'value', t: '2019', vocab: 'eov', depth: 'dive', method: 'names-pct' })
-  it('writes view first, then ind, the selection, color, t, cls, the shared keys and method', () => {
-    expect(serializeHash(map)).toBe('view=map&ind=obis:species&pi=coll:mr_eez&color=value&t=2019&vocab=eov&depth=dive&method=names-pct')
+  it('writes view first, then ind, the selection, color, cls, the shared keys (t last of them) and method', () => {
+    expect(serializeHash(map)).toBe('view=map&ind=obis:species&pi=coll:mr_eez&color=value&vocab=eov&depth=dive&t=2019&method=names-pct')
     expect(serializeHash({ ...map, color: 'share', cls: 'Tropical Seas', t: null, vocab: 'onms', depth: 'swim', method: null }))
       .toBe('view=map&ind=obis:species&pi=coll:mr_eez&color=share&cls=Tropical%20Seas')
   })
@@ -250,7 +250,7 @@ describe('the Map view hash', () => {
   })
   it('the grain is a Map key: written after cls, dropped when unknown, never in a Matrix hash', () => {
     const s = st({ view: 'map', ind: 'obis:species:fish', pi: ['coll:mr_eez'], t: '2010', grain: 'decade' })
-    expect(serializeHash(s)).toBe('view=map&ind=obis:species:fish&pi=coll:mr_eez&t=2010&grain=decade')
+    expect(serializeHash(s)).toBe('view=map&ind=obis:species:fish&pi=coll:mr_eez&grain=decade&t=2010')
     expect(parseHash('#' + serializeHash(s))).toEqual(s)
     expect(parseHash('#view=map&grain=week').grain).toBeNull()
     expect(serializeHash(st({ grain: 'decade' }))).toBe('')
@@ -262,7 +262,7 @@ describe('the Map view hash', () => {
     expect(parseHash('#view=map&t=2024-07').t).toBe('2024-07')
   })
   it('the Map keys do not leak into a Matrix hash', () => {
-    expect(serializeHash(st({ color: 'status', t: '2020', cls: 'x', ind: 'a:b' }))).toBe('')
+    expect(serializeHash(st({ color: 'status', cls: 'x', ind: 'a:b', layer: 'erddap:dhw_5km:CRW_SST' }))).toBe('')
   })
   it('mapHref carries the selection, the vocabulary, the detail level and the method', () => {
     expect(mapHref({ ...from, vocab: 'eov' }, 'erddap:dhw_5km:CRW_SST:mean', 'status')).toBe('#view=map&ind=erddap:dhw_5km:CRW_SST:mean&color=status&vocab=eov')
@@ -354,5 +354,47 @@ describe('the Map projection (proj)', () => {
   it('is never written by the Matrix or the Place view', () => {
     expect(serializeHash({ ...DEFAULT_STATE, proj: 'globe' })).toBe('')
     expect(serializeHash({ ...DEFAULT_STATE, view: 'place', place: 'NMS:CINMS', proj: 'globe' })).toBe('view=place&place=NMS:CINMS')
+  })
+})
+
+describe('t is shared by every view (one period for the Map, its layer and, from build week 3, the Matrix)', () => {
+  it('is written in every view when set, last of the shared keys', () => {
+    expect(serializeHash(st({ t: '2020' }))).toBe('t=2020')
+    expect(serializeHash(st({ t: '2024-07', axes: 'places', vocab: 'eov' }))).toBe('vocab=eov&axes=p&t=2024-07')
+    expect(serializeHash(st({ view: 'report', t: '2020' }))).toBe('view=report&t=2020')
+    expect(serializeHash(st({ view: 'place', place: 'NMS:A', t: '2020', ind: 'a:b' }))).toBe('view=place&place=NMS:A&t=2020&ind=a:b')
+    expect(serializeHash(st({ view: 'map', t: '2020' }))).toBe('view=map&t=2020')
+  })
+  it('is dropped when null, in every view', () => {
+    for (const view of ['matrix', 'map', 'report'] as const) expect(serializeHash(st({ view, t: null }))).not.toContain('t=')
+    expect(serializeHash(st({ view: 'place', place: 'NMS:A', t: null }))).toBe('view=place&place=NMS:A')
+  })
+  it('round-trips outside the Map, and a malformed period is still dropped', () => {
+    expect(parseHash('#t=2024-07').t).toBe('2024-07')
+    expect(parseHash('#' + serializeHash(st({ t: '2019', q: 'x' })))).toEqual(st({ t: '2019', q: 'x' }))
+    expect(parseHash('#view=report&t=latest').t).toBeNull()
+  })
+  it('survives a switch of views: Map to Matrix, Matrix to Map, the Place view and carryOver', () => {
+    const at = { ...from, t: '2024-07' }
+    expect(mapToMatrixHref(at, 'sdg:x', 'NMS:A')).toBe('#cell=NMS:A|sdg:x&t=2024-07')
+    expect(matrixToMapHref(at, null)).toBe('#view=map&t=2024-07')
+    expect(placeHref(at, 'NMS:A')).toBe('#view=place&place=NMS:A&t=2024-07')
+    expect(serializeHash(carryOver(st({ view: 'map', ind: 'a:b', t: '2010' }), { ...from, t: '2024' }))).toBe('view=map&ind=a:b&t=2024')
+    expect(serializeHash(carryOver(st({ view: 'map', ind: 'a:b', t: '2010' }), from))).toBe('view=map&ind=a:b')
+  })
+})
+
+describe('the layer under the map (layer=<kind>:<id>[:<variable>])', () => {
+  it('is a Map key, written after proj, round-tripped with its colons readable', () => {
+    const s = st({ view: 'map', ind: 'erddap:dhw_5km:CRW_SST:mean', proj: 'globe', layer: 'erddap:dhw_5km:CRW_SST', t: '2024-07' })
+    expect(serializeHash(s)).toBe('view=map&ind=erddap:dhw_5km:CRW_SST:mean&proj=globe&layer=erddap:dhw_5km:CRW_SST&t=2024-07')
+    expect(parseHash('#' + serializeHash(s))).toEqual(s)
+    expect(parseHash('#view=map&layer=erddap:jplMURSST41mday').layer).toBe('erddap:jplMURSST41mday')
+  })
+  it('an unknown kind or a malformed key is dropped', () => {
+    expect(parseHash('#view=map&layer=wms:x:y').layer).toBeNull()
+    expect(parseHash('#view=map&layer=erddap').layer).toBeNull()
+    expect(parseHash('#view=map&layer=erddap:a:b:c').layer).toBeNull()
+    expect(parseHash('#view=map&layer=erddap:a%20b').layer).toBeNull()
   })
 })

@@ -42,3 +42,8 @@ export function dataCredit(ind: Pick<Indicator, 'dataset'>): string {
   const lic = own && !['other', 'various'].includes(own.toLowerCase()) ? own : ''
   return `Data: ${ind.dataset.title}${who.length ? ` (${who.join('; ')})` : ''}${lic ? `, ${lic}` : ''}`
 }
+
+/** the layer under the map: its own credit line, else its title; nothing without a layer */
+export function slotCredit(slot: { title: string; credit?: string } | null): string {
+  return slot ? `Layer: ${slot.credit || slot.title}` : ''
+}

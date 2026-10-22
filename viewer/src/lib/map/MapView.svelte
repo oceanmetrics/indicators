@@ -6,7 +6,8 @@
   // their places; a group chosen in part is drawn restricted to its chosen places. the indicator is the hash's `ind` when it is in
   // the selection, else the first selected one with values in the selected places. the classes, legend and table come from
   // classes.ts (status and trend from @oceanmetrics/status); MapCanvas only draws. all state is the URL hash:
-  // #view=map&ind=&pi=&px=&ii=&ix=&place=&color=&t=&cls=&method=
+  // #view=map&ind=&pi=&px=&ii=&ix=&place=&color=&t=&cls=&layer=&method=
+  // under the places, the layer the hash's `layer` names (layerSlot.ts; Day 6: an ERDDAP dataset's own WMS) at the same period.
   // the group's members that are not computed are drawn faint (and as a small hollow circle from far away), and a click on one offers
   // the next steps.
   import { onMount } from 'svelte'
@@ -31,7 +32,11 @@
   import { placesWithValueAnywhere } from '../pick/indicatorsTree.ts'
   import { MODE_LABELS, mapModel, periodToT } from './classes.ts'
   import type { MapItem } from './classes.ts'
-  import { basemapCredit, dataCredit, partsCredit } from './credit.ts'
+  import { basemapCredit, dataCredit, partsCredit, slotCredit } from './credit.ts'
+  import { parseLayerKey, registerSlotKind, slotFor } from './layerSlot.ts'
+  import type { LayerSlot } from './layerSlot.ts'
+  import { erddapSlot } from './erddapSlot.ts'
+  import { layerChoices, slotLegendLine } from './erddapWms.ts'
   import { loadGazetteer } from './gazetteer.ts'
   import type { GazLayer } from './gazetteer.ts'
   import { buildParts, partsBbox } from './parts.ts'
@@ -64,6 +69,7 @@
   let { catalog, view, titles, idx = null, layers: _layers = {}, universe = null, onpatch, onother, onready }: Props = $props()
 
   const t0 = performance.now()
+  registerSlotKind('erddap', erddapSlot)
   const m = $derived(catalog.manifest)
 
   // ---- what is mapped: the groups of the selection and the indicator ----
@@ -183,6 +189,32 @@
   }
   const periodWord = (i: number) => (model && periods[i] ? periodLabel(periods[i], model.grain) + (i === periods.length - 1 ? ' (latest)' : '') : '')
 
+  // ---- the layer under the map (the hash's `layer`), at the period shown ----
+  let slot = $state.raw<LayerSlot | null>(null)
+  let slotError = $state('')
+  // the slot says when its legend changes (a new period, no tiles); the legend line reads it again
+  let slotTick = $state(0)
+  $effect(() => {
+    const spec = parseLayerKey(view.layer)
+    slot = null
+    slotError = ''
+    if (!spec) return
+    let live = true
+    try {
+      slotFor(spec, { onchange: () => { if (live) slotTick++ } }).then(
+        sl => { if (live) slot = sl },
+        e => { if (live) slotError = `The layer ${view.layer} did not load (${e instanceof Error ? e.message : String(e)}).` },
+      )
+    } catch (e) { slotError = `The layer ${view.layer} cannot be drawn here (${e instanceof Error ? e.message : String(e)}).` }
+    return () => { live = false }
+  })
+  const layerOptions = $derived(layerChoices(m.indicators, ind, view.layer))
+  const slotLine = $derived.by(() => {
+    void slotTick
+    const l = slot?.legend()
+    return l && model ? slotLegendLine(l, t => periodLabel(t, model.grain)) : slotError
+  })
+
   // ---- the selected place (the hash's `place`): computed, or a member the group has not computed yet ----
   const selectedId = $derived(view.place)
   let marker = $state<{ lng: number; lat: number } | null>(null)
@@ -215,7 +247,7 @@
 
   const dark = $derived(theme === 'dark')
   const credit = $derived(
-    [basemapCredit(dark), partsCredit(parts.map(p => p.home)), ind ? dataCredit(ind) : '']
+    [basemapCredit(dark), partsCredit(parts.map(p => p.home)), slotCredit(slot), ind ? dataCredit(ind) : '']
       .filter(Boolean).map(s => s.replace(/\.+$/, '') + '.').join(' '),
   )
   const heading = $derived(
@@ -288,6 +320,9 @@
       {#if valuesError}<span class="warn" role="status">The record did not load, so only the latest period is shown ({valuesError}).</span>
       {:else if !values && periods.length < 2}<span class="hint" role="status">Loading the record for the period slider…</span>{/if}
     </div>
+    <div class="group layer">
+      <Select label="Layer under the map" value={view.layer ?? ''} options={layerOptions} onchange={(v: string) => onpatch({ layer: v || null })} />
+    </div>
   </section>
 
   {#if notice}<p class="notice" role="status"><Icon name="ui-info" size={16} />{notice}</p>{/if}
@@ -301,7 +336,7 @@
       <div class="frame">
         {#if parts.length}
           <MapCanvas {parts} {bbox} {colors} line={lineColor} none={noneColor} nofill={nofillColor} faint={faintColor} focus={focusColor} {dark} selected={selectedId} proj={view.proj} {marker}
-            {onpick} onstate={s => (drawn = s)} label={`Map of ${ind.short} by place`} />
+            {onpick} onstate={s => (drawn = s)} label={`Map of ${ind.short} by place`} {slot} slotT={model.period} />
           <MapFrameControls target={fsEl} proj={view.proj} onproj={p => onpatch({ proj: p })} bind:mode={full} />
         {:else if layerError}
           <div class="msg"><Notice kind="error">{layerError}</Notice></div>
@@ -315,7 +350,7 @@
     </div>
 
     <aside class="side">
-      <MapLegend {model} unit={ind.unit_label ?? ''} />
+      <MapLegend {model} unit={ind.unit_label ?? ''} layer={slotLine} />
       <section class="pick" aria-labelledby="pick-h" aria-live="polite">
         <h2 id="pick-h" class="mbon-label">Selected place</h2>
         {#if selectedId}
@@ -356,6 +391,7 @@
   .controls { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: flex-start; }
   .group { display: grid; gap: var(--space-2); min-width: 0; }
   .group.slide { min-width: min(20rem, 100%); flex: 1; max-width: 32rem; }
+  .group.layer { width: min(18rem, 100%); }
   .row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
   .one { font: var(--fw-semibold) var(--text-sm) / 1 var(--font-mono); color: var(--text-strong); }
   .notice { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: var(--space-2) var(--space-3); background: var(--bg-tint); border-radius: var(--radius-sm); font: var(--type-small); color: var(--text-strong); }

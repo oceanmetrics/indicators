@@ -104,7 +104,9 @@ but the Place view's body; the Place view carries it in its hash and its links).
 - `ii` / `ix`: the indicators included and excluded: `*` (each series' lead; the default, written as nothing), `all` (every indicator),
   `cat:<term>`, `series:<id>` (its lead), `series:<id>:*`, or an id.
 - the order: `ps pg po is ig io` (see "The order" below).
-- shared by every view: `vocab`, `depth`, `axes=p` (places as rows; the old `axes=t` reads as the default), `empty=1` (show the indicators without values).
+- shared by every view: `vocab`, `depth`, `axes=p` (places as rows; the old `axes=t` reads as the default), `empty=1` (show the indicators without values),
+  `t` (the period, `2024` or `2024-07`; none = the latest). One `t` drives the Map, the layer under it and, with the period scrubber of build week 3
+  (2026-11-13 to 11-19), the Matrix; until then the Matrix, the Report and the Place view carry it untouched, so it survives a switch of views.
 - Matrix only: `q` (a place search that narrows the selection; the toolbar shows it as a chip) and `cell` (an open drawer: `place|indicator`).
 - **Old links still open on the same places and indicators** (read when the hash is parsed, dropped on the next write): `colls=a,b` is `pi=coll:a,coll:b`
   (`set:` stays), `xp` is `px`, `xi` is `ix`, `ai` joins `ii` beside `*`, `leads=0` is `ii=all`, and a Map link's `coll=<slug>` is `pi=coll:<slug>`
@@ -227,7 +229,17 @@ value (five quantile classes), its departure from the place's own mean (in SD), 
 `@oceanmetrics/status` as of the period shown), the length of its record, or, for a categorical indicator, its largest class or the share of
 one class. A slider walks the periods. Hash keys: `ind` (the indicator: the hash's when it is in the selection, else the first selected one with
 values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` (the place selected), `color` (`value|departure|status|trend|record|class|share`), `t`
-(`2024` or `2024-07`; none = each place's latest), `cls` (the class `share` maps), `grain`, `proj` (`globe`; absent = the flat map) and `method`.
+(shared by every view: `2024` or `2024-07`; none = each place's latest), `cls` (the class `share` maps), `grain`, `proj` (`globe`; absent = the flat map), `layer`
+(the layer under the map, below) and `method`.
+- **The layer under the map** (`layer=<kind>:<id>[:<variable>]`, e.g. `layer=erddap:dhw_5km:CRW_SST`; the "Layer under the map" select beside the Period slider):
+  a raster drawn under the places at the period shown (the period start of `t`, else the latest period). `viewer/src/lib/map/layerSlot.ts` is the slot: a
+  `LayerSlot` (`mount`, `update(t)`, `unmount`, `legend`) made by the factory its kind registers (`registerSlotKind`, `slotFor`); MapCanvas mounts it under the
+  first vector part's fill (else the first WMS part) and its ids start `slot:`, so a rebuild clears it and a click never hits it. The renderer of build week 2
+  (2026-11-06 to 11-12, `@oceanmetrics/map`: grid slices, COGs, H3) registers its kinds there. Until then the one kind is `erddap`: the dataset's own ERDDAP WMS,
+  its server and variables read from the gazetteer's `erddap/<id>/collection.json`, at 0.7 opacity, with a legend line ("ERDDAP WMS, provisional until ...")
+  and its credit in the credit line. ERDDAP's WMS draws only CRS:84 / EPSG:4326 pictures, so each tile goes through an `erddapwms://` protocol that asks for
+  the tile's lon/lat box and stretches the rows onto Mercator (`erddapWms.ts`, `erddapSlot.ts`). A server that sends no picture leaves the legend saying
+  "no tiles from <host>". The select lists the ERDDAP datasets of the manifest's indicators, one entry per variable, the shown indicator's dataset first.
 - **Every group of the selection is a layered part** of the map, as a place set is (see below): `viewer/src/lib/map/selection.ts` turns the rules into groups; a group chosen in part
   (places picked by id, or some taken away) is drawn restricted to its chosen places (a vector filter; for a Marine Regions group an SLD filter on the
   MRGIDs, up to 120 of them: past that the whole group is drawn). Excluded places are not drawn and not in the legend or the table.
@@ -339,6 +351,9 @@ of 330 and its CSS 12.2 kB of 15); (2) the Report view's own lazy styles (`Repor
 have a **report CSS** budget of 8 kB, now 4.7 kB (they were 2.1 kB inside the 15 kB "CSS but map", which is now 12.9 kB); the six layouts and
 the two maps are new code, loaded only with the report. The other JS (all but the map) is 181.7 kB of 200, the swExport chunk (SVG, PNG, ZIP) 5.7 kB
 loaded on Export.
+
+With the layer slot (2026-10-22: `layerSlot.ts`, the `erddap` kind and its protocol, the "Layer under the map" select) the entry is 97.2 kB (the
+hash's `layer` codec), the other JS 196.5 kB and the map JS 293.4 kB of 330 (+2.7): the kind's code is in the map chunk, so nothing was lazy-loaded or raised.
 
 ## Brand and icons
 

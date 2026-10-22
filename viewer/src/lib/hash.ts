@@ -8,14 +8,18 @@
 //   we, custom), pg=0 (places not grouped), po (the custom order: a comma list of place ids, led by `g:<collection>` entries
 //   for the groups), is (indicator sort: az, the default, vocab, custom), ig=0, io (as po, with `g:<term>`).
 // - shared: vocab, depth, axes=p (places as rows; absent = indicators in rows, places in columns; the old axes=t means the
-//   default and is dropped on the next write), empty=1 (also the indicators with no value for any place on display).
+//   default and is dropped on the next write), empty=1 (also the indicators with no value for any place on display), t (the
+//   period: "2024", "2024-07"; none = the latest). one `t` drives the Map, the layer under it and, from build week 3
+//   (2026-11-13 to 11-19, the period scrubber), the Matrix: today the Map and its layer read it, and the Matrix, the Report and
+//   the Place view carry it untouched, so it survives a switch of views.
 // - Matrix: q (place search, narrows the selection), cell (an open drawer: place_id|indicator).
 // - Place: place (a place_id), coll (its group; kept for old links, the place is found by its id), method
 //   (iea-sd | names-pct | values: overrides every continuous card's status method), ind (the indicator opened: its card
 //   comes first).
 // - Map: ind (the indicator: one of the selection's), place (the place selected), color (value | departure | status | trend |
-//   record | class | share), t (the period shown: "2024", "2024-07"; none = the latest), cls (the class of `share`), grain (year |
-//   decade | month: the grain read; the indicator's status grain when absent), proj (globe; absent = the flat map), method.
+//   record | class | share), cls (the class of `share`), grain (year | decade | month: the grain read; the indicator's status
+//   grain when absent), proj (globe; absent = the flat map), layer (the layer under the map, `<kind>:<id>[:<variable>]`:
+//   map/layerSlot.ts), method.
 // - Report: the report spec's own flat keys after the selection (src/report/spec.ts: ctx, layout, status, recent, base,
 //   grain, from, to, asof, title).
 // defaults are left out. `?brand=` and `?theme=` are query switches, never hash keys.
@@ -25,6 +29,7 @@ import { DEFAULT_SPEC, specFromParams, specParams } from '../../../src/report/sp
 import type { ReportSpec } from '../../../src/report/spec.ts'
 import { ORDER_KEYS, ORDER_LISTS } from '../../../src/report/order.ts'
 import { migrateSelectionKeys, selectionSpec, withSelection } from './selection.ts'
+import { formatLayerKey, parseLayerKey } from './map/layerSlot.ts'
 
 export type Depth = 'skim' | 'swim' | 'dive'
 export const DEPTHS: Depth[] = ['skim', 'swim', 'dive']
@@ -58,6 +63,8 @@ export interface ViewState {
   grain: Grain | null
   /** the Map's projection: the globe, or null for the flat map (the default) */
   proj: 'globe' | null
+  /** the layer under the Map (`erddap:dhw_5km:CRW_SST`), or null for none */
+  layer: string | null
   /** the report spec: its `places` and `indicators` are the selection every view shares; its other keys are the Report's (the default in every other view) */
   spec: ReportSpec
 }
@@ -65,7 +72,7 @@ export interface ViewState {
 export const DEFAULT_STATE: ViewState = {
   view: 'matrix', q: '', vocab: 'onms', depth: 'swim', cell: null,
   place: null, coll: null, method: null, ind: null,
-  axes: 'indicators', showEmpty: false, color: null, t: null, cls: null, grain: null, proj: null, spec: DEFAULT_SPEC,
+  axes: 'indicators', showEmpty: false, color: null, t: null, cls: null, grain: null, proj: null, layer: null, spec: DEFAULT_SPEC,
 }
 
 // keep the readable characters of ids (NMS:FKNMS, erddap:dhw_5km:CRW_SST:mean, a|b) out of percent-encoding
@@ -88,6 +95,7 @@ export function parseHash(hash: string): ViewState {
   const place = kv.get('place') || null
   const color = kv.get('color')
   const t = kv.get('t') ?? ''
+  const layer = parseLayerKey(kv.get('layer'))
   // a Place view without a place is the matrix; a Map view picks its indicator when it has none
   const view: ViewKind = kv.get('view') === 'place' && place ? 'place' : kv.get('view') === 'map' ? 'map' : kv.get('view') === 'report' ? 'report' : 'matrix'
   const spec = specFromParams(kv, depth === 'skim' || depth === 'dive' ? depth : 'swim')
@@ -109,6 +117,7 @@ export function parseHash(hash: string): ViewState {
     cls: kv.get('cls') || null,
     grain: MAP_GRAINS.includes(kv.get('grain') as Grain) ? (kv.get('grain') as Grain) : null,
     proj: kv.get('proj') === 'globe' ? 'globe' : null,
+    layer: layer ? formatLayerKey(layer) : null,
     // outside the Report only the selection is read; the Report's other keys are its own
     spec: view === 'report' ? spec : selectionSpec(spec),
   }
@@ -130,6 +139,7 @@ export function serializeHash(s: ViewState): string {
     if (s.depth !== DEFAULT_STATE.depth) parts.push('depth=' + s.depth)
     if (s.axes === 'places') parts.push('axes=p')
     if (s.showEmpty) parts.push('empty=1')
+    if (s.t) parts.push('t=' + s.t)
   }
   if (s.view === 'place' && s.place) {
     parts.push('view=place', 'place=' + enc(s.place))
@@ -153,10 +163,10 @@ export function serializeHash(s: ViewState): string {
     parts.push(...selectionParts(s.spec))
     if (s.place) parts.push('place=' + enc(s.place))
     if (s.color) parts.push('color=' + s.color)
-    if (s.t) parts.push('t=' + s.t)
     if (s.cls) parts.push('cls=' + enc(s.cls))
     if (s.grain) parts.push('grain=' + s.grain)
     if (s.proj) parts.push('proj=' + s.proj)
+    if (s.layer) parts.push('layer=' + enc(s.layer))
     shared()
     if (s.method) parts.push('method=' + s.method)
     return parts.join('&')
@@ -168,25 +178,26 @@ export function serializeHash(s: ViewState): string {
   if (s.cell) parts.push('cell=' + enc(s.cell.place) + '|' + enc(s.cell.indicator))
   if (s.axes === 'places') parts.push('axes=p')
   if (s.showEmpty) parts.push('empty=1')
+  if (s.t) parts.push('t=' + s.t)
   return parts.join('&')
 }
 
 // ---- the context a view switch carries ----
 
-/** what a link to another view carries of the state it is opened from: the selection, the vocabulary, the detail level, the orientation and show-empty */
-export type Carry = Pick<ViewState, 'vocab' | 'depth' | 'axes' | 'showEmpty' | 'spec'> & Partial<Pick<ViewState, 'method'>>
+/** what a link to another view carries of the state it is opened from: the selection, the vocabulary, the detail level, the orientation, show-empty and the period */
+export type Carry = Pick<ViewState, 'vocab' | 'depth' | 'axes' | 'showEmpty' | 'spec'> & Partial<Pick<ViewState, 'method' | 't'>>
 
 const selOnly = (from: Pick<ViewState, 'spec'>): ReportSpec => selectionSpec(from.spec)
 
 const carried = (from: Carry): ViewState => ({
-  ...DEFAULT_STATE, vocab: from.vocab, depth: from.depth, axes: from.axes, showEmpty: from.showEmpty, spec: selOnly(from),
+  ...DEFAULT_STATE, vocab: from.vocab, depth: from.depth, axes: from.axes, showEmpty: from.showEmpty, t: from.t ?? null, spec: selOnly(from),
 })
 
-/** another view's state with this one's shared keys: its own keys stay, the selection, vocabulary, detail, orientation and show-empty follow */
+/** another view's state with this one's shared keys: its own keys stay, the selection, vocabulary, detail, orientation, show-empty and period follow */
 export function carryOver(target: ViewState, from: Carry): ViewState {
   const spec = withSelection(target, { places: from.spec.places, indicators: from.spec.indicators, order: from.spec.order }).spec
   return {
-    ...target, vocab: from.vocab, depth: from.depth, axes: from.axes, showEmpty: from.showEmpty,
+    ...target, vocab: from.vocab, depth: from.depth, axes: from.axes, showEmpty: from.showEmpty, t: from.t ?? null,
     spec: target.view === 'report' ? { ...spec, depth: from.depth } : spec,
   }
 }
