@@ -289,7 +289,7 @@ value (five quantile classes), its departure from the place's own mean (in SD), 
 one class. The Period scrubber walks the periods. Hash keys: `ind` (the indicator: the hash's when it is in the selection, else the first selected one with
 values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` (the place selected), `color` (`value|departure|status|trend|record|class|share`), `t`
 (shared by every view: `2024` or `2024-07`; none = each place's latest), `t2` (the second period of the compare mode, shared like `t`, or a year range `2003-2012`; absent = off),
-`anom` (`1`: the compare mode draws `t2 - t`), `swipe` (the compare handle, 0..1), `cls` (the class `share` maps), `grain`, `proj` (`globe`; absent = the flat map), `layer`
+`anom` (`1`: the compare mode draws `t2 - t`), `swipe` (the compare handle, 0..1), `cls` (the class `share` maps), `grain`, `proj` (`globe`; absent = the flat map), `bm` (`carto`: CARTO's own basemap without the GEBCO tiers), `layer`
 (the layer under the map, below), `pal` (its palette) and `method`. The grammar did not change with the packages below.
 - **The map stack** is `@oceanmetrics/map` (the slot contract, `setupMapLibre`, the basemap, the ramps, the grid provider) and
   `@oceanmetrics/engine` (the mask, the lobes, the ERDDAP requests, DuckDB-WASM, the slice) on MapLibre 6 (named imports: it has no
@@ -297,21 +297,36 @@ values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` 
   `vite.config.ts` names worker chunks `.mjs`, which MapLibre 6's `importScriptInWorkers` requires) and registers `pmtiles://` (`setup.ts`:
   one setup a page for every map, given the same three functions each time). Both packages come from npm (`@oceanmetrics/map` ^0.3.1 for the
   cell readout, the counts, the palette and the Retry; `@oceanmetrics/engine` ^0.1.1).
-- **The basemap** is CARTO's positron (light) or dark-matter (dark) through `composeStyle(baseStyle(theme), { theme, dem: false })`:
-  the GEBCO sea floor, isobaths, land mask and undersea names are built and in the bucket, but `storage.oceanmetrics.io/basemap/`
-  (the package's `DEFAULT_TILES`) answers 404 until the storage host lets `basemap` through, and MapLibre schedules no frame while a source
-  fails, so `dem: false` stays the default. `VITE_BASEMAP_DEM=1` at build or dev time turns them on, read from the bucket's path-style url
-  (`basemapTiles.ts`, `tilesAt`). The credit line is the style's own attribution
-  (`styleCredit`: "© OpenStreetMap contributors © CARTO"). What is the basemap's is the layer ids of the style set (`basemapLayerIds`):
+- **The basemap** is CARTO's positron (light) or dark-matter (dark) with the GEBCO 2025 sea floor (colour relief and hillshade), the
+  isobaths, the OSM land mask and the GEBCO undersea names, composed by `composeStyle` in both themes (Ben 2026-10-22: the bathymetric
+  basemap is global and goes everywhere; the Map, the report's locator and its Map sheet all draw it). The tiers are read through the
+  storage rule (`basemapTiles.ts`: `store('basemap/')`, so they follow `DEFAULT_STORAGE_HOST`, `VITE_OM_STORAGE` and `data-om-storage`).
+  The map boots on CARTO's own style (`dem: false`: MapLibre schedules no frame while a source fails, so the first paint never waits on
+  terrain) and the tiers come on at `load`. `VITE_BASEMAP_DEM=0` at build time keeps CARTO's own style; so does the Map's hash key
+  `bm=carto` (`demOn`). The credit line is the style's own attribution (`styleCredit`: "© OpenStreetMap contributors © CARTO; GEBCO
+  Compilation Group (2025) GEBCO 2025 Grid; IHO-IOC GEBCO Gazetteer of Undersea Feature Names"; a line another one holds, such as the land
+  mask's OSM line, is left out). What is the basemap's is the layer ids of the style set (`basemapLayerIds`):
   `clear()` removes every other layer and source, a click or the pointer tests the others that are not the slot's (`isSlotLayer`), and a
   theme flip is `setStyle(next, { diff: true, transformStyle: carryLayers(id => !basemap.has(id)) })`, which carries the parts and the slot
-  into the other theme's style under the layers they sat under. If CARTO does not answer, the map draws on a plain `--map-sea` background.
+  into the other theme's style under the layers they sat under; then the slots go back under the land mask. If CARTO does not answer, the
+  map draws on a plain `--map-sea` background. **What a first view costs** (2026-10-23, a 1280×800 map at one device pixel, a fresh cache,
+  bytes on the wire until idle, the app's own modules; the far tier draws z0-5, core from z6):
+
+  | view | CARTO | GEBCO and OSM tiers | total |
+  |---|---|---|---|
+  | z2 over the North Pacific (-120, 30) | 76,623 B (5 requests) | 7,919,171 B (45): far 2,598,727, core 2,611,755, contours 1,765,212, land 909,149, names 17,163, regional 17,165 | 7,995,794 B (7.6 MiB) |
+  | z8 over the Channel Islands (-119.7, 34.0) | 97,721 B (6) | 1,931,276 B (52): core 1,612,532, contours 120,769, far 105,345, land 40,540, names 34,905, regional 17,185 | 2,028,997 B (1.9 MiB) |
+
+  At z2 core's z0-5 tiles are fetched beside far's (the same tiles twice: the package README's "Known" note), which is about a third
+  of the z2 bytes; gating core's layers from z6 in `@oceanmetrics/map` would save it. The regional tier costs only its header and root
+  directory (17 kB) outside z9-10.
 - **The layer under the map** (`layer=<kind>:<id>[:<variable>]`, e.g. `layer=grid:dhw_5km:CRW_SST`; the "Layer under the map" select beside the
   Period scrubber; Day 6's `layer=erddap:...` links open the same layer and are written back as `grid:`): a **grid slice** of an ERDDAP dataset
   drawn under the places at the step of `t` (the period's first day, `2024-07` -> `2024-07-01`; the dataset's latest step when `t` is
   absent), computed in the browser. `viewer/src/lib/map/layerSlot.ts` re-exports the contract of `@oceanmetrics/map` (a `LayerSlot`: `mount`,
-  `update(t)`, `unmount`, `legend`, made by the factory its kind registers); MapCanvas mounts it under the first vector part's fill (else
-  the first layer of ours, else the basemap's sea surface) and its ids start `slot:`. The one kind is `grid` (`gridKind.ts`): `gridSlot`
+  `update(t)`, `unmount`, `legend`, made by the factory its kind registers); MapCanvas mounts it under the land mask once the tiers are on, so it draws
+  over the relief and the isobaths and the coast cuts it (`slotBefore`; on CARTO's own style under the first vector part's fill, else the
+  first layer of ours, else the basemap's sea surface), at 0.8 opacity so the relief reads through it (`SLICE_OPACITY`), and its ids start `slot:`. The one kind is `grid` (`gridKind.ts`): `gridSlot`
   (one square per cell of the dataset's own lattice, a ramp from `defaultRampFor`, holes where the step has no data) over the engine's
   `sliceSource`. The dataset is the gazetteer's `erddap/<id>/collection.json` through `toDataset`; the places are the polygon places the map
   draws (`slicePlaces`: every computed place of a vector group, from that group's gazetteer collection; a reference group such as the

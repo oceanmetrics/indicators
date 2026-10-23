@@ -341,3 +341,7 @@ export function problemText(e: unknown, host: string): string {
   if (url) return `${url[1]} did not answer${status ? ` (HTTP ${status})` : ''}`
   return m.length > 160 ? `${m.slice(0, 157)}…` : m
 }
+
+/** the grid slice's fill opacity over the sea floor: 0.9 hid the relief under it on the GEBCO basemap; at 0.8 (the map
+ * package's default) the shading and the isobaths read through the colours */
+export const SLICE_OPACITY = 0.8

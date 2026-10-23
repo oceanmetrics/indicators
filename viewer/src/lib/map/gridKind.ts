@@ -12,7 +12,7 @@ import { anomalyDomain, isYearRange, parseYearRange, rangeMonth, unionRange, yea
 import type { MeanInfo } from './compare.ts'
 import { sharedSlices } from './sliceCache.ts'
 import type { LayerSlot, SlotFactory } from './layerSlot.ts'
-import { clampStep, collectionUrl, gridCredit, gridTitle, gridVia, hostOf, problemText, producersOf, unitLabel } from './gridLayer.ts'
+import { clampStep, collectionUrl, gridCredit, gridTitle, gridVia, hostOf, problemText, producersOf, SLICE_OPACITY, unitLabel } from './gridLayer.ts'
 import type { PlaceCells, SlicePlaces } from './gridLayer.ts'
 import type { GridSource } from './gridSource.ts'
 
@@ -148,7 +148,8 @@ export function gridKind(places: () => SlicePlaces): SlotFactory {
     const scale = new Set<GridSlot>()
     const shared = () => unionRange([...scale].map(s => s.cellRange()))
     const unit = v.unit
-    const base = { title, credit: gridCredit(title, producersOf(coll), host), units: unitLabel(unit), via: gridVia(host), opacity: 0.9, ramp: defaultRampFor(name, { units: unit }) }
+    // the slice at SLICE_OPACITY, so the GEBCO relief and isobaths read through it (gridLayer.ts)
+    const base = { title, credit: gridCredit(title, producersOf(coll), host), units: unitLabel(unit), via: gridVia(host), opacity: SLICE_OPACITY, ramp: defaultRampFor(name, { units: unit }) }
 
     function make(o: { instance?: string; anomOf?: () => string | null; firstT?: () => string | null; onchange?: () => void }): GridLayerSlot {
       let t0 = 0

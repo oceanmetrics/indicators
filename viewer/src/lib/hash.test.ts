@@ -524,3 +524,16 @@ describe('which changes Back undoes (parity rows 72, 87)', () => {
     expect(historyStep(map, map)).toBe('replace')
   })
 })
+
+describe('the Map\'s basemap: bm=carto (CARTO\'s own style; absent = the GEBCO tiers)', () => {
+  it('round-trips after proj, read only as carto and only in the Map', () => {
+    const s = parseHash('#view=map&proj=globe&bm=carto')
+    expect(s.bm).toBe('carto')
+    expect(serializeHash(s)).toBe('view=map&proj=globe&bm=carto')
+    expect(parseHash('#view=map').bm).toBeNull()
+    expect(parseHash('#view=map&bm=gebco').bm).toBeNull()
+    expect(serializeHash(parseHash('#view=map&bm=osm'))).toBe('view=map')
+    expect(parseHash('#bm=carto').bm).toBeNull()
+    expect(serializeHash(st({ view: 'place', place: 'NMS:A', bm: 'carto' }))).toBe('view=place&place=NMS:A')
+  })
+})

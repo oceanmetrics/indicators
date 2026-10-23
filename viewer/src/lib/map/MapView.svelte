@@ -509,7 +509,7 @@
     <div class="mapcol">
       <div class="frame" bind:clientWidth={frameW} bind:clientHeight={frameH}>
         {#if parts.length}
-          <MapCanvas {parts} {bbox} {colors} line={lineColor} none={noneColor} nofill={nofillColor} faint={faintColor} focus={focusColor} {dark} selected={selectedId} proj={view.proj} {marker}
+          <MapCanvas {parts} {bbox} {colors} line={lineColor} none={noneColor} nofill={nofillColor} faint={faintColor} focus={focusColor} {dark} selected={selectedId} proj={view.proj} bm={view.bm} {marker}
             {onpick} onstate={s => (drawn = s)} label={`Map of ${ind.short} by place`} {slot} {slotT} {sliced} oncredit={c => (baseCredit = c)}
             {slot2} {slot2T} swipe={swipeF} anom={anomOn} oncell={c => (hover = c)} />
           {#if readout && tip}

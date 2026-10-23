@@ -11,6 +11,11 @@ describe('the credit lines', () => {
     expect(styleCredit({ sources: {} })).toBe('')
     expect(styleCredit(null)).toBe('')
   })
+  it('a source line another one holds is left out (regression: OSM twice, CARTO\'s and the land mask\'s, 2026-10-23)', () => {
+    const carto = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/about-carto/">CARTO</a>'
+    expect(styleCredit({ sources: { protomaps: { attribution: carto }, gebco: { attribution: 'GEBCO 2025 Grid' }, 'osm-land': { attribution: '© OpenStreetMap contributors' } } }))
+      .toBe('Basemap: © OpenStreetMap contributors © CARTO; GEBCO 2025 Grid')
+  })
   it('the places carry their layer’s attribution, the title when it has none, nothing without a layer', () => {
     expect(layerCredit({ title: 'T', attribution: 'Flanders Marine Institute (2023).' })).toBe('Places: Flanders Marine Institute (2023).')
     expect(layerCredit({ title: 'T', attribution: '' })).toBe('Places: T')

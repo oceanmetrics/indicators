@@ -4,7 +4,7 @@
 import type { Indicator } from '../data.ts'
 import type { GazLayer } from './gazetteer.ts'
 
-/** a style's own attribution (every source's, once each), as the credit line says it: tags dropped, entities read */
+/** a style's own attribution (every source's, once each, a line held by another left out), as the credit line says it: tags dropped, entities read */
 export function styleCredit(style: { sources?: Record<string, { attribution?: string } | unknown> } | null | undefined): string {
   const seen = new Set<string>()
   for (const src of Object.values(style?.sources ?? {})) {
@@ -13,7 +13,9 @@ export function styleCredit(style: { sources?: Record<string, { attribution?: st
     const text = a.replace(/<[^>]*>/g, '').replace(/&copy;/g, '©').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
     if (text) seen.add(text)
   }
-  return seen.size ? `Basemap: ${[...seen].join('; ')}` : ''
+  // a line another one already holds goes (the land mask's "© OpenStreetMap contributors" is in CARTO's own line)
+  const lines = [...seen].filter(t => ![...seen].some(o => o !== t && o.includes(t)))
+  return lines.length ? `Basemap: ${lines.join('; ')}` : ''
 }
 
 /** the places layer's own credit (Marine Regions' for `mr_*`, which it draws from its own WMS) */

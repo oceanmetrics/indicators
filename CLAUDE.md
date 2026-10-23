@@ -73,7 +73,7 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   own `places` and `indicators` rules, in the hash as `pi`, `px` (place ids, `coll:<slug>`, `set:<id>`; default `coll:places`) and `ii`, `ix`
   (`*` = leads, `all`, `cat:`, `series:`, ids). The old keys (`colls`, `xp`, `xi`, `ai`, `leads`, a Map's `coll`) are read as the same selection on
   parse. Other hash keys: `q`, `vocab`, `depth`, `cell`, the Matrix's `page` (60 places a page) and `unfold` (the OBIS series opened), `axes=p`, `empty=1`, `t` (shared by every view since 2026-10-22; the Map reads it, the Matrix from
-  build week 3), `t2` (the compare mode's second period, shared like `t`), the Map's `anom=1`, `pal` and `layer=<kind>:<id>[:<variable>]` (the layer slot, `map/layerSlot.ts`; `grid:dhw_5km:CRW_SST`), and the order `ps pg po is ig io` (README "Matrix view"). The place picker lists every polygon
+  build week 3), `t2` (the compare mode's second period, shared like `t`), the Map's `anom=1`, `bm=carto`, `pal` and `layer=<kind>:<id>[:<variable>]` (the layer slot, `map/layerSlot.ts`; `grid:dhw_5km:CRW_SST`), and the order `ps pg po is ig io` (README "Matrix view"). The place picker lists every polygon
   collection of the gazetteer; the gazetteer's places are read lazily (`gazetteerPlaces.ts`), never for the default selection.
 - **The cards and the Matrix summary come from `@oceanmetrics/catalog`** (`/cards`; 0.3.0, shared with the places page): `cardsFor` (through `place.ts`
   `placeCard`) gives the Place view's card words, citation with the place clause and Reproduce block; `valuesUrl`, `duckdbSnippet`, `configLines`, `configHash`
@@ -94,11 +94,12 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   drawn by layering them (`parts.ts`: vector and derived groups first, WMS on top, one legend and scale), a **derived**
   group as the features of its `via` layer matched by `display_id`; a click answers from the top part down. Reference
   geometry (Marine Regions) is never hosted by us, in a set as anywhere: the EEZs stay Marine Regions' own WMS. Under the places sits the **layer slot**
-  (`map/layerSlot.ts` re-exports `@oceanmetrics/map`'s contract: one `LayerSlot` per hash `layer`, made by the factory of its kind, ids prefixed `slot:`, mounted under the first part's fill);
+  (`map/layerSlot.ts` re-exports `@oceanmetrics/map`'s contract: one `LayerSlot` per hash `layer`, made by the factory of its kind, ids prefixed `slot:`, mounted under the land mask with the tiers on, else under the first part's fill: `basemapTiles.ts` `slotBefore`);
   the one kind is `grid` (`gridKind.ts`: `gridSlot` over `@oceanmetrics/engine` `sliceSource`, one slice per place lobe of the polygon places drawn, each masked by its own place; rules in
   `gridLayer.ts`), and the engine with DuckDB-WASM (1.32.0 exact, self-hosted `?url` bundles) is one lazy chunk (`gridSource.ts`), never in the entry or the map chunk. The packages replaced the
   provisional ERDDAP WMS kind (`erddap:` links parse as `grid:`). The map runs on **MapLibre 6** (named imports only; worker chunks are `.mjs`, `vite.config.ts`) and boots on CARTO's style through
-  `composeStyle(..., { dem: false })` (`VITE_BASEMAP_DEM=1` reads the GEBCO tiers from the bucket's path-style url until storage.oceanmetrics.io serves them). **The `clear()` rule:** what is the basemap's is `basemapLayerIds(style)` of the style set; `clear()` removes
+  `composeStyle(..., { dem: false })` and turns the **GEBCO tiers on at `load` by default** (Ben 2026-10-22: GEBCO goes everywhere; the tiers through `store('basemap/')`,
+  `map/basemapTiles.ts`; `VITE_BASEMAP_DEM=0` or the Map's hash `bm=carto` keeps CARTO's own style); after any restyle the slots go back under the land mask (`sinkSlots`). **The `clear()` rule:** what is the basemap's is `basemapLayerIds(style)` of the style set; `clear()` removes
   every other layer and source, a click tests those that are neither the basemap's nor `isSlotLayer`, and a theme flip is `setStyle(next, { diff: true, transformStyle: carryLayers(id => !basemap.has(id)) })`.
   Never key on an id prefix such as `base-`: no CARTO layer has one. **Compare** (`map/compare.ts`, hash `t2` shared like `t`, the Map's `anom=1`): a second grid slot of the same layer at `t2`
   (`companion()` in `gridKind.ts`, ids `slot:grid@t2`) above the first, each slot cut to its side of the swipe (t2 left, t right) by a pair of custom layers that set and clear the

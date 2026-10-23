@@ -301,6 +301,7 @@ const SHOTS = [
   ['map_layer_sst_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, LAYER],
   // framed on one place, where the slice's cells show: the dataset's own lattice inside the place, the class on the outline
   ['map_layer_sst_cinms_oceanmetrics_light', 'oceanmetrics', 'light', MAP, LAYER + '&place=NMS:CINMS'],
+  ['map_layer_sst_cinms_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, LAYER + '&place=NMS:CINMS'],
   ['map_layer_sst_fknms_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, LAYER + '&place=NMS:FKNMS'],
   ['map_layer_sst_cinms_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, LAYER + '&place=NMS:CINMS'],
   ['map_compare_sst_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, COMPARE],
@@ -309,6 +310,9 @@ const SHOTS = [
   ['map_compare_sst_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, COMPARE],
   // closer: the swipe through the Channel Islands, and the difference (anom=1) there
   ['map_compare_sst_cinms_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, COMPARE + '&place=NMS:CINMS'],
+  ['map_compare_sst_cinms_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, COMPARE + '&place=NMS:CINMS'],
+  // the basemap kept on CARTO's own style by the hash (bm=carto: no GEBCO tiers)
+  ['map_layer_sst_cinms_carto_oceanmetrics_light', 'oceanmetrics', 'light', MAP, LAYER + '&place=NMS:CINMS&bm=carto'],
   ['map_compare_sst_cinms_anom_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, COMPARE + '&place=NMS:CINMS&anom=1'],
   ['map_compare_sst_cinms_globe_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, COMPARE + '&place=NMS:CINMS&proj=globe&swipe=0.35'],
   ['map_compare_sst_cinms_anom_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, COMPARE + '&place=NMS:CINMS&anom=1'],

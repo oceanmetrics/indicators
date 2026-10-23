@@ -22,7 +22,8 @@
 //   comes first).
 // - Map: ind (the indicator: one of the selection's), place (the place selected), color (value | departure | status | trend |
 //   record | class | share), cls (the class of `share`), grain (year | decade | month: the grain read; the indicator's status
-//   grain when absent), proj (globe; absent = the flat map), layer (the layer under the map, `<kind>:<id>[:<variable>]`:
+//   grain when absent), proj (globe; absent = the flat map), bm (carto: CARTO's own basemap, no GEBCO sea floor; absent =
+//   the GEBCO tiers, map/basemapTiles.ts), layer (the layer under the map, `<kind>:<id>[:<variable>]`:
 //   map/layerSlot.ts), pal (the layer's palette, a ramp id of @oceanmetrics/map, `_r` reversed; absent = the layer's default),
 //   anom=1 (with t2: the second slice is t2 - t per cell), swipe (with t2 and no anom: the handle's share of
 //   the width, 0..1 in three decimals; 0.5 is left out), method.
@@ -76,6 +77,8 @@ export interface ViewState {
   grain: Grain | null
   /** the Map's projection: the globe, or null for the flat map (the default) */
   proj: 'globe' | null
+  /** the Map's basemap: `carto` (CARTO's own style), or null for the GEBCO tiers over CARTO (the default) */
+  bm: 'carto' | null
   /** the layer under the Map (`erddap:dhw_5km:CRW_SST`), or null for none */
   layer: string | null
   /** the layer's palette (a ramp id, `thermal`, `spectral_r`), or null for the layer's default */
@@ -90,7 +93,7 @@ export interface ViewState {
 export const DEFAULT_STATE: ViewState = {
   view: 'matrix', q: '', vocab: 'onms', depth: 'swim', cell: null,
   place: null, coll: null, method: null, ind: null,
-  axes: 'indicators', showEmpty: false, color: null, t: null, t2: null, anom: false, swipe: null, cls: null, grain: null, proj: null, layer: null, pal: null, page: 1, unfold: [], spec: DEFAULT_SPEC,
+  axes: 'indicators', showEmpty: false, color: null, t: null, t2: null, anom: false, swipe: null, cls: null, grain: null, proj: null, bm: null, layer: null, pal: null, page: 1, unfold: [], spec: DEFAULT_SPEC,
 }
 
 /** a period in the hash: "2024", "2024-07", "2024-07-15" */
@@ -153,6 +156,7 @@ export function parseHash(hash: string): ViewState {
     cls: kv.get('cls') || null,
     grain: MAP_GRAINS.includes(kv.get('grain') as Grain) ? (kv.get('grain') as Grain) : null,
     proj: kv.get('proj') === 'globe' ? 'globe' : null,
+    bm: view === 'map' && kv.get('bm') === 'carto' ? 'carto' : null,
     layer: layer ? formatLayerKey(layer) : null,
     pal: layer && PAL.test(kv.get('pal') ?? '') ? kv.get('pal')! : null,
     page: view === 'matrix' && /^\d+$/.test(kv.get('page') ?? '') ? Math.max(1, Number(kv.get('page'))) : 1,
@@ -206,6 +210,7 @@ export function serializeHash(s: ViewState): string {
     if (s.cls) parts.push('cls=' + enc(s.cls))
     if (s.grain) parts.push('grain=' + s.grain)
     if (s.proj) parts.push('proj=' + s.proj)
+    if (s.bm) parts.push('bm=' + s.bm)
     if (s.layer) parts.push('layer=' + enc(s.layer))
     if (s.layer && s.pal) parts.push('pal=' + s.pal)
     shared()

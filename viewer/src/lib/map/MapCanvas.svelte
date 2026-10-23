@@ -1,12 +1,14 @@
 <script lang="ts">
-  // the map itself: CARTO's positron or dark-matter basemap through `@oceanmetrics/map` `composeStyle` (the GEBCO sea floor
-  // and the land mask once their tiers exist: `dem: false` until then, VITE_BASEMAP_DEM=1 turns them on) under the parts
+  // the map itself: CARTO's positron or dark-matter basemap through `@oceanmetrics/map` `composeStyle` with the GEBCO sea
+  // floor, the isobaths, the land mask and the undersea names (the tiers, on by default once the map has loaded: the boot
+  // style is CARTO's own; VITE_BASEMAP_DEM=0 or the hash's bm=carto leaves them off; basemapTiles.ts) under the parts
   // of one place group or one place set. a vector part is drawn from the gazetteer's PMTiles (a fill per class, an outline
   // for every place, and below DOT_MAXZOOM a hollow circle at each member that is not computed); a derived part (the high
   // seas by FAO area) is the features of another layer, only those that are its pieces; a reference part (Marine Regions)
   // is drawn by Marine Regions' own WMS, one request per tile, and no geometry of ours. the parts arrive in drawing order
   // (parts.ts: vector and derived first, reference on top). under them all, the layer slot (layerSlot.ts: a grid slice at
-  // the period `slotT`; its ids start `slot:`), under the first part's fill, else under the basemap's sea surface. what is
+  // the period `slotT`; its ids start `slot:`), under the land mask (over the relief) once the tiers are on, else under the
+  // first part's fill, else under the basemap's sea surface (basemapTiles.ts `slotBefore`). what is
   // the basemap's is the layer ids of the style set (`basemapLayerIds`): clear() removes every other layer, a click tests
   // the others that are not the slot's, and a theme flip carries them into the next style (`carryLayers`). this component
   // only draws: the classes, colours and credits come in as props, and a click goes out as a place id. the compare mode
@@ -19,9 +21,10 @@
   import { Map as MlMap, NavigationControl, ScaleControl } from 'maplibre-gl'
   import type { CustomLayerInterface, GeoJSONSource, MapMouseEvent, RasterTileSource, StyleSpecification } from 'maplibre-gl'
   import 'maplibre-gl/dist/maplibre-gl.css'
-  import { BASEMAP_URL, basemapLayerIds, baseStyle, composeStyle, DEFAULT_TILES, seaSurfaceId } from '@oceanmetrics/map'
+  import { basemapLayerIds, baseStyle, LAND_LAYER, seaSurfaceId } from '@oceanmetrics/map'
   import { setupMap } from './setup.ts'
-  import { tilesAt } from './basemapTiles.ts'
+  import { basemapStyle, demOn, slotBefore } from './basemapTiles.ts'
+  import type { BasemapKind } from './basemapTiles.ts'
   import { styleCredit } from './credit.ts'
   import { crossesAntimeridian, crossingMinZoom, fitPadding, geometryBounds, placeBox, unionBoxes, worldCopies } from './bounds.ts'
   import type { Box4, Padding } from './bounds.ts'
@@ -32,7 +35,7 @@
   import { boxCentre, globeZoom, isWorldScale, projectionSpec } from './frame.ts'
   import type { Proj } from './frame.ts'
   import type { WmsEntry } from './wms.ts'
-  import { carryLayers, isSlotLayer, slotBeforeId } from './layerSlot.ts'
+  import { carryLayers, isSlotLayer } from './layerSlot.ts'
   import type { LayerSlot } from './layerSlot.ts'
   import { GRID_LAYER } from '@oceanmetrics/map'
   import type { GridSlot } from '@oceanmetrics/map'
@@ -83,9 +86,11 @@
     anom?: boolean
     /** the cell of each slot under the pointer or a tap (x, y in CSS pixels of the map box); null off the slice or off the map */
     oncell?: (c: { x: number; y: number; first: CellProps | null; second: CellProps | null } | null) => void
+    /** the basemap: `carto` draws CARTO's own style (the Map's `bm=carto`); null or `gebco` adds the GEBCO tiers */
+    bm?: BasemapKind | null
   }
   let { parts, bbox, colors, line, none, nofill, faint, focus, dark, selected, proj = null, marker, onpick, onstate, label, compact = false, fitIds = null, onhover, slot = null, slotT = null, sliced = null, oncredit,
-    slot2 = null, slot2T = null, swipe = 0.5, anom = false, oncell }: Props = $props()
+    slot2 = null, slot2T = null, swipe = 0.5, anom = false, oncell, bm = null }: Props = $props()
 
   let box: HTMLDivElement | undefined = $state()
   let phase = $state<'loading' | 'done'>('loading')
@@ -95,11 +100,11 @@
   let shown: string | null = null
 
   // ---- the basemap: the composed style in force, and what of it is the basemap's ----
-  // the GEBCO and OSM tiers are in the bucket, but storage.oceanmetrics.io/basemap/ (the package's DEFAULT_TILES) answers 404
-  // until the storage host lets them through: the map boots and stays on CARTO's own style (`dem: false`), since MapLibre
-  // schedules no frame while a source fails. VITE_BASEMAP_DEM=1 turns the tiers on, read from the bucket's path-style url
-  const DEM = import.meta.env.VITE_BASEMAP_DEM === '1'
-  const TILES = tilesAt(DEFAULT_TILES, BASEMAP_URL)
+  // the GEBCO and OSM tiers through the storage rule (basemapTiles.ts): the map boots on CARTO's own style (`dem: false`:
+  // MapLibre schedules no frame while a source fails, so the first paint never waits on terrain) and the tiers come on at
+  // `load`. VITE_BASEMAP_DEM=0 at build time, or the hash's bm=carto, keeps CARTO's own style
+  const dem = $derived(demOn(import.meta.env.VITE_BASEMAP_DEM, bm))
+  let styledDem: boolean | null = null
   let basemap = new Set<string>()
   let baseSources = new Set<string>()
   let sea: string | null = null
@@ -113,7 +118,7 @@
       const sea = getComputedStyle(document.documentElement).getPropertyValue('--map-sea').trim() || 'transparent'
       base = { version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': sea } }] }
     }
-    return { ...composeStyle(base, { theme, dem, tiles: TILES }), projection: projectionSpec(untrack(() => proj)) }
+    return { ...basemapStyle(base, theme, dem), projection: projectionSpec(untrack(() => proj)) }
   }
   function setBasemap(style: StyleSpecification) {
     basemap = basemapLayerIds(style)
@@ -126,18 +131,25 @@
   const hits = (id: string) => isOurs(id) && !isSlotLayer(id)
   /** the style as it is mid-change: a diff keeps it loaded, a full reload (a style the diff cannot reach) does not */
   const styleReady = (m: MlMap) => (m as unknown as { style?: { _loaded?: boolean } }).style?._loaded !== false
-  // a theme flip (or the tiers coming on): the next style, with every layer of ours carried over under the one it sat under
+  // a theme flip (or the tiers coming on or off): the next style, with every layer of ours carried over under the one it sat
+  // under, then the slots back under the land mask (they may have been mounted on the boot style, which has none)
   let restyleSeq = 0
-  async function restyle(m: MlMap, d: boolean, dem: boolean) {
+  async function restyle(m: MlMap, d: boolean, withDem: boolean) {
     const seq = ++restyleSeq
-    const next = await styleFor(d, dem)
+    const next = await styleFor(d, withDem)
     if (seq !== restyleSeq || map !== m) return
     const old = basemap
     m.setStyle(next, { diff: true, transformStyle: carryLayers(id => !old.has(id)) })
     setBasemap(next)
     styledDark = d
-    if (styleReady(m)) { setRing(m); placeSwipe(m) }
-    else m.once('style.load', () => { setRing(m); untrack(sync) })
+    styledDem = withDem
+    if (styleReady(m)) { setRing(m); sinkSlots(m); placeSwipe(m) }
+    else m.once('style.load', () => { setRing(m); sinkSlots(m); untrack(sync) })
+  }
+  /** the slots' layers under the land mask, in their order (the swipe's custom layers are placed again by placeSwipe) */
+  function sinkSlots(m: MlMap) {
+    if (sea !== LAND_LAYER || !m.getLayer(LAND_LAYER)) return
+    for (const l of m.getStyle().layers) if (isSlotLayer(l.id) && !SWIPE_IDS.includes(l.id)) m.moveLayer(l.id, LAND_LAYER)
   }
 
   const setState = (s: 'loading' | 'done') => { phase = s; onstate?.(s) }
@@ -279,6 +291,7 @@
       }))
       setBasemap(style)
       styledDark = d
+      styledDem = false
       m.touchZoomRotate.disableRotation()
       if (!compact) {
         m.addControl(new NavigationControl({ showCompass: false }), 'top-right')
@@ -288,8 +301,8 @@
       ro = new ResizeObserver(() => m.resize())
       ro.observe(box as HTMLDivElement)
       m.on('load', () => {
+        // ready: the effect below brings the tiers on (styledDem is false on the boot style)
         m.resize(); copies(m); map = m; ready = true
-        if (DEM) void restyle(m, untrack(() => dark), true)
       })
       m.on('moveend', () => copies(m))
       m.on('resize', () => copies(m))
@@ -351,11 +364,11 @@
     onpick({ placeId: null, lng, lat })
   }
 
-  // ---- the basemap follows the theme: the other theme's style, our layers carried over ----
+  // ---- the basemap follows the theme (and bm): the other style, our layers carried over ----
   $effect(() => {
-    const d = dark
-    if (!ready || !map || d === styledDark) return
-    void restyle(map, d, DEM)
+    const d = dark, withDem = dem
+    if (!ready || !map || (d === styledDark && withDem === styledDem)) return
+    void restyle(map, d, withDem)
   })
 
   // ---- the projection: flat (mercator) or the globe; the layers stay as they are, MapLibre redraws them ----
@@ -376,7 +389,7 @@
   }
 
   // the slot on the map now, mounted under the first part that draws (a vector part's fill, else the first layer of ours),
-  // else under the basemap's sea surface (its land mask, once the tiers are on)
+  // else under the basemap's sea surface; under the land mask once the tiers are on (basemapTiles.ts `slotBefore`)
   let mounted: LayerSlot | null = null
   let mountedT: string | null = null
   function mountSlot(m: MlMap) {
@@ -384,7 +397,7 @@
     mounted?.unmount(m)
     mounted = slot
     mountedT = slotT
-    const before = slotBeforeId(m.getStyle().layers.map(l => l.id).filter(isOurs), { fallback: sea })
+    const before = slotBefore(m.getStyle().layers.map(l => l.id), isOurs, sea)
     slot?.mount(m, before, slotT)
     mountSlot2(m, before)
     waitSlot(m)
