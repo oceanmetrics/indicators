@@ -94,7 +94,7 @@ def test_the_stats_upload_is_a_dry_run_unless_om_stats_publish_is_publish():
   st = step("list the stats files, and upload them only when OM_STATS_PUBLISH is publish")
   assert st["id"] == "stats" and st["env"]["OM_STATS_PUBLISH"] == "${{ vars.OM_STATS_PUBLISH }}"
   script = st["run"]
-  assert "mode=dry-run\n" in script and '[ "${OM_STATS_PUBLISH:-}" = publish ] && mode=publish' in script
+  assert "mode=dry-run\n" in script and 'elif [ "${OM_STATS_PUBLISH:-}" = publish ]; then' in script
   upload, dry = script.split('if [ "$mode" = publish ]; then', 1)[1].split("else", 1)
   assert "aws s3 cp" in upload and "s3://oceanmetrics.io-public/gazetteer/$f" in upload
   assert "aws s3 cp" not in script.split('if [ "$mode" = publish ]; then', 1)[0] and "aws s3" not in dry
@@ -117,3 +117,75 @@ def test_a_dry_run_neither_rebuilds_nor_closes_and_says_so_on_the_issue():
 def test_the_header_states_why_the_default_is_a_dry_run():
   head = WF_TEXT.split("name: requests", 1)[0]
   assert "OM_STATS_PUBLISH" in head and "ledger 2026-10-23" in head and "om-extract run" in head
+
+
+# ---- the refresh label and the manual dispatch (2026-10-23) ----
+
+ON = WF.get("on", WF.get(True))                      # PyYAML reads the key `on` as True
+
+
+def test_the_dispatch_takes_a_place_a_collection_a_dataset_a_variable_and_publish_off_by_default():
+  inputs = ON["workflow_dispatch"]["inputs"]
+  assert set(inputs) == {"place", "coll", "dataset", "variable", "publish"}
+  for k in ("place", "coll", "dataset", "variable"):
+    assert inputs[k]["required"] is True and inputs[k]["type"] == "string"
+  assert inputs["publish"]["type"] == "boolean" and inputs["publish"]["default"] is False
+  assert "issues" in ON                                  # the issue events are still there
+
+
+def test_a_dispatch_runs_the_same_run_job_without_triage_and_the_job_survives_the_skipped_triage():
+  cond = " ".join(RUN["if"].split())
+  assert RUN["needs"] == "triage" and cond.startswith("!cancelled() && (github.event_name == 'workflow_dispatch' ||")
+  assert "github.event_name == 'workflow_dispatch'" not in WF["jobs"]["triage"].get("if", "")
+  assert "github.event.issue.state == 'open'" in WF["jobs"]["triage"]["if"]          # no issue, no triage
+  assert RUN["env"]["EVENT"] == "${{ github.event_name }}"
+
+
+def test_the_dispatch_job_is_built_from_environment_and_checked_like_any_other():
+  s = step("the job from the dispatch inputs, checked")
+  assert s["if"] == "github.event_name == 'workflow_dispatch'"
+  assert s["env"] == {"IN_PLACE": "${{ inputs.place }}", "IN_COLL": "${{ inputs.coll }}",
+                      "IN_DATASET": "${{ inputs.dataset }}", "IN_VARIABLE": "${{ inputs.variable }}"}
+  assert "check-job job.json" in s["run"] and '"erddap:" + $dataset + ":" + $variable + ":mean"' in s["run"]
+  assert "inputs." not in s["run"]
+  # the issue's own steps do not run on a dispatch
+  assert step("check the job again")["if"] == "github.event_name != 'workflow_dispatch'"
+  dl = next(x for x in RUN["steps"] if x.get("uses", "").startswith("actions/download-artifact"))
+  assert dl["if"] == "github.event_name != 'workflow_dispatch'"
+  assert step_by_id("cap")["if"].startswith("github.event_name == 'issues'")
+
+
+def step_by_id(i):
+  return next(s for s in RUN["steps"] if s.get("id") == i)
+
+
+def test_publish_true_sets_the_same_mode_as_the_variable_and_a_dispatch_ignores_the_variable():
+  st = step("list the stats files, and upload them only when OM_STATS_PUBLISH is publish")
+  assert st["env"]["DISPATCH_PUBLISH"] == "${{ inputs.publish }}"
+  script = st["run"]
+  assert 'if [ "$EVENT" = workflow_dispatch ]; then' in script
+  assert 'if [ "${DISPATCH_PUBLISH:-}" = true ]; then mode=publish; fi' in script
+  assert 'elif [ "${OM_STATS_PUBLISH:-}" = publish ]; then\n  mode=publish' in script
+  assert script.count("mode=publish") == 2 and "mode=dry-run\n" in script
+
+
+def test_a_dispatch_neither_comments_nor_closes_and_writes_the_summary_instead():
+  for name in ("answer the issue", "answer the issue (a dry run, computed but not published)", "say so when it failed"):
+    assert "github.event_name == 'issues'" in step(name)["if"], name
+  assert step("daily cap (automatic runs only; a maintainer's `run` label is not capped)")["if"].startswith("github.event_name == 'issues'")
+  summ = step("write the summary (a dispatch)")
+  assert "github.event_name == 'workflow_dispatch'" in summ["if"] and "$GITHUB_STEP_SUMMARY" in summ["run"]
+  assert "gh issue" not in summ["run"]
+
+
+def test_a_refresh_label_counts_only_from_someone_with_write_access():
+  assert "refresh" in WF["jobs"]["triage"]["outputs"]
+  tri = next(s for s in WF["jobs"]["triage"]["steps"] if s.get("id") == "triage")
+  assert tri["env"]["SENDER"] == "${{ github.event.sender.login }}"
+  script = tri["run"]
+  assert 'gh api "repos/$REPO/collaborators/$SENDER/permission"' in script
+  assert "admin|maintain|write) runflag=(--run-label)" in script and '"${runflag[@]}"' in script
+  # a refresh is announced on the issue, though the `run` label otherwise re-checks silently
+  assert '[ "$ACTION" != labeled ] || [ "$refresh" = true ]' in script
+  # the run job takes it as it takes an approved request: only on the `run` label
+  assert "outputs.approvable == 'true'" in RUN["if"] and "github.event.label.name == 'run'" in RUN["if"]

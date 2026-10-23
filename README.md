@@ -448,7 +448,7 @@ Anyone with a GitHub account can ask for an indicator the catalog does not hold 
    - `auto`: the indicator is in the manifest, comes from erddap-places, the place's polygon is published by the
      gazetteer or served one place at a time by its publisher (the Marine Regions EEZs, `raster.feature_url`), and the
      job is under 50 million grid values;
-   - `already`: the values exist;
+   - `already`: the values exist (a maintainer's `run` label turns it into a refresh, below);
    - `needs-review`: anything else, for a maintainer. Some of these a maintainer can accept with one label, see
      "Accepting a request that needs review" below.
 3. **The run, on the Mac mini:** an `auto` request runs by itself while the repository variable `REQUESTS_AUTORUN` is
@@ -470,6 +470,24 @@ Anyone with a GitHub account can ask for an indicator the catalog does not hold 
      and published, and the bot comments the Place view link and closes the issue.
 
    Issue #1 (Wells NERR, precipitation) is the worked example (run by erddap-places before the switch).
+
+   **Refreshing existing values.** A maintainer's `run` label on an `already` ERDDAP request recomputes the place: the
+   triage makes the job a new request would get (the label stays `already`, the job has `approvable` and `refresh`
+   true), comments "refreshing the existing values", and the run job takes it like an accepted request, with the same
+   dry run or `publish` as above. The label counts only when its labeler has write access (the triage step asks the
+   collaborators API; a label from anyone else leaves the request `already`). Without the label, or for a Copernicus Marine
+   request or a job over the size limit, an `already` request has no job. This is how the 36 existing sanctuary units
+   are recomputed through `requests.yml`.
+
+   **Running it without an issue.** `workflow_dispatch` on `requests.yml` runs the same job from inputs `place`, `coll`,
+   `dataset`, `variable` (the indicator is `erddap:<dataset>:<variable>:mean`, checked like any job) and `publish`
+   (default false). It skips the triage and the comment-and-close steps and writes a summary on the run page. `publish`
+   true is the dispatch's `OM_STATS_PUBLISH=publish` (upload, requested-items list, catalog rebuild); false is a dry run
+   whatever the repository variable says. For example, the sanctuary NMS:CINMS, sea surface temperature, published:
+
+   ```sh
+   gh workflow run requests.yml -R oceanmetrics/indicators -f place=NMS:CINMS -f coll=places -f dataset=dhw_5km -f variable=CRW_SST -f publish=true
+   ```
 
 Requesters are answered on the issue only; no email is sent.
 

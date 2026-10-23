@@ -25,11 +25,47 @@
 # REQUESTS_PER_DAY, default 10, in 24 h); otherwise, or past the cap, a maintainer starts it by adding the `run` label
 # (only people with triage access can add labels, and labels this workflow's own token adds start no run; REQUESTS_AUTORUN
 # never starts a Copernicus Marine request). requesters are answered on the issue only: no email (yet).
+#
+# refresh: a maintainer's `run` label on an `already` request (the place has values for it) is a refresh of the existing
+# values: triage gives the job a new request would get, with approvable and refresh true, and the run job takes it like an
+# approved request (how the existing sanctuary units are recomputed). the label is maintainer-only twice over: GitHub lets
+# only people with triage access add labels, and the triage step passes --run-label only when the labeler (the event's
+# sender) has write, maintain or admin permission on the repository (the collaborators API), so a refresh never starts
+# on a label from anyone else.
+#
+# workflow_dispatch: the same run job without an issue (the place, collection, dataset and variable as inputs; the
+# indicator is erddap:<dataset>:<variable>:mean, checked by check-job like any job). triage and the comment-and-close steps
+# are skipped and the job writes its summary to the run page instead. `publish` (default false) is the dispatch's
+# OM_STATS_PUBLISH: true uploads the stats files and rebuilds the catalog, false is a dry run; OM_STATS_PUBLISH itself
+# applies to issue runs only.
 name: requests
 
 on:
   issues:
     types: [opened, edited, reopened, labeled]
+  workflow_dispatch:
+    inputs:
+      place:
+        description: place_id, like NMS:CINMS
+        required: true
+        type: string
+      coll:
+        description: the place's collection slug, like places
+        required: true
+        type: string
+      dataset:
+        description: ERDDAP dataset id, like dhw_5km
+        required: true
+        type: string
+      variable:
+        description: variable of the dataset, like CRW_SST
+        required: true
+        type: string
+      publish:
+        description: upload the stats files to gazetteer/stats/ and rebuild the catalog (false is a dry run)
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -47,6 +83,7 @@ jobs:
     outputs:
       label: ${{ steps.triage.outputs.label }}
       approvable: ${{ steps.triage.outputs.approvable }}
+      refresh: ${{ steps.triage.outputs.refresh }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -59,21 +96,32 @@ jobs:
           AUTORUN: ${{ vars.REQUESTS_AUTORUN }}
           ACTION: ${{ github.event.action }}
           LABEL: ${{ github.event.label.name }}
+          SENDER: ${{ github.event.sender.login }}
+          REPO: ${{ github.repository }}
         run: |
           printf '%s' "$BODY" > body.md
+          # the `run` label refreshes an `already` request only when its labeler can write to the repository
+          runflag=()
+          if [ "$ACTION" = labeled ] && [ "$LABEL" = run ]; then
+            perm=$(gh api "repos/$REPO/collaborators/$SENDER/permission" --jq .permission 2>/dev/null || echo none)
+            echo "the run label was added by a user with $perm permission"
+            case "$perm" in admin|maintain|write) runflag=(--run-label) ;; esac
+          fi
           uv run python -m om_indicators.requests triage --body body.md --out triage.json --comment comment.md \
-            --autorun "${AUTORUN:-off}"
+            --autorun "${AUTORUN:-off}" "${runflag[@]}"
           label=$(jq -r .label triage.json)
           approvable=$(jq -r '.approvable // false' triage.json)
+          refresh=$(jq -r '.refresh // false' triage.json)
           echo "label=$label" >> "$GITHUB_OUTPUT"
           echo "approvable=$approvable" >> "$GITHUB_OUTPUT"
+          echo "refresh=$refresh" >> "$GITHUB_OUTPUT"
           for l in auto already needs-review; do
             gh label create "$l" --color ededed --force >/dev/null 2>&1 || true
             [ "$l" = "$label" ] || gh issue edit "$NUM" --remove-label "$l" >/dev/null 2>&1 || true
           done
           gh issue edit "$NUM" --add-label "$label"
-          # a maintainer's `run` label re-checks the request without commenting again
-          [ "$ACTION" = labeled ] || gh issue comment "$NUM" --body-file comment.md
+          # a maintainer's `run` label re-checks the request without commenting again, except a refresh, which says so
+          if [ "$ACTION" != labeled ] || [ "$refresh" = true ]; then gh issue comment "$NUM" --body-file comment.md; fi
           # the `run` label on a request nothing can run says so, instead of doing nothing
           if [ "$ACTION" = labeled ] && [ "$LABEL" = run ] && [ "$label" = needs-review ] && [ "$approvable" != true ]; then
             gh issue comment "$NUM" --body "The \`run\` label starts a request only when this bot says a maintainer can accept it that way; this one needs a maintainer's own work (see the reasons above)."
@@ -87,11 +135,13 @@ jobs:
   run:
     needs: triage
     # an `auto` request runs by itself (REQUESTS_AUTORUN) or on the `run` label; a request triage marked approvable (a
-    # Copernicus Marine one) runs only on a maintainer's `run` label, never by itself
+    # Copernicus Marine one, or a refresh of existing values) runs only on a maintainer's `run` label, never by itself; a
+    # manual dispatch runs without an issue (triage is skipped then, so !cancelled() keeps the job from being skipped with it)
     if: >-
+      !cancelled() && (github.event_name == 'workflow_dispatch' ||
       (needs.triage.outputs.label == 'auto' &&
        ((github.event.action != 'labeled' && vars.REQUESTS_AUTORUN == 'on') || github.event.label.name == 'run')) ||
-      (needs.triage.outputs.approvable == 'true' && github.event.action == 'labeled' && github.event.label.name == 'run')
+      (needs.triage.outputs.approvable == 'true' && github.event.action == 'labeled' && github.event.label.name == 'run'))
     # the Mac mini's second runner, for short jobs: on the first (`macmini`) a request waited behind erddap-places' daily
     # precompute, which runs for hours (issue #2, 2026-10-20)
     runs-on: [self-hosted, macmini-quick]
@@ -104,19 +154,35 @@ jobs:
       NUM: ${{ github.event.issue.number }}
       GH_TOKEN: ${{ github.token }}
       ACTION: ${{ github.event.action }}
+      EVENT: ${{ github.event_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
+        if: github.event_name != 'workflow_dispatch'
         with:
           name: triage
       - name: check the job again
+        if: github.event_name != 'workflow_dispatch'
         run: |
           export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
           jq '.job' triage.json > job.json
           uv run python -m om_indicators.requests check-job job.json >> "$GITHUB_ENV"
+      # the dispatch's job from its inputs (passed as environment, never spliced into the script), checked like any other
+      - name: the job from the dispatch inputs, checked
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          IN_PLACE: ${{ inputs.place }}
+          IN_COLL: ${{ inputs.coll }}
+          IN_DATASET: ${{ inputs.dataset }}
+          IN_VARIABLE: ${{ inputs.variable }}
+        run: |
+          export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+          jq -n --arg place "$IN_PLACE" --arg coll "$IN_COLL" --arg dataset "$IN_DATASET" --arg variable "$IN_VARIABLE" \
+            '{place: $place, coll: $coll, dataset: $dataset, variable: $variable, indicator: ("erddap:" + $dataset + ":" + $variable + ":mean")}' > job.json
+          uv run python -m om_indicators.requests check-job job.json >> "$GITHUB_ENV"
       - name: daily cap (automatic runs only; a maintainer's `run` label is not capped)
         id: cap
-        if: github.event.action != 'labeled'
+        if: github.event_name == 'issues' && github.event.action != 'labeled'
         run: |
           since=$(date -u -v-1d +%Y-%m-%dT%H:%M:%SZ)
           n=$(gh issue list --label auto-done --state closed --search "closed:>$since" --json number --jq length)
@@ -154,12 +220,18 @@ jobs:
         if: steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems'
         env:
           OM_STATS_PUBLISH: ${{ vars.OM_STATS_PUBLISH }}
+          DISPATCH_PUBLISH: ${{ inputs.publish }}
         run: |
           export PATH="/opt/homebrew/bin:$PATH"
           # dry-run by default: waits on the parity criterion, ledger 2026-10-23 (the engine writes nothing under
           # gazetteer/stats/ until Ben restates "bit for bit"); `publish` uploads
           mode=dry-run
-          [ "${OM_STATS_PUBLISH:-}" = publish ] && mode=publish
+          if [ "$EVENT" = workflow_dispatch ]; then
+            # a dispatch decides by its own `publish` input (default false), whatever OM_STATS_PUBLISH says
+            if [ "${DISPATCH_PUBLISH:-}" = true ]; then mode=publish; fi
+          elif [ "${OM_STATS_PUBLISH:-}" = publish ]; then
+            mode=publish
+          fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           cd out/gazetteer
           # the upload order: the parquet, its provenance, then the item (it records the others' size and checksum)
@@ -210,7 +282,7 @@ jobs:
             || echo "::warning::the change files were not written; recover them with scripts/backfill_changes.mjs"
           scripts/publish_catalog.sh
       - name: answer the issue
-        if: steps.cap.outputs.over != '1' && (env.REQ_FAMILY == 'cmems' || steps.stats.outputs.mode == 'publish')
+        if: github.event_name == 'issues' && steps.cap.outputs.over != '1' && (env.REQ_FAMILY == 'cmems' || steps.stats.outputs.mode == 'publish')
         run: |
           link="https://oceanmetrics.io/indicators/#view=place&place=${REQ_PLACE}&coll=${REQ_COLL}&ind=${REQ_INDICATOR}"
           # a run that started by itself is `auto-done`, which the daily cap counts; one a maintainer started with the `run`
@@ -221,15 +293,36 @@ jobs:
           gh issue edit "$NUM" --add-label "$done"
           gh issue close "$NUM" --reason completed
       - name: answer the issue (a dry run, computed but not published)
-        if: steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems' && steps.stats.outputs.mode != 'publish'
+        if: github.event_name == 'issues' && steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems' && steps.stats.outputs.mode != 'publish'
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           n=$(wc -l < out/stats_files.txt | tr -d ' ')
           gh issue comment "$NUM" --body "Computed, not published yet: the new extraction engine wrote $n stats file(s) for this place, attached to the run as the \`stats\` artifact ($RUN_URL). Publishing them waits on a maintainer's check of the engine against the published statistics; the issue stays open and a maintainer re-runs it with the \`run\` label once publishing is on."
       - name: say so when it failed
-        if: failure()
+        if: failure() && github.event_name == 'issues'
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           gh issue comment "$NUM" --body "The run failed; a maintainer will look at it. Run log: $RUN_URL"
+      # a dispatch has no issue to answer: the run page says what was computed and whether it was published
+      - name: write the summary (a dispatch)
+        if: always() && github.event_name == 'workflow_dispatch'
+        env:
+          JOB_STATUS: ${{ job.status }}
+          MODE: ${{ steps.stats.outputs.mode }}
+        run: |
+          {
+            echo "### requests dispatch: ${REQ_INDICATOR:-no valid job} at ${REQ_PLACE:-?} (${REQ_COLL:-?})"
+            echo
+            echo "- status: $JOB_STATUS, mode: ${MODE:-not reached}"
+            if [ -f out/stats_files.txt ]; then
+              echo "- $(wc -l < out/stats_files.txt | tr -d ' ') stats file(s):"
+              sed 's/^/  - `/; s/$/`/' out/stats_files.txt
+            fi
+            if [ "$MODE" = publish ] && [ "$JOB_STATUS" = success ]; then
+              echo "- published; Place view: https://oceanmetrics.io/indicators/#view=place&place=${REQ_PLACE}&coll=${REQ_COLL}&ind=${REQ_INDICATOR}"
+            elif [ "$MODE" = dry-run ]; then
+              echo "- dry run: nothing uploaded to s3://oceanmetrics.io-public/gazetteer/stats/ (the files are in the \`stats\` artifact)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

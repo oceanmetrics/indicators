@@ -11,6 +11,10 @@ becomes a label and a comment, and a small known job runs by itself on the macmi
   (a vector collection, or a reference collection with a feature service) and a job under 10 M grid values. It is never
   run by itself (the producer uses a maintainer's own Copernicus Marine login); the sanctuaries (`places`) are
   noaa-onms/eco-indicators' and stay with a maintainer.
+- **refresh:** a maintainer's `run` label on an `already` ERDDAP request is a refresh (how the 36 existing sanctuary
+  units can be recomputed through `requests.yml`): the triage makes the job it would make for a new request, with
+  `approvable` and `refresh` true, and the label stays `already`. Without the `run` label an `already` request has no job.
+  The workflow passes the label only when the labeler has write access (`--run-label`).
 - **never trust the issue:** every value that reaches a command is checked against a strict pattern and against the
   published lists here, again in the job, and passed as data (environment, JSON), never spliced into a shell line.
   The requester's email never goes into the issue: the form says so, and nothing here reads one.
@@ -73,6 +77,7 @@ class Triage:
   estimate: int | None = None
   links: dict[str, str] = field(default_factory=dict)
   approvable: bool = False        # needs-review, but a maintainer can accept it with the `run` label
+  refresh: bool = False           # `already`, and a maintainer's `run` label asked to recompute the existing values
 
 
 def _first_token(s: str) -> str:
@@ -170,9 +175,11 @@ def _classify_cmems(ind: dict, ind_id: str, place: str, coll: str, row: dict, la
 
 
 def classify(form: dict[str, str], manifest: dict, layers: dict, place_row: Callable[[str], dict | None],
-             dims: Callable[[str], dict], coverage_has: Callable[[str, str, str], bool], today: dt.date) -> Triage:
+             dims: Callable[[str], dict], coverage_has: Callable[[str, str, str], bool], today: dt.date,
+             run_label: bool = False) -> Triage:
   """the label and reasons for a parsed request. `place_row(place_id)` → the gazetteer index row (place_id, name,
-  collection, bbox …) or None; `dims(stac_url)` → the dataset's cube:dimensions; `coverage_has(place, coll, ind)`."""
+  collection, bbox …) or None; `dims(stac_url)` → the dataset's cube:dimensions; `coverage_has(place, coll, ind)`.
+  `run_label` = a maintainer's `run` label is on the issue: on an `already` ERDDAP request it makes a refresh."""
   place = _first_token(form.get("place", ""))
   coll = _first_token(form.get("collection", ""))
   ind_id = _first_token(form.get("indicator", ""))
@@ -194,7 +201,17 @@ def classify(form: dict[str, str], manifest: dict, layers: dict, place_row: Call
     return Triage("needs-review", reasons + [f"{ind_id} is not in the manifest: a new dataset or method needs a maintainer"])
   links = {"place": f"{VIEWER}#view=place&place={place}&coll={coll}&ind={ind_id}"}
   if coverage_has(place, coll, ind_id):
-    return Triage("already", reasons + [f"{place} already has values for {ind['short']}"], links=links)
+    have = reasons + [f"{place} already has values for {ind['short']}"]
+    if not (run_label and ind["producer"]["name"] == "erddap-places"):
+      return Triage("already", have, links=links)
+    # a maintainer's `run` label: the job a new request would get, as a refresh of the existing values
+    fresh = classify(form, manifest, layers, place_row, dims, lambda p, c, i: False, today)
+    if fresh.label != "auto":
+      return Triage("already", have + ["not refreshed: " + r for r in fresh.reasons], links=links)
+    return Triage("already", have + [f"refreshing the existing values (about {fresh.estimate / 1e6:,.1f} M grid values)"
+                                     if fresh.estimate >= 100_000 else
+                                     f"refreshing the existing values ({fresh.estimate:,} grid values)"],
+                  job=fresh.job, estimate=fresh.estimate, links=links, approvable=True, refresh=True)
   if ind_id.startswith("cmems:") and ind["producer"]["name"] == CMEMS_PRODUCER:
     return _classify_cmems(ind, ind_id, place, coll, row, layers, reasons, links)
   if ind["producer"]["name"] != "erddap-places":
@@ -261,9 +278,11 @@ def comment(t: Triage, form: dict[str, str], autorun: bool = True) -> str:
   review = ("This request needs a maintainer, who will reply here. A maintainer can accept it by adding the `run` label; it runs "
             "on Copernicus Marine with the maintainer's account, and this issue then gets a comment with the link when the "
             "values are published.") if t.approvable else "This request needs a maintainer, who will reply here."
+  refresh = ("These values exist already. A maintainer added the `run` label, so this run is refreshing the existing values "
+             "on the Ocean Metrics runner; this issue gets a comment with the link when the refreshed values are published.")
   head = {
     "auto": auto,
-    "already": "These values exist already.",
+    "already": refresh if t.refresh else "These values exist already.",
     "needs-review": review,
   }[t.label]
   lines = [head, ""] + [f"- {r}" for r in t.reasons]
@@ -307,6 +326,8 @@ def main(argv: list[str] | None = None) -> int:
   t.add_argument("--comment", type=Path, required=True, help="comment markdown")
   t.add_argument("--catalog", default=CATALOG)
   t.add_argument("--autorun", default="on", help="the repo variable REQUESTS_AUTORUN: `on` runs small requests by themselves")
+  t.add_argument("--run-label", action="store_true",
+                 help="a maintainer (write access, checked by the workflow) added the `run` label: an `already` ERDDAP request becomes a refresh")
   c = sub.add_parser("check-job", help="re-check a job JSON; prints KEY=value lines for $GITHUB_ENV")
   c.add_argument("job", type=Path)
   ai = sub.add_parser("add-item", help="add a job's stats item to the requested-items list (read from --list, a path or URL)")
@@ -322,7 +343,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0
   if a.cmd == "triage":
     form = parse_issue_form(a.body.read_text())
-    tri = classify(form, *_load_network(a.catalog), today=dt.date.today())
+    tri = classify(form, *_load_network(a.catalog), today=dt.date.today(), run_label=a.run_label)
     a.out.write_text(json.dumps(asdict(tri), indent=2))
     a.comment.write_text(comment(tri, form, autorun=a.autorun == "on"))
     print(tri.label)

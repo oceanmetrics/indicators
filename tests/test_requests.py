@@ -67,8 +67,8 @@ DIMS = {"time": {"extent": ["1985-04-01T12:00:00Z", None], "step": "P1D"},
 TODAY = dt.date(2026, 10, 20)
 
 
-def run(form, has=False):
-  return classify(form, MANIFEST, LAYERS, ROWS.get, lambda url: DIMS, lambda p, c, i: has, TODAY)
+def run(form, has=False, run_label=False):
+  return classify(form, MANIFEST, LAYERS, ROWS.get, lambda url: DIMS, lambda p, c, i: has, TODAY, run_label=run_label)
 
 
 def test_parse_reads_each_field_and_empties_no_response():
@@ -289,3 +289,38 @@ def test_a_tiny_job_says_its_count_in_full():
   dims = {**DIMS, "time": {"extent": ["2025-01-01T00:00:00Z", "2025-12-31T00:00:00Z"], "step": "P1M"}}
   t = classify({"place": "NERR:ELK", "indicator": "erddap:dhw_5km:CRW_SST:mean"}, MANIFEST, LAYERS, ROWS.get, lambda url: dims, lambda p, c, i: False, TODAY)
   assert t.reasons[-1] == "48 grid values: small enough to run by itself"  # 2 x 2 cells of 0.05 deg x 12 months
+
+
+# ---- the `run` label on values that exist is a refresh (2026-10-23) ----
+
+def test_an_already_request_with_the_run_label_is_a_refresh_with_the_job_a_new_request_gets():
+  new = run(parse_issue_form(BODY))
+  t = run(parse_issue_form(BODY), has=True, run_label=True)
+  assert t.label == "already" and t.refresh and t.approvable
+  assert t.job == new.job and t.estimate == new.estimate
+  assert any("refreshing the existing values" in r for r in t.reasons)
+  assert check_job(t.job) == t.job and job_family(t.job) == "erddap"
+
+
+def test_an_already_request_without_the_run_label_stays_already_with_no_job():
+  t = run(parse_issue_form(BODY), has=True)
+  assert t.label == "already" and t.job is None and not t.approvable and not t.refresh
+
+
+def test_the_run_label_changes_nothing_for_a_request_without_values():
+  assert run(parse_issue_form(BODY), run_label=True) == run(parse_issue_form(BODY))
+
+
+def test_the_refresh_comment_says_the_existing_values_are_refreshed():
+  c = comment(run(parse_issue_form(BODY), has=True, run_label=True), {})
+  assert c.startswith("These values exist already. A maintainer added the `run` label") and "refreshing the existing values" in c
+  assert comment(run(parse_issue_form(BODY), has=True), {}).startswith("These values exist already.\n")
+
+
+def test_a_refresh_is_for_erddap_requests_only_and_never_over_the_size_limit():
+  # a Copernicus Marine request keeps its own accept path; a job too big for the runner is not refreshed
+  t = run({"place": "MRGID:5670", "indicator": NO3}, has=True, run_label=True)
+  assert t.label == "already" and t.job is None and not t.refresh and not t.approvable
+  t = run({"place": "BIG:1", "indicator": "erddap:dhw_5km:CRW_SST:mean"}, has=True, run_label=True)
+  assert t.label == "already" and t.job is None and not t.refresh and not t.approvable
+  assert any(r.startswith("not refreshed: about") for r in t.reasons)
