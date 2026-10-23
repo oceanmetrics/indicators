@@ -6,7 +6,8 @@ import { describe, expect, it } from 'vitest'
 import { parquetWriteBuffer } from 'hyparquet-writer'
 import { asyncBufferFromFile, parquetReadObjects } from 'hyparquet'
 import { validate } from '@oceanmetrics/catalog/validate'
-import { DIFF_COLUMNS, run } from './changes.ts'
+import { CATALOG_OPENED, DIFF_COLUMNS, foldOpened, run } from './changes.ts'
+import type { ChangeRow } from '@oceanmetrics/catalog/changes'
 
 type Row = Record<(typeof DIFF_COLUMNS)[number], string | number | null>
 const r = (place_id: string, indicator: string, time_grain: string, last_time: string | null, last_value: number | null, status: string | null = null, status_method: string | null = null): Row =>
@@ -115,5 +116,36 @@ describe('changes:build on a fixture pair', () => {
     const cat = catalog(AFTER)
     const { rows } = await run(opts(cat, join(dir, 'coverage.parquet')))
     expect(rows).toHaveLength(2)
+  })
+})
+
+describe('the catalog opening in the feeds', () => {
+  const row = (place_id: string, indicator: string, kind: ChangeRow['kind'], seen: string): ChangeRow => ({
+    place_id, place_name: place_id === 'NMS:A' ? 'Alpha Sanctuary' : null, coll: 'places', place_coll: 'places', indicator, kind, time_grain: 'year',
+    from_status: null, to_status: null, from_time: null, to_time: '2025-01-01', value: 1, unit: null, sentence: `${indicator} ${kind}`, seen,
+  })
+  it('folds the opening day\'s new rows to one entry per place, in place of its first; other days and kinds untouched', () => {
+    expect(CATALOG_OPENED).toBe('2026-10-20')
+    const rows = [
+      row('NMS:A', 'a:1', 'new', '2026-10-23'),
+      row('NMS:A', 'a:1', 'new', '2026-10-20'), row('NMS:B', 'a:1', 'new', '2026-10-20'), row('NMS:A', 'a:2', 'new', '2026-10-20'),
+      row('NMS:A', 'a:3', 'status', '2026-10-20'),
+    ]
+    expect(foldOpened(rows).map(r => [r.place_id, r.indicator, r.kind, r.seen, r.sentence])).toEqual([
+      ['NMS:A', 'a:1', 'new', '2026-10-23', 'a:1 new'],
+      ['NMS:A', '', 'new', '2026-10-20', 'Catalog opened: 2 indicators in Alpha Sanctuary have their first values (the first full build, 2026-10-20).'],
+      ['NMS:B', '', 'new', '2026-10-20', 'Catalog opened: 1 indicator in NMS:B has its first values (the first full build, 2026-10-20).'],
+      ['NMS:A', 'a:3', 'status', '2026-10-20', 'a:3 status'],
+    ])
+  })
+  it('the change file keeps every row; the feed links the place view with no indicator', async () => {
+    const cat = catalog(AFTER)
+    await run({ ...opts(cat, prevFile(BEFORE)), date: '2026-10-20' })
+    expect(json(cat, 'changes/2026-10-20.json')).toHaveLength(2)
+    const feed = readFileSync(join(cat, 'feeds/place=NMS:A.xml'), 'utf8')
+    expect(feed.match(/<entry>/g)).toHaveLength(2)   // the status row and one fold
+    expect(feed).toContain('Catalog opened: 1 indicator in Alpha Sanctuary has its first values')
+    expect(feed).toContain('href="https://oceanmetrics.io/indicators/#view=place&amp;place=NMS:A&amp;coll=places"/>')
+    expect(validate('feeds-index', json(cat, 'feeds/index.json')).errors).toEqual([])
   })
 })

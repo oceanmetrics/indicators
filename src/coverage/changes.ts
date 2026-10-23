@@ -5,6 +5,7 @@
 //                                                published file, so a re-run on the same day adds only what is new)
 //   <catalog>/changes/latest.json                every build: checked_at, the last non-empty file, the last 30 files
 //   <catalog>/feeds/{all,coll=<slug>,set=<id>,place=<id>}.xml and feeds/index.json   the Atom feeds over the last 30 files
+//                                                (the opening day's `new` rows folded per place: foldOpened)
 // every row, latest.json and feeds/index.json are validated against their schemas (@oceanmetrics/catalog/validate)
 // before anything is written. scripts/publish_changes.sh uploads them (called by publish_catalog.sh). the pure part,
 // changeFiles(), is shared with scripts/backfill_changes.mjs.
@@ -55,6 +56,34 @@ export function changesParquet(rows: ChangeRow[], meta: Record<string, string>):
   }))
 }
 
+/**
+ * the day the catalog opened: its first full build made every cell `new` (16,871 rows on 2026-10-20). in the feeds only,
+ * that day's `new` rows fold to one entry per place and values collection ("catalog opened"), so a place's feed opens
+ * with one line instead of dozens; the change file (json and parquet) keeps every row.
+ */
+export const CATALOG_OPENED = '2026-10-20'
+
+/** the feed rows: the opening day's `new` rows folded per place (an entry with no indicator links the place's view) */
+export function foldOpened(rows: ChangeRow[], opened = CATALOG_OPENED): ChangeRow[] {
+  const folds = new Map<string, ChangeRow[]>()
+  const out: (ChangeRow | string)[] = []
+  for (const r of rows) {
+    if (r.seen !== opened || r.kind !== 'new') { out.push(r); continue }
+    const k = `${r.place_id}\u0000${r.coll}`
+    if (!folds.has(k)) { folds.set(k, []); out.push(k) }
+    folds.get(k)!.push(r)
+  }
+  return out.map(x => {
+    if (typeof x !== 'string') return x
+    const rs = folds.get(x)!
+    const n = new Set(rs.map(r => r.indicator)).size
+    return {
+      ...rs[0], indicator: '', value: null, unit: null,
+      sentence: `Catalog opened: ${n} indicator${n === 1 ? '' : 's'} in ${rs[0].place_name || rs[0].place_id} ${n === 1 ? 'has its' : 'have their'} first values (the first full build, ${opened}).`,
+    }
+  })
+}
+
 const fail = (what: string, errors: string[]) => { if (errors.length) throw new Error(`${what} does not validate: ${errors.slice(0, 5).join('; ')}`) }
 
 export interface ChangeFilesOptions {
@@ -89,7 +118,7 @@ export function changeFiles(o: ChangeFilesOptions): Map<string, string | Uint8Ar
   }
   fail('changes/latest.json', validate('changes-latest', latest).errors)
   // the feeds read the recent files, newest first
-  const rows = dates.flatMap(d => o.days.get(d)!)
+  const rows = foldOpened(dates.flatMap(d => o.days.get(d)!))
   const feeds = feedsFor(rows, o.places)
   const newest = (rs: ChangeRow[]) => rs.reduce<string | null>((m, r) => (m == null || r.seen > m ? r.seen : m), null)
   const allNewest = newest(rows)

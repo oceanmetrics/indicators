@@ -260,7 +260,9 @@ back to the Place view; `?theme=` and `?brand=` work as in the app, and `main.em
   changes; merged with the day's published file, so a re-run adds only what is new), `catalog/changes/latest.json` (every
   build: `checked_at`, the last non-empty day, the last 30 files) and the Atom feeds `catalog/feeds/all.xml`,
   `coll=<slug>.xml`, `set=<id>.xml`, `place=<id>.xml` (every place with a coverage row, an empty feed until its first
-  change; the newest 100 entries of the last 30 files) with `feeds/index.json`, each validated against its schema.
+  change; the newest 100 entries of the last 30 files; the opening day's `new` rows, 2026-10-20, fold to one "Catalog
+  opened" entry per place, `foldOpened`, while its change file keeps every row) with `feeds/index.json`, each validated
+  against its schema.
   `scripts/publish_changes.sh` uploads them (called by `publish_catalog.sh` after `coverage.parquet` and before
   `indicators.json`; `latest.json` last; nothing deleted). The step is `continue-on-error`: a failure never blocks the
   catalog, and a missed day is recovered from the bucket's object versions with `scripts/backfill_changes.mjs` (the same
