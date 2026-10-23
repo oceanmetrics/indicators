@@ -13,8 +13,8 @@ import { gzipSync } from 'node:zlib'
 const DIST = new URL('../viewer/dist/assets/', import.meta.url).pathname
 // cssReport is the Report view's own lazy styles (its layouts and the two maps it holds), budgeted apart so the rest keeps its 15 kB
 // jsRest was 200 kB until 2026-10-23: raised to 205 kB for the shared card rules of @oceanmetrics/catalog and the Matrix's summary, sorts,
-// fold and pager (README "Size budget")
-const BUDGET = { jsEntry: 110_000, jsRest: 205_000, jsMap: 330_000, jsEngine: 160_000, css: 15_000, cssMap: 15_000, cssReport: 8_000 }   // bytes, gzip
+// fold and pager (README "Size budget"), and to 210 kB on 2026-10-23 for the shared bar's lazy chunk (@oceanmetrics/nav, 4.9 kB; README "Size budget")
+const BUDGET = { jsEntry: 110_000, jsRest: 210_000, jsMap: 330_000, jsEngine: 160_000, css: 15_000, cssMap: 15_000, cssReport: 8_000 }   // bytes, gzip
 
 const files = readdirSync(DIST)
 const manifest = JSON.parse(readFileSync(join(DIST, '..', '.vite', 'manifest.json'), 'utf8'))

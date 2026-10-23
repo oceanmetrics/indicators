@@ -11,5 +11,7 @@ import App from './App.svelte'
 const brand = parseBrand(location.search)
 applyBrand(brand)
 initTheme()
+// the shared bar is its own lazy chunk (4.9 kB gzip): the MBON instance never shows it, so it never pays for it
+if (brand !== 'mbon') import('@oceanmetrics/nav/define')
 
 export default mount(App, { target: document.getElementById('app')!, props: { brand } })

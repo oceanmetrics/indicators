@@ -34,3 +34,6 @@ body { min-height: 100dvh; overflow-x: hidden; }
 .om-h2 { margin: 0; font: var(--fw-bold) var(--text-xl) / 1.15 var(--font-display); color: var(--text-strong); text-wrap: balance }
 .om-h2:focus, .om-h2:focus-visible { outline: none }
 .om-marks li { display: flex; align-items: center; gap: var(--space-2); color: var(--text-strong); font: var(--type-small) }
+
+/* the shared bar reserves its row until its chunk defines it, so the page does not shift (@oceanmetrics/nav README) */
+om-nav:not(:defined) { display: block; min-height: 48px; }

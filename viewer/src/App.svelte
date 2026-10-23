@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte'
-  import { Button, Header, Notice } from '@marinebon/ui'
+  import { Button, Header, Menu, Notice, ThemeToggle, currentTheme, onThemeChange } from '@marinebon/ui'
   import { loadCatalog, loadLayers, resolveDataBase, collTitle } from './lib/data.ts'
   import type { Catalog, Indicator, Layers } from './lib/data.ts'
   import { carryOver, DEFAULT_STATE, groupHref, historyStep, mapToMatrixHref, matrixHref, matrixToMapHref, parseHash, placeToMapHref, serializeHash } from './lib/hash.ts'
@@ -10,9 +10,8 @@
   import { expandIndicators, expandPlaces } from '@oceanmetrics/catalog/report'
   import { cellModel, foldColumns, groupColumns, indexCoverage, pageRows, pickRow, ROW_CAP, selectionRollups, selectionRows, statusRank, withValues } from './lib/matrix.ts'
   import { producerCredits } from './lib/delivery.ts'
-  import { APP_NAME, TAGLINE, pageTitle } from './lib/brand/brand.ts'
+  import { APP_NAME, TAGLINE, navAttrs, pageTitle } from './lib/brand/brand.ts'
   import type { Brand } from './lib/brand/brand.ts'
-  import OmHeader from './lib/brand/OmHeader.svelte'
   import AppFooter from './lib/AppFooter.svelte'
   import SelectBar from './lib/SelectBar.svelte'
   import Toolbar from './lib/Toolbar.svelte'
@@ -30,6 +29,11 @@
   import { SHORTCUTS } from './lib/keys.ts'
 
   let { brand }: { brand: Brand } = $props()
+
+  // the shared bar (@oceanmetrics/nav) wears the viewer's resolved theme: the kit writes it to <html data-theme> and announces a change
+  let theme = $state(currentTheme())
+  onMount(() => onThemeChange(t => (theme = t)))
+  const nav = $derived(navAttrs(brand, theme))
 
   let selectBar = $state<{ showIndicators: () => void } | undefined>()
   // Help ▾ → Keyboard: the shortcuts (lib/keys.ts), a dismissible notice above the view
@@ -251,7 +255,16 @@
 {#if brand === 'mbon'}
   <Header appName={APP_NAME} tagline={TAGLINE} lens={lensWord} help={helpItems} {feedback} />
 {:else}
-  <OmHeader appName="Indicators" tagline={TAGLINE} lens={lensWord} help={helpItems} {feedback} />
+  <om-nav {...nav}>
+    <div class="nav-end">
+      <span class="nav-lens">{@render lensWord()}</span>
+      <Menu label="Help" align="end" variant="plain">
+        {#snippet children(close)}{@render helpItems(close)}{/snippet}
+      </Menu>
+      {@render feedback()}
+      <ThemeToggle />
+    </div>
+  </om-nav>
 {/if}
 
 <main class="lens" data-state={phase} data-brand={brand}>
@@ -311,12 +324,15 @@
 
 <style>
   .lens { flex: 1; }
+  .nav-end { display: flex; align-items: center; gap: var(--space-2); }
+  .nav-lens { font: var(--type-label); text-transform: uppercase; letter-spacing: var(--ls-label); color: var(--label-color); }
   .wrap { display: grid; gap: var(--space-4); padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right, 0px)) var(--space-6) max(var(--space-4), env(safe-area-inset-left, 0px)); max-width: var(--container-wide); margin: 0 auto; min-width: 0; }
   .status { margin: 0; color: var(--text-body); }
   .summary { display: flex; align-items: center; gap: var(--space-2); margin: 0; font: var(--type-small); color: var(--text-body); }
   .summary :global(svg) { color: var(--label-color); }
   @media (max-width: 640px) {
-    .fb { display: none; }
+    .fb, .nav-lens { display: none; }
+    .nav-end { gap: var(--space-1); }
     .wrap { padding-inline: var(--space-3); gap: var(--space-3); }
   }
 </style>
