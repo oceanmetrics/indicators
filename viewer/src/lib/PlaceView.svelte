@@ -5,6 +5,7 @@
   // with `ind=` the indicator the reader opened comes first ("You opened"): its card, or, when the place has no values
   // for it, a "not computed yet" card with the ways forward. a breadcrumb leads back to the Matrix cell it came from.
   import { onMount, tick, untrack } from 'svelte'
+  import { METHOD_NOTES } from '@oceanmetrics/status'
   import { Button, Notice } from '@marinebon/ui'
   import { Icon } from '../../../src/icons/index.ts'
   import { gazetteerPlaceHref } from './data.ts'
@@ -15,7 +16,7 @@
   import { cellModel, indexCoverage, pickRow, shortPlaceName, STATE_WORDS } from './matrix.ts'
   import { computedGroups } from './nextSteps.ts'
   import NextSteps from './NextSteps.svelte'
-  import { coveredIndicators, groupCards, METHOD_NOTES, placeCoverage } from './place.ts'
+  import { coveredIndicators, groupCards, placeCoverage } from './place.ts'
   import { asIcon } from './icons.ts'
   import IndicatorCard from './IndicatorCard.svelte'
   import PlacePicker from './pick/PlacePicker.svelte'

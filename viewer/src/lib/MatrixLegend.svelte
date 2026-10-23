@@ -2,8 +2,9 @@
   // the key to a cell, always shown above the grid: what each empty state means in one line, then the statistical
   // (not better or worse) status and trend glyphs. with the EOV vocabulary it also shows the GOOS badge and its credit.
   import { Icon } from '../../../src/icons/index.ts'
+  import { STATUS_WORDS } from '@oceanmetrics/status'
   import { GOOS_CREDIT } from './credits.ts'
-  import { STATE_WORDS, STATUS_WORDS } from './matrix.ts'
+  import { STATE_WORDS } from './matrix.ts'
   import type { VocabId } from './data.ts'
   import { badgeUrl } from './delivery.ts'
 

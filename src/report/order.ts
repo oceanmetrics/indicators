@@ -7,6 +7,11 @@
 //   centre of the place's bbox (`lat`, `lon`: src/coverage/centre.ts); a place with no position goes last. indicators: `az` (the
 //   default: by short title) or `vocab` (the vocabulary's own term order, a series together, its lead first, then the manifest
 //   order). `custom` on either: the reader's own order, `custom` below.
+// - the status sorts (the Matrix's sort select, build week 3), which read counts of the selection on display (`StatusRank`, made
+//   by the viewer from @oceanmetrics/catalog `rollups`): places by the count of cells above (`above`), below (`below`), or by
+//   the most recent period with a value (`recent`); indicators in series order, the leads first (`series`), or by the count of
+//   places above (`above`) or below (`below`). most first, a tie A-Z. without a rank (a caller that has no counts) they read
+//   as A-Z, `series` needs none.
 // - grouping, on by default: places by their home collection (the groups A-Z by title), indicators by the chosen vocabulary's
 //   category (the groups A-Z by label, "Other" last). off gives one flat list in which any item can go anywhere.
 // - `custom` is an id list: for a grouped axis it may begin with group entries, `g:<group id>` (a collection slug, a vocabulary
@@ -17,10 +22,32 @@
 // - the URL carries the custom list only for `custom`, as short as it can be: an entry is dropped when the order is the same
 //   without it (`compactCustom`), so moving one place writes a few ids, not all of them.
 
-export type PlaceSort = 'az' | 'ns' | 'sn' | 'we' | 'custom'
-export type IndicatorSort = 'az' | 'vocab' | 'custom'
-export const PLACE_SORTS: PlaceSort[] = ['az', 'ns', 'sn', 'we', 'custom']
-export const INDICATOR_SORTS: IndicatorSort[] = ['az', 'vocab', 'custom']
+export type PlaceSort = 'az' | 'ns' | 'sn' | 'we' | 'above' | 'below' | 'recent' | 'custom'
+export type IndicatorSort = 'az' | 'vocab' | 'series' | 'above' | 'below' | 'custom'
+export const PLACE_SORTS: PlaceSort[] = ['az', 'ns', 'sn', 'we', 'above', 'below', 'recent', 'custom']
+export const INDICATOR_SORTS: IndicatorSort[] = ['az', 'vocab', 'series', 'above', 'below', 'custom']
+
+/**
+ * the counts a status sort reads, per place id or indicator id: cells above and below their own record, and the latest period
+ * with a value (an ISO time, compared as text). an id the rank does not know counts 0 and has no period.
+ */
+export interface StatusRank {
+  above: (id: string) => number
+  below: (id: string) => number
+  latest: (id: string) => string | null
+}
+/** the sorts that read a StatusRank */
+export const RANK_SORTS: ReadonlySet<string> = new Set(['above', 'below', 'recent'])
+/** does the order need counts (a status sort on either axis)? the caller then makes a StatusRank */
+export const usesRank = (o: OrderSpec): boolean => RANK_SORTS.has(o.places.sort) || RANK_SORTS.has(o.indicators.sort)
+/** most first; a tie, or no rank, falls to the next comparison */
+const byCount = <T>(get: ((id: string) => number) | undefined, id: (t: T) => string) => (a: T, b: T) => (get ? get(id(b)) - get(id(a)) : 0)
+/** the most recent period first; one with none last */
+const byLatest = <T>(rank: StatusRank | undefined, id: (t: T) => string) => (a: T, b: T) => {
+  if (!rank) return 0
+  const x = rank.latest(id(a)), y = rank.latest(id(b))
+  return x === y ? 0 : x == null ? 1 : y == null ? -1 : x < y ? 1 : -1
+}
 
 export interface AxisOrder<S extends string> {
   sort: S
@@ -157,8 +184,10 @@ const byNumber = (get: (p: OrderPlace) => number | null | undefined, dir: 1 | -1
 }
 const byName = (a: OrderPlace, b: OrderPlace) => compareText(a.name, b.name) || compareText(a.id, b.id)
 
-function placeAxis<P extends OrderPlace>(sort: PlaceSort, groupLabel: (coll: string) => string): Axis<P> {
-  const key = sort === 'ns' ? byNumber(p => p.lat, -1) : sort === 'sn' ? byNumber(p => p.lat, 1) : sort === 'we' ? byNumber(p => p.lon, 1) : null
+function placeAxis<P extends OrderPlace>(sort: PlaceSort, groupLabel: (coll: string) => string, rank?: StatusRank): Axis<P> {
+  const key = sort === 'ns' ? byNumber(p => p.lat, -1) : sort === 'sn' ? byNumber(p => p.lat, 1) : sort === 'we' ? byNumber(p => p.lon, 1)
+    : sort === 'above' ? byCount<OrderPlace>(rank?.above, p => p.id) : sort === 'below' ? byCount<OrderPlace>(rank?.below, p => p.id)
+    : sort === 'recent' ? byLatest<OrderPlace>(rank, p => p.id) : null
   return {
     id: p => p.id,
     group: p => p.coll,
@@ -168,10 +197,10 @@ function placeAxis<P extends OrderPlace>(sort: PlaceSort, groupLabel: (coll: str
   }
 }
 
-/** the places in order: grouped by collection (the groups A-Z by title) or flat; `custom` lists their own order */
-export function orderPlaces<P extends OrderPlace>(places: P[], o: AxisOrder<PlaceSort>, groupLabel: (coll: string) => string = c => c): Group<P>[] {
+/** the places in order: grouped by collection (the groups A-Z by title) or flat; `custom` lists their own order; `rank` serves the status sorts */
+export function orderPlaces<P extends OrderPlace>(places: P[], o: AxisOrder<PlaceSort>, groupLabel: (coll: string) => string = c => c, rank?: StatusRank): Group<P>[] {
   const sort: PlaceSort = o.sort === 'custom' ? 'az' : o.sort
-  return arrange(places, placeAxis<P>(sort, groupLabel), o.group, o.sort === 'custom' ? o.custom : null)
+  return arrange(places, placeAxis<P>(sort, groupLabel, rank), o.group, o.sort === 'custom' ? o.custom : null)
 }
 
 // ---- indicators ----
@@ -191,7 +220,7 @@ export interface OrderTerm {
 /** the group of the indicators whose tag is not a term of the vocabulary: last in either order */
 export const OTHER_GROUP = 'other'
 
-function indicatorAxis<I extends OrderIndicator>(sort: IndicatorSort, vocab: string, terms: readonly OrderTerm[], input: I[]): Axis<I> {
+function indicatorAxis<I extends OrderIndicator>(sort: IndicatorSort, vocab: string, terms: readonly OrderTerm[], input: I[], rank?: StatusRank): Axis<I> {
   const known = new Map(terms.map((t, n) => [t.id, n]))
   const label = (g: string) => terms.find(t => t.id === g)?.label ?? 'Other'
   const group = (i: I) => {
@@ -202,6 +231,10 @@ function indicatorAxis<I extends OrderIndicator>(sort: IndicatorSort, vocab: str
   input.forEach(i => { if (!seriesRank.has(i.series)) seriesRank.set(i.series, seriesRank.size) })
   const at = new Map(input.map((i, n) => [i.id, n]))
   const otherLast = (a: string, b: string) => Number(a === OTHER_GROUP) - Number(b === OTHER_GROUP)
+  // a series together in the order the series first appear, its lead first, then the order given
+  const inSeries = (a: I, b: I) => (seriesRank.get(a.series) as number) - (seriesRank.get(b.series) as number) || Number(b.lead) - Number(a.lead) || (at.get(a.id) as number) - (at.get(b.id) as number)
+  const az = (a: I, b: I) => compareText(a.short, b.short) || compareText(a.id, b.id)
+  const count = sort === 'above' ? byCount<I>(rank?.above, i => i.id) : sort === 'below' ? byCount<I>(rank?.below, i => i.id) : null
   return {
     id: i => i.id,
     group,
@@ -209,20 +242,19 @@ function indicatorAxis<I extends OrderIndicator>(sort: IndicatorSort, vocab: str
     groupCmp: sort === 'vocab'
       ? (a, b) => otherLast(a, b) || (known.get(a) ?? 0) - (known.get(b) ?? 0)
       : (a, b) => otherLast(a, b) || compareText(label(a), label(b)) || compareText(a, b),
-    cmp: sort === 'vocab'
-      ? (a, b) => (seriesRank.get(a.series) as number) - (seriesRank.get(b.series) as number) || Number(b.lead) - Number(a.lead) || (at.get(a.id) as number) - (at.get(b.id) as number)
-      : (a, b) => compareText(a.short, b.short) || compareText(a.id, b.id),
+    cmp: sort === 'vocab' || sort === 'series' ? inSeries : count ? (a, b) => count(a, b) || az(a, b) : az,
   }
 }
 
 /**
  * the indicators in order, grouped by the vocabulary's categories or flat. `az`: the groups A-Z by label and the indicators A-Z
- * by short title; `vocab`: the vocabulary's term order, a series together with its lead first, then the order given. "Other" is
- * the last group of either.
+ * by short title; `vocab`: the vocabulary's term order, a series together with its lead first, then the order given; `series`:
+ * the groups A-Z, a series together with its lead first; `above` / `below`: the groups A-Z, the indicators by their count of
+ * places above or below (`rank`). "Other" is the last group of each.
  */
-export function orderIndicators<I extends OrderIndicator>(indicators: I[], o: AxisOrder<IndicatorSort>, vocab: string, terms: readonly OrderTerm[]): Group<I>[] {
+export function orderIndicators<I extends OrderIndicator>(indicators: I[], o: AxisOrder<IndicatorSort>, vocab: string, terms: readonly OrderTerm[], rank?: StatusRank): Group<I>[] {
   const sort: IndicatorSort = o.sort === 'custom' ? 'az' : o.sort
-  return arrange(indicators, indicatorAxis(sort, vocab, terms, indicators), o.group, o.sort === 'custom' ? o.custom : null)
+  return arrange(indicators, indicatorAxis(sort, vocab, terms, indicators, rank), o.group, o.sort === 'custom' ? o.custom : null)
 }
 
 // ---- moving: the pure model of a drag or a keypress ----
@@ -340,5 +372,9 @@ export const movedWords = (name: string, other: string, side: Side) => `Moved ${
 export const stuckWords = (name: string, edge: 'first' | 'last' | 'group') =>
   edge === 'group' ? `${name} cannot move into another group; turn grouping off to move it anywhere` : `${name} is already ${edge}`
 
-export const PLACE_SORT_WORDS: Record<PlaceSort, string> = { az: 'A to Z', ns: 'North to south', sn: 'South to north', we: 'West to east', custom: 'Custom' }
-export const INDICATOR_SORT_WORDS: Record<IndicatorSort, string> = { az: 'A to Z', vocab: 'Vocabulary order', custom: 'Custom' }
+export const PLACE_SORT_WORDS: Record<PlaceSort, string> = {
+  az: 'A to Z', ns: 'North to south', sn: 'South to north', we: 'West to east', above: 'Most above', below: 'Most below', recent: 'Most recent period', custom: 'Custom',
+}
+export const INDICATOR_SORT_WORDS: Record<IndicatorSort, string> = {
+  az: 'A to Z', vocab: 'Vocabulary order', series: 'Series order, leads first', above: 'Most above', below: 'Most below', custom: 'Custom',
+}

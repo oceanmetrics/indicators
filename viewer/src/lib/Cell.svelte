@@ -4,8 +4,9 @@
   // the empty states read differently: "not computed yet" (inviting: it can be computed), "no data here" (with the reason),
   // and a quiet dash (the indicator is not offered for this kind of place).
   import { Icon } from '../../../src/icons/index.ts'
+  import { STATUS_WORDS, TREND_WORDS } from '@oceanmetrics/status'
   import type { Indicator } from './data.ts'
-  import { classText, cellAria, STATE_WORDS, STATUS_WORDS, TREND_WORDS, periodText, valueText, valuesCollOf } from './matrix.ts'
+  import { classText, cellAria, STATE_WORDS, periodText, valueText, valuesCollOf } from './matrix.ts'
   import type { CellModel, Place } from './matrix.ts'
   import type { Depth } from './hash.ts'
   import Spark from './Spark.svelte'

@@ -2,7 +2,8 @@
 // numbers, and what "Reproduce" says for a figure: the configuration that pins the number, the values file, the DuckDB query
 // that reads the place's rows, and the place view that draws the same card. nothing here computes a status.
 import type { Indicator } from '../../data.ts'
-import { configHash, configLines, duckdbSnippet } from '../../delivery.ts'
+import { configHash, configLines, duckdbSnippet } from '@oceanmetrics/catalog/cards'
+import type { Reproduce } from '@oceanmetrics/catalog/cards'
 import type { Place } from '../../matrix.ts'
 
 export interface DossierEntry { place: Place; ind: Indicator; figure: number }
@@ -16,19 +17,12 @@ export function dossierSections(places: Place[], inds: Indicator[], has: (p: Pla
     .filter(s => s.entries.length > 0)
 }
 
-export interface Reproduce {
-  /** the configuration lines the hash is taken over (place, indicator, status method and options, manifest) */
-  config: string[]
-  hash: string
-  /** the values file, null when the manifest lists none for the place's collection */
-  valuesUrl: string | null
-  /** the DuckDB one-liner that reads the place's rows from it */
-  sql: string | null
-}
+export type { Reproduce }
 
+/** a figure's Reproduce block (@oceanmetrics/catalog's shape, as the places page shows it) for the values file the report read */
 export function reproduceOf(ind: Indicator, place: Place, manifestVersion: string, valuesUrl: string | null): Reproduce {
-  const config = configLines(ind, place, manifestVersion)
-  return { config, hash: configHash(config), valuesUrl, sql: valuesUrl ? duckdbSnippet(valuesUrl, place.id) : null }
+  const config = configLines(ind, place.id, manifestVersion)
+  return { valuesUrl, snippet: valuesUrl ? duckdbSnippet(valuesUrl, place.id) : null, config, hash: configHash(config) }
 }
 
 /** the caption of a figure: "Figure 3. <the status sentence>" (the sentence as @oceanmetrics/status words it) */

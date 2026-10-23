@@ -5,12 +5,13 @@
   // place, the status and trend glyphs and the last value. the charts are the Place view's geometry (chart.ts) on the card
   // model (@oceanmetrics/status), so a panel and a card cannot disagree.
   import { Button } from '@marinebon/ui'
+  import { STATUS_WORDS, TREND_WORDS } from '@oceanmetrics/status'
   import { Icon } from '../../../../../src/icons/index.ts'
   import type { IconName } from '../../../../../src/icons/index.ts'
   import type { ReportSpec } from '../../../../../src/report/spec.ts'
   import type { Catalog, Indicator } from '../../data.ts'
   import type { Depth } from '../../hash.ts'
-  import { pickRow, STATUS_WORDS, TREND_WORDS } from '../../matrix.ts'
+  import { pickRow } from '../../matrix.ts'
   import type { ColumnGroup, CoverageIndex, Place } from '../../matrix.ts'
   import { cellKey, loadCells } from '../cells.ts'
   import type { CellResult } from '../cells.ts'

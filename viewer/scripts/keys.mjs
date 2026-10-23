@@ -1,5 +1,7 @@
 // keyboard check of the viewer, keys only: Tab reaches a Matrix cell, Enter opens its drawer, Esc closes it and focus
-// returns to the cell; Tab reaches a place link, Enter opens the Place view, and its controls are reachable by Tab.
+// returns to the cell; Tab reaches a place link (its page on the places site, a new tab) and the Place view's controls are reachable by
+// Tab. the summary bar: Tab reaches the sort selects (ArrowDown picks "Most below": ps=below), the pager's Next (Enter: page=2, the
+// selection and sort kept) and an OBIS series' disclosure (Enter: unfold=, aria-expanded).
 // the first pass is places as rows (#axes=p), the second the default, indicators as rows with places in columns: the same cell round
 // trip, and Tab + Enter on a remove button; then the Place view's breadcrumb returns to the cell it came from. at the end, the order:
 // Alt+arrow and the Move buttons move a header, a drag onto another header of its group does, grouping off lifts the limit, and the Order control.
@@ -49,16 +51,48 @@ if (cell) {
   check(back?.label === cell.f.label, 'focus returns to the same cell')
 }
 
-// a place link, the Place view, its controls
-const link = await tabUntil(f => f.tag === 'A' && /view=place/.test(f.href ?? ''))
-check(!!link, `Tab reaches a place link${link ? ` ("${link.f.label}")` : ''}`)
-if (link) {
-  await page.keyboard.press('Enter')
-  const ok = await page.waitForFunction(() => location.hash.includes('view=place') && document.querySelector('.lens[data-state=done]'), { timeout: 20000 }).then(() => true, () => false)
-  check(ok, 'Enter opens the Place view')
-  await page.waitForFunction(() => !document.querySelector('table.matrix'), { timeout: 10000 }).catch(() => {})
-  const ctl = await tabUntil(f => f.tag === 'BUTTON', 40)
+// a place link: its record page on the places site, in a new tab (the cells lead to the Place view, through the drawer)
+const link = await tabUntil(f => f.tag === 'A' && /\/places\/p\//.test(f.href ?? ''))
+check(!!link, `Tab reaches a place link to the places page${link ? ` ("${link.f.label}", ${link.f.href})` : ''}`)
+if (link) check(await page.evaluate(() => document.activeElement?.getAttribute('target') === '_blank'), 'the place link opens in a new tab')
+// the Place view's controls
+await page.goto('about:blank')
+await page.goto(`${URL_BASE}${Q}#view=place&place=NMS:CINMS`, { waitUntil: 'networkidle0' })
+await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
+{
+  const ctl = await tabUntil(f => f.tag === 'BUTTON', 60)
   check(!!ctl, `Tab reaches a Place view control${ctl ? ` ("${ctl.f.label}")` : ''}`)
+}
+
+// the summary bar: the sort select, the pager, the fold (the political set, every indicator)
+await page.goto('about:blank')
+await page.goto(`${URL_BASE}${Q}#pi=set:political&ii=all`, { waitUntil: 'networkidle0' })
+await page.waitForSelector('.lens[data-state=done]', { timeout: 30000 })
+{
+  const sel = await tabUntil(f => f.tag === 'SELECT', 200)
+  check(!!sel, 'Tab reaches the sort select')
+  if (sel) {
+    // typing an option's first letters picks it on a closed native select (ArrowDown opens the popup on macOS)
+    await page.keyboard.type('Most b', { delay: 30 })
+    const ok = await page.waitForFunction(() => location.hash.includes('ps=below'), { timeout: 5000 }).then(() => true, () => false)
+    check(ok, 'typing "Most b" on the select sorts the places by the count below (ps=below)')
+  }
+  const next = await tabUntil(f => f.tag === 'A' && /page=2/.test(f.href ?? ''), 40)
+  check(!!next, 'Tab reaches the pager\'s Next')
+  if (next) {
+    await page.keyboard.press('Enter')
+    const ok = await page.waitForFunction(() => /page=2/.test(location.hash) && /ps=below/.test(location.hash) && /pi=set:political/.test(location.hash), { timeout: 5000 }).then(() => true, () => false)
+    check(ok, 'Enter on Next opens page 2 with the same places and sort')
+    check(await page.waitForFunction(() => /places 61 to 120 of/.test(document.querySelector('.pager')?.textContent ?? ''), { timeout: 5000 }).then(() => true, () => false), 'the pager says "places 61 to 120 of ..."')
+  }
+  const fold = await tabUntil(f => f.tag === 'BUTTON' && /more of OBIS/.test(f.label ?? ''), 800)
+  check(!!fold, `Tab reaches an OBIS series' disclosure${fold ? ` ("${fold.f.label}")` : ''}`)
+  if (fold) {
+    await page.keyboard.press('Enter')
+    const ok = await page.waitForFunction(() => /unfold=obis/.test(location.hash), { timeout: 5000 }).then(() => true, () => false)
+    check(ok, 'Enter on the disclosure unfolds the series (unfold=)')
+    check(await page.evaluate(() => document.activeElement?.getAttribute('aria-expanded') === 'true' || !!document.querySelector('button.fold[aria-expanded=true]')), 'the disclosure says it is expanded')
+  }
 }
 
 // the default matrix: indicators in rows, places in columns

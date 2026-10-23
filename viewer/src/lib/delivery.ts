@@ -1,47 +1,7 @@
-// the cell drawer's delivery element and the credits: URLs, the DuckDB one-liner, the hashed configuration and the
-// per-producer data credits. plain functions.
+// the viewer's own delivery rules: the per-producer data credits of the footer, the dataset link, the licence line and the
+// GOOS badge path. plain functions. the values url, the DuckDB one-liner and the configuration lines and hash are
+// @oceanmetrics/catalog's (`valuesUrl`, `duckdbSnippet`, `configLines`, `configHash`), shared with the places page.
 import type { Indicator, Manifest } from './data.ts'
-import type { Place } from './matrix.ts'
-
-/** the values parquet of an indicator in a collection, under the catalog base */
-export function valuesUrl(base: string, ind: Indicator, coll: string): string | null {
-  const c = ind.collections.find(x => x.coll === coll)
-  return c ? base + c.path : null
-}
-
-const sqlQuote = (s: string) => `'${s.replaceAll("'", "''")}'`
-
-/** a DuckDB one-liner that reads the place's rows straight from storage */
-export function duckdbSnippet(url: string, placeId: string): string {
-  return `SELECT time_grain, time, value, n FROM read_parquet(${sqlQuote(url)}) WHERE place_id = ${sqlQuote(placeId)} ORDER BY time_grain, time;`
-}
-
-/** the configuration of a cell, canonical: what pins the number (place, indicator, status method and its options, manifest) */
-export function configLines(ind: Indicator, place: Place, manifestVersion: string): string[] {
-  return [
-    `place_id: ${place.id}`,
-    `indicator: ${ind.id}`,
-    `status_method: ${ind.status_method}`,
-    `status_grain: ${ind.status_grain}`,
-    `recent: ${ind.recent}`,
-    `min_periods: ${ind.min_periods}`,
-    `manifest: ${manifestVersion}`,
-  ]
-}
-
-/**
- * a short hash of the configuration (FNV-1a over the canonical lines, 48 bits as 12 hex digits). a stand-in for the
- * paper's sha256 job id: stable and deterministic, but not cryptographic.
- */
-export function configHash(lines: string[]): string {
-  const s = lines.join('\n')
-  let h1 = 0x811c9dc5, h2 = 0x01000193
-  for (let i = 0; i < s.length; i++) {
-    h1 = Math.imul(h1 ^ s.charCodeAt(i), 16777619) >>> 0
-    h2 = Math.imul(h2 ^ h1, 2246822519) >>> 0
-  }
-  return (h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0')).slice(0, 12)
-}
 
 export interface Credit {
   producer: string

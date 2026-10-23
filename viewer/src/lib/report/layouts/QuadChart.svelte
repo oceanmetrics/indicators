@@ -6,10 +6,9 @@
   // and a table (details) carries every number for those who do not read the plot.
   import { CORE_PATHS, Icon } from '../../../../../src/icons/index.ts'
   import type { IconName } from '../../../../../src/icons/index.ts'
-  import { QUADRANT_SHORT, QUADRANT_WORDS, fmt, quadAlt, quadPoint, quadWhy, quadWords, quadrantOf } from '@oceanmetrics/status'
+  import { fmt, quadAlt, quadPoint, QUADRANT_SHORT, QUADRANT_WORDS, quadrantOf, quadWhy, quadWords, STATUS_WORDS, TREND_WORDS } from '@oceanmetrics/status'
   import type { QuadPoint } from '@oceanmetrics/status'
   import { scaleLinear } from '../../chart.ts'
-  import { STATUS_WORDS, TREND_WORDS } from '../../matrix.ts'
   import type { CardModel } from '../../place.ts'
   import { placeLabels, quadExtent, quadTicks } from './quadPlot.ts'
   import type { QuadItem } from './quadPlot.ts'

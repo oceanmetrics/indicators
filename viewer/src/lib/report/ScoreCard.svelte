@@ -5,12 +5,12 @@
   // places and indicators are sorted exceptions first. `axes` says which are the rows (indicators by default, as the Matrix
   // has them). on a phone the table becomes one card per row: per indicator, or per place.
   import { onMount } from 'svelte'
+  import { valuesUrl } from '@oceanmetrics/catalog/cards'
   import { Icon } from '../../../../src/icons/index.ts'
   import type { StatusResult } from '@oceanmetrics/status'
   import type { ReportSpec } from '../../../../src/report/spec.ts'
   import { isDefaultAxis } from '../../../../src/report/order.ts'
   import type { Catalog, Indicator } from '../data.ts'
-  import { valuesUrl } from '../delivery.ts'
   import type { Depth } from '../hash.ts'
   import { pickRow } from '../matrix.ts'
   import type { ColumnGroup, CoverageIndex, Place } from '../matrix.ts'

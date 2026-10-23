@@ -6,7 +6,7 @@ import { parquetReadObjects } from 'hyparquet'
 import { describe, expect, it } from 'vitest'
 import { normalizeRow } from './data.ts'
 import type { Manifest } from './data.ts'
-import { cellAria, cellModel, groupColumns, indexCoverage, matrixStats, pickRow, selectionRows } from './matrix.ts'
+import { cellAria, cellModel, groupColumns, indexCoverage, pickRow, selectionRollups, selectionRows } from './matrix.ts'
 import { VOCAB_IDS } from './data.ts'
 
 const DIR = resolve(__dirname, '../../../catalog')
@@ -45,10 +45,11 @@ describe.skipIf(!have)('the real catalog', async () => {
       }
     }
   }, 60_000)   // 110 indicators × ~300 places × 6 ways (OBIS made it ~10 s)
-  it('the default matrix has the places and the cells with a status the coverage promises', () => {
-    const s = matrixStats(selectionRows(idx.places, idx, ''), groupColumns(manifest.indicators.filter(i => i.lead), manifest.vocabularies, 'onms'), idx)
-    expect(s.places).toBe(new Set(rows.map(r => r.place_id)).size)
-    expect(s.withStatus).toBeGreaterThan(0)
-    expect(s.withValue).toBeGreaterThanOrEqual(s.withStatus)
+  it('the summary of every place by the leads has the places and the cells with a status the coverage promises', () => {
+    const places = selectionRows(idx.places, idx, '').flatMap(g => g.places)
+    const r = selectionRollups(rows, places, manifest.indicators.filter(i => i.lead))
+    expect(places.length).toBe(new Set(rows.map(r => r.place_id)).size)
+    expect(r.total.above + r.total.within + r.total.below).toBeGreaterThan(0)
+    expect(r.total.cells).toBe(r.total.above + r.total.within + r.total.below + r.total.none + r.total.nodata)
   })
 })

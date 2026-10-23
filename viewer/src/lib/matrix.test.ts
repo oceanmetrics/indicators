@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { CoverageRow } from '../../../src/coverage/build.ts'
 import type { Indicator, Vocab, VocabId } from './data.ts'
 import {
-  cellAria, computedOf, cellModel, classText, groupColumns, indexCoverage, matrixStats, orderGroups, pickRow,
-  ROW_CAP, selectionRows, shortPlaceName, valueText, valuesCollOf, withValues,
+  cellAria, computedOf, cellModel, classText, countsText, foldColumns, foldsInMatrix, foldWords, groupColumns, headerCounts, indexCoverage, latestOf,
+  orderGroups, pageRows, pageText, pickRow, ROW_CAP, selectionRollups, selectionRows, shortPlaceName, statusRank, summaryText, valueText, valuesCollOf,
+  withValues,
 } from './matrix.ts'
+import type { RowGroup } from './matrix.ts'
 
 // small synthetic manifest and coverage: one rule per test, exact outputs
 const ind = (o: Partial<Indicator> & { id: string }): Indicator => ({
@@ -341,12 +343,115 @@ describe('shortPlaceName', () => {
   })
 })
 
-describe('matrixStats', () => {
-  it('counts places, indicators, cells with a value and with a status', () => {
-    const sst = ind({ id: 'sst' })
-    const idx = indexCoverage([row({ place_id: 'NMS:A' }), row({ place_id: 'NMS:B', place_name: 'B', status: null, status_method: 'iea-sd' }), row({ place_id: 'NMS:C', place_name: 'C', last_value: null, status: null })])
-    const cols = groupColumns([sst], vocabs(), 'onms')
-    const s = matrixStats(selectionRows(idx.places, idx, ''), cols, idx)
-    expect(s).toEqual({ places: 3, indicators: 1, cells: 3, withValue: 2, withStatus: 1 })
+describe('the summary: the rollups of the selection (@oceanmetrics/catalog rollups)', () => {
+  const cov = [
+    row({ place_id: 'NMS:A', indicator: 'sst', status: 'above', last_time: '2025-01-01' }),
+    row({ place_id: 'NMS:A', indicator: 'chl', status: 'below', last_time: '2024-01-01' }),
+    row({ place_id: 'NMS:B', place_name: 'Beta', indicator: 'sst', status: 'within', last_time: '2023-01-01' }),
+    row({ place_id: 'NMS:B', place_name: 'Beta', indicator: 'chl', status: null, status_method: 'values', last_time: '2023-01-01' }),
+    row({ place_id: 'NMS:B', place_name: 'Beta', indicator: 'ph', status: 'below' }),
+    row({ place_id: 'NMS:C', place_name: 'Gamma', indicator: 'sst', status: 'above' }),
+  ]
+  const P = (id: string) => ({ id })
+  const r = selectionRollups(cov, [P('NMS:A'), P('NMS:B')], [P('sst'), P('chl')])
+  it('counts only the places and indicators given, one cell each', () => {
+    expect(r.total).toEqual({ above: 1, within: 1, below: 1, none: 1, nodata: 0, cells: 4 })
+    expect(r.places.map(p => [p.id, p.above, p.below])).toEqual([['NMS:A', 1, 1], ['NMS:B', 0, 0]])
+  })
+  it('the summary line: places by indicators, the counts, the latest period', () => {
+    expect(summaryText(2, 2, r)).toBe('2 places × 2 indicators: 1 above, 1 within, 1 below, 1 without a status; latest 2025')
+    expect(summaryText(1, 1, selectionRollups([], [], []))).toBe('1 place × 1 indicator: 0 above, 0 within, 0 below, 0 without a status')
+  })
+  it('a header says its counts and its latest period; one with no cells says so', () => {
+    expect(headerCounts(r.places[0])).toBe('1 above, 0 within, 1 below, 0 without a status; latest 2025')
+    expect(headerCounts(undefined)).toBe('no cells with a value')
+    expect(countsText({ above: 1200, within: 0, below: 0, none: 0, nodata: 3, cells: 1203 })).toBe('1,200 above, 0 within, 0 below, 0 without a status')
+  })
+  it('the latest period of any rollup; none without a value', () => {
+    expect(latestOf(r.indicators)).toBe('2025')
+    expect(latestOf([])).toBeNull()
+  })
+  it('the rank of the status sorts reads the counts and the latest time; an unknown id is 0 and none', () => {
+    const k = statusRank(r.places)
+    expect([k.above('NMS:A'), k.below('NMS:A'), k.latest('NMS:B'), k.above('X'), k.latest('X')]).toEqual([1, 1, '2023-01-01', 0, null])
+  })
+  it('the rank orders the rows: places by the count below (or above), most first, a tie A-Z', () => {
+    const idx = indexCoverage(cov)
+    const all = selectionRollups(cov, idx.places, [P('sst'), P('chl'), P('ph')])
+    const below = selectionRows(idx.places, idx, '', { sort: 'below', group: true, custom: [] }, c => c, ROW_CAP, statusRank(all.places))
+    expect(below[0].places.map(p => p.id)).toEqual(['NMS:A', 'NMS:B', 'NMS:C'])
+    const above = selectionRows(idx.places, idx, '', { sort: 'above', group: true, custom: [] }, c => c, ROW_CAP, statusRank(all.places))
+    expect(above[0].places.map(p => p.id)).toEqual(['NMS:A', 'NMS:C', 'NMS:B'])
+  })
+  it('the rank orders the columns: indicators by the count above', () => {
+    const idx = indexCoverage(cov)
+    const all = selectionRollups(cov, idx.places, [P('sst'), P('chl'), P('ph')])
+    const cols = groupColumns([ind({ id: 'chl' }), ind({ id: 'ph' }), ind({ id: 'sst' })], vocabs(), 'onms', { sort: 'above', group: false, custom: [] }, statusRank(all.indicators))
+    expect(cols[0].indicators.map(i => i.id)).toEqual(['sst', 'chl', 'ph'])
+  })
+})
+
+describe('paging: 60 places a page, across the groups', () => {
+  const g = (coll: string, n: number, at = 0): RowGroup => ({ coll, places: Array.from({ length: n }, (_, i) => ({ id: `${coll}:${at + i + 1}`, name: `${at + i + 1}`, coll })) })
+  const rows = [g('places', 18), g('mr_eez', 281)]
+  it('the first page is the first 60 places; a group cut in two keeps its head', () => {
+    const p = pageRows(rows, 1)
+    expect([p.page, p.pages, p.from, p.to, p.total]).toEqual([1, 5, 1, 60, 299])
+    expect(p.rows.map(r => [r.coll, r.places.length])).toEqual([['places', 18], ['mr_eez', 42]])
+    expect(p.rows[1].places[0].id).toBe('mr_eez:1')
+  })
+  it('page 2 starts where page 1 ended, without the groups that are not on it', () => {
+    const p = pageRows(rows, 2)
+    expect([p.from, p.to]).toEqual([61, 120])
+    expect(p.rows.map(r => [r.coll, r.places[0].id, r.places.length])).toEqual([['mr_eez', 'mr_eez:43', 60]])
+  })
+  it('the last page holds the rest; a page out of range is the nearest page', () => {
+    expect(pageRows(rows, 5)).toMatchObject({ page: 5, from: 241, to: 299 })
+    expect(pageRows(rows, 9).page).toBe(5)
+    expect(pageRows(rows, 0).page).toBe(1)
+    expect(pageRows(rows, Number.NaN).page).toBe(1)
+  })
+  it('a group keeps its total (the 300 cap) on every page', () => {
+    expect(pageRows([{ ...g('mpa', 300), total: 4000 }], 2).rows[0].total).toBe(4000)
+  })
+  it('no places is one empty page', () => {
+    expect(pageRows([], 1)).toEqual({ rows: [], page: 1, pages: 1, from: 0, to: 0, total: 0 })
+  })
+  it('the words: "places 61 to 120 of 299", or the count when one page holds them', () => {
+    expect(pageText(pageRows(rows, 2))).toBe('places 61 to 120 of 299')
+    expect(pageText(pageRows([g('places', 18)], 1))).toBe('18 places')
+    expect(pageText(pageRows([g('places', 1)], 1))).toBe('1 place')
+  })
+})
+
+describe('the fold: the OBIS series without a status rule, one row each', () => {
+  const obis = (id: string, series: string, lead = false) => ind({ id: `obis:${id}`, short: id, series, series_title: `OBIS (${series})`, lead, status_method: 'values' })
+  const term = { id: 'bio', label: 'Bio' }
+  const cols = [{ term, indicators: [obis('fish-es50', 'fish'), ind({ id: 'sst' }), obis('fish-n', 'fish', true), obis('fish-sp', 'fish'), obis('all-n', 'all', true)] }]
+  it('folds OBIS series with no status rule; any other series stays', () => {
+    expect(foldsInMatrix({ id: 'obis:x', status_method: 'values' })).toBe(true)
+    expect(foldsInMatrix({ id: 'obis:x', status_method: 'iea-sd' })).toBe(false)
+    expect(foldsInMatrix({ id: 'erddap:x', status_method: 'values' })).toBe(false)
+  })
+  it('closed: the series is its lead, where the series first appears; a series of one does not fold', () => {
+    const { cols: out, folds } = foldColumns(cols)
+    expect(out[0].indicators.map(i => i.id)).toEqual(['obis:fish-n', 'sst', 'obis:all-n'])
+    expect([...folds.keys()]).toEqual(['obis:fish-n'])
+    expect(folds.get('obis:fish-n')).toMatchObject({ series: 'fish', title: 'OBIS (fish)', open: false })
+    expect(folds.get('obis:fish-n')!.rest.map(i => i.id)).toEqual(['obis:fish-es50', 'obis:fish-sp'])
+  })
+  it('open: the other indicators follow the lead, together', () => {
+    const { cols: out, folds } = foldColumns(cols, new Set(['fish']))
+    expect(out[0].indicators.map(i => i.id)).toEqual(['obis:fish-n', 'obis:fish-es50', 'obis:fish-sp', 'sst', 'obis:all-n'])
+    expect(folds.get('obis:fish-n')!.open).toBe(true)
+  })
+  it('a series whose lead is not on display folds under its first indicator', () => {
+    const { cols: out } = foldColumns([{ term, indicators: [obis('fish-sp', 'fish'), obis('fish-es50', 'fish')] }])
+    expect(out[0].indicators.map(i => i.id)).toEqual(['obis:fish-sp'])
+  })
+  it('the disclosure says how many and of what', () => {
+    const { folds } = foldColumns(cols)
+    expect(foldWords(folds.get('obis:fish-n')!)).toBe('Show 2 more of OBIS (fish)')
+    expect(foldWords({ ...folds.get('obis:fish-n')!, open: true })).toBe('Hide 2 more of OBIS (fish)')
   })
 })

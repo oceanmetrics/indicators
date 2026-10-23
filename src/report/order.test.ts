@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { bboxCentre } from '../coverage/centre.ts'
 import {
   canMoveItem, compareText, customOf, DEFAULT_ORDER, indicatorsCustom, isDefaultOrder, moveGroup, moveItem, movedWords, nudgeGroup, nudgeItem,
-  orderEquals, orderFromParams, orderIndicators, orderParams, orderPlaces, placesCustom, shownOf, stuckWords,
+  orderEquals, orderFromParams, orderIndicators, orderParams, orderPlaces, placesCustom, shownOf, stuckWords, usesRank,
 } from './order.ts'
-import type { AxisOrder, IndicatorSort, OrderIndicator, OrderPlace, PlaceSort, Shown } from './order.ts'
+import type { AxisOrder, IndicatorSort, OrderIndicator, OrderPlace, PlaceSort, Shown, StatusRank } from './order.ts'
 
 const titles: Record<string, string> = { places: 'National Marine Sanctuaries', mr_eez: 'Exclusive Economic Zones', noaa_nerrs: 'National Estuarine Research Reserves' }
 const label = (c: string) => titles[c] ?? c
@@ -187,6 +187,47 @@ describe('indicators: grouping off and a custom order', () => {
   it('a group entry of another vocabulary is ignored', () => {
     const o = iOrder({ sort: 'custom', custom: ['g:nope'] })
     expect(gids(orderIndicators(inds, o, 'onms', terms))).toEqual(['biological', 'chemical', 'physical', 'other'])
+  })
+})
+
+describe('the status sorts (the Matrix sort select): most first, a tie A-Z, without a rank A-Z', () => {
+  const rank = (above: Record<string, number>, below: Record<string, number>, latest: Record<string, string> = {}): StatusRank =>
+    ({ above: id => above[id] ?? 0, below: id => below[id] ?? 0, latest: id => latest[id] ?? null })
+  const r = rank({ 'NMS:SBNMS': 3, 'NMS:CINMS': 1, 'NMS:FKNMS': 1, 'MRGID:8493': 2, sst: 2, ph: 1, chl: 2 }, { 'NMS:HIHWNMS': 4, 'NMS:FKNMS': 2, dhw: 5, oxy: 1 },
+    { 'NMS:FKNMS': '2025-07-01', 'NMS:CINMS': '2025-01-01', 'NMS:SBNMS': '2024-01-01', 'MRGID:8456': '2023-01-01' })
+  it('places by the count above, within each group (Channel Islands and Florida Keys tie on 1: A-Z)', () => {
+    expect(ids(orderPlaces(places, pOrder({ sort: 'above' }), label, r))).toEqual([
+      ['MRGID:8493', 'MRGID:8403', 'MRGID:8456'], ['NERRS:WEL'], ['NMS:SBNMS', 'NMS:CINMS', 'NMS:FKNMS', 'NMS:HIHWNMS']])
+  })
+  it('places by the count below, flat', () => {
+    expect(orderPlaces(places, pOrder({ sort: 'below', group: false }), label, r)[0].items.map(p => p.id).slice(0, 3)).toEqual(['NMS:HIHWNMS', 'NMS:FKNMS', 'MRGID:8403'])
+  })
+  it('places by the most recent period; a place with none goes last', () => {
+    expect(orderPlaces(places, pOrder({ sort: 'recent', group: false }), label, r)[0].items.map(p => p.id).slice(0, 5)).toEqual(['NMS:FKNMS', 'NMS:CINMS', 'NMS:SBNMS', 'MRGID:8456', 'MRGID:8403'])
+  })
+  it('without a rank a status sort is A to Z', () => {
+    expect(ids(orderPlaces(places, pOrder({ sort: 'below' }), label))).toEqual(ids(orderPlaces(places, pOrder({}), label)))
+  })
+  it('indicators in series order, the leads first; the groups A-Z', () => {
+    const out = orderIndicators(inds, iOrder({ sort: 'series' }), 'onms', terms)
+    expect(gids(out)).toEqual(['biological', 'chemical', 'physical', 'other'])
+    expect(ids(out)).toEqual([['chl'], ['ph', 'oxy'], ['sst', 'sst_anom', 'dhw'], ['misc']])
+  })
+  it('indicators by the count of places above or below, flat', () => {
+    expect(orderIndicators(inds, iOrder({ sort: 'above', group: false }), 'onms', terms, r)[0].items.map(i => i.id)).toEqual(['chl', 'sst', 'ph', 'dhw', 'misc', 'oxy', 'sst_anom'])
+    expect(orderIndicators(inds, iOrder({ sort: 'below', group: false }), 'onms', terms, r)[0].items.map(i => i.id).slice(0, 2)).toEqual(['dhw', 'oxy'])
+  })
+  it('an order needs counts only with a status sort on an axis (series needs none)', () => {
+    expect(usesRank(DEFAULT_ORDER)).toBe(false)
+    expect(usesRank({ ...DEFAULT_ORDER, indicators: iOrder({ sort: 'series' }) })).toBe(false)
+    expect(usesRank({ ...DEFAULT_ORDER, places: pOrder({ sort: 'recent' }) })).toBe(true)
+    expect(usesRank({ ...DEFAULT_ORDER, indicators: iOrder({ sort: 'below' }) })).toBe(true)
+  })
+  it('the status sorts are read from and written to the URL like the others', () => {
+    const o = orderFromParams(new Map([['ps', 'below'], ['is', 'series']]))
+    expect([o.places.sort, o.indicators.sort]).toEqual(['below', 'series'])
+    expect(orderParams(o)).toEqual([['ps', 'below'], ['is', 'series']])
+    expect(orderFromParams(new Map([['ps', 'series'], ['is', 'recent']]))).toEqual(DEFAULT_ORDER)
   })
 })
 

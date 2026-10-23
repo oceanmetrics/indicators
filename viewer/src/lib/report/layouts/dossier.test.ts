@@ -28,10 +28,10 @@ describe('reproduceOf', () => {
     expect(reproduceOf(SST, A, '2026.10.21', null).hash).not.toBe(r.hash)
   })
   it('the query reads this place from the values file', () => {
-    expect(r.sql).toBe("SELECT time_grain, time, value, n FROM read_parquet('https://x/values/sst/data.parquet') WHERE place_id = 'NMS:A' ORDER BY time_grain, time;")
+    expect(r.snippet).toBe("SELECT time_grain, time, value, n FROM read_parquet('https://x/values/sst/data.parquet') WHERE place_id = 'NMS:A' ORDER BY time_grain, time;")
   })
   it('no values file gives no query', () => {
-    expect(reproduceOf(SST, A, '2026.10.20', null)).toMatchObject({ valuesUrl: null, sql: null })
+    expect(reproduceOf(SST, A, '2026.10.20', null)).toMatchObject({ valuesUrl: null, snippet: null })
   })
 })
 

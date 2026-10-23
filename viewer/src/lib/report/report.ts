@@ -4,8 +4,8 @@
 import { budget, coverageCounts, expandIndicators, expandPlaces, LAYOUTS, seriesLeads } from '../../../../src/report/spec.ts'
 import type { Budget, ReportSpec } from '../../../../src/report/spec.ts'
 import type { Catalog, Indicator, VocabId } from '../data.ts'
-import { orderPlaces } from '../../../../src/report/order.ts'
-import { cellModel, groupColumns, pickRow } from '../matrix.ts'
+import { orderPlaces, usesRank } from '../../../../src/report/order.ts'
+import { cellModel, groupColumns, pickRow, selectionRollups, statusRank } from '../matrix.ts'
 import type { CellKind, ColumnGroup, CoverageIndex, Place } from '../matrix.ts'
 import { SOURCE_HREF } from '../credits.ts'
 
@@ -39,8 +39,10 @@ export function buildReport(
   const chosenPlaces = expandPlaces(spec.places, idx.places, catalog.manifest.place_sets ?? [])
   const counts = coverageCounts(catalog.coverage, chosenPlaces)
   const indicators = expandIndicators(spec.indicators, all).filter(i => (counts.get(i.id) ?? 0) > 0)
-  const places = orderPlaces(chosenPlaces.filter(p => indicators.some(i => hasValue(idx, p, i))), spec.order.places, groupLabel).flatMap(g => g.items)
-  const groups = groupColumns(indicators, catalog.manifest.vocabularies, vocab, spec.order.indicators)
+  // a status sort (most above, most below, most recent) reads the counts of the report's own places and indicators, as the Matrix does
+  const r = usesRank(spec.order) ? selectionRollups(catalog.coverage, chosenPlaces, indicators) : null
+  const places = orderPlaces(chosenPlaces.filter(p => indicators.some(i => hasValue(idx, p, i))), spec.order.places, groupLabel, r ? statusRank(r.places) : undefined).flatMap(g => g.items)
+  const groups = groupColumns(indicators, catalog.manifest.vocabularies, vocab, spec.order.indicators, r ? statusRank(r.indicators) : undefined)
   const leads = new Set(seriesLeads(all).values())
   const empties: EmptyCell[] = []
   for (const p of places) {

@@ -1,14 +1,16 @@
 // the Matrix's rules, in plain functions: which coverage row fills a cell, what state the cell is in, how columns
 // group by vocabulary and rows by collection, and the words a cell speaks. the status itself is never computed here:
 // it is read from the coverage row, which src/coverage/ built with @oceanmetrics/status.
-import { fmt, periodLabel } from '@oceanmetrics/status'
+import { rollups, STATUS_RULES } from '@oceanmetrics/catalog/cards'
+import type { Rollup, Rollups, StatusCounts } from '@oceanmetrics/catalog/cards'
+import { fmt, periodLabel, STATUS_WORDS, TREND_WORDS } from '@oceanmetrics/status'
 import type { Grain, Status, Trend } from '@oceanmetrics/status'
 import { shownGrainOrder } from '../../../src/coverage/build.ts'
 import type { CoverageRow } from '../../../src/coverage/build.ts'
 import { GROUP_ORDER } from './data.ts'
 import type { Indicator, Term, VocabId, Vocab } from './data.ts'
 import { DEFAULT_ORDER, orderIndicators, orderPlaces } from '../../../src/report/order.ts'
-import type { AxisOrder, IndicatorSort, PlaceSort } from '../../../src/report/order.ts'
+import type { AxisOrder, IndicatorSort, PlaceSort, StatusRank } from '../../../src/report/order.ts'
 
 /**
  * a place. `coll` is its group: its home gazetteer collection (coverage `place_coll`, else the values collection).
@@ -159,15 +161,7 @@ export function cellModel(ind: Indicator, place: Place, row: CoverageRow | null)
   return { kind: 'na', row, statusIcon: null, trendIcon: null, stateIcon: null, reason: null }
 }
 
-// ---- words ----
-
-export const STATUS_WORDS: Record<Status | 'none', string> = {
-  above: 'above its own record',
-  within: 'within its own record',
-  below: 'below its own record',
-  none: 'no status',
-}
-export const TREND_WORDS: Record<Trend, string> = { up: 'up', flat: 'flat', down: 'down' }
+// ---- words (STATUS_WORDS and TREND_WORDS are @oceanmetrics/status's) ----
 
 /** the class label and share of a categorical row, e.g. "Tropical Seas 49%" */
 export function classText(ind: Indicator, row: CoverageRow): string {
@@ -228,10 +222,10 @@ export const VOCAB_ORDER: AxisOrder<IndicatorSort> = { sort: 'vocab', group: tru
  * an indicator whose tag is not a term of the vocabulary goes to a last group "Other". with no order given it is the vocabulary
  * order, where a series' indicators stay together (the lead first) in the order given.
  */
-export function groupColumns(indicators: Indicator[], vocabs: Record<VocabId, Vocab>, vocab: VocabId, order: AxisOrder<IndicatorSort> = VOCAB_ORDER): ColumnGroup[] {
+export function groupColumns(indicators: Indicator[], vocabs: Record<VocabId, Vocab>, vocab: VocabId, order: AxisOrder<IndicatorSort> = VOCAB_ORDER, rank?: StatusRank): ColumnGroup[] {
   const terms = vocabs[vocab]?.terms ?? []
   const byId = new Map<string, Term>([...terms.map(t => [t.id, t] as [string, Term]), [OTHER.id, OTHER]])
-  return orderIndicators(indicators, order, vocab, terms).map(g => ({ term: order.group ? byId.get(g.id) ?? OTHER : FLAT_TERM, indicators: g.items }))
+  return orderIndicators(indicators, order, vocab, terms, rank).map(g => ({ term: order.group ? byId.get(g.id) ?? OTHER : FLAT_TERM, indicators: g.items }))
 }
 
 /**
@@ -266,38 +260,148 @@ export const ROW_CAP = 300
  */
 export function selectionRows(
   places: Place[], idx: CoverageIndex, q: string, order: AxisOrder<PlaceSort> = DEFAULT_ORDER.places, groupLabel: (coll: string) => string = c => c, cap = ROW_CAP,
+  rank?: StatusRank,
 ): RowGroup[] {
   const needle = q.trim().toLowerCase()
   const computed = new Set(idx.places.map(p => p.id))
   const hits = needle ? places.filter(p => p.name.toLowerCase().includes(needle) || p.id.toLowerCase().includes(needle)) : places
-  return orderPlaces(hits, order, groupLabel).map(g => {
+  return orderPlaces(hits, order, groupLabel, rank).map(g => {
     if (g.items.length <= cap) return { coll: g.id, places: g.items }
     const keep = new Set([...g.items.filter(p => computed.has(p.id)), ...g.items.filter(p => !computed.has(p.id))].slice(0, cap))
     return { coll: g.id, places: g.items.filter(p => keep.has(p)), total: g.items.length }
   })
 }
 
-export interface MatrixStats {
-  places: number
-  indicators: number
-  cells: number
-  withValue: number
-  withStatus: number
+// ---- the summary: the rollups of the selection (@oceanmetrics/catalog `rollups`) ----
+
+export type { Rollup, Rollups, StatusCounts }
+
+/** the rollups of the places and indicators given: one cell per place x indicator, from the coverage rows of those only */
+export function selectionRollups(coverage: CoverageRow[], places: readonly Pick<Place, 'id'>[], indicators: readonly Pick<Indicator, 'id'>[]): Rollups {
+  const p = new Set(places.map(x => x.id))
+  const i = new Set(indicators.map(x => x.id))
+  return rollups(coverage.filter(r => p.has(r.place_id) && i.has(r.indicator)))
 }
 
-export function matrixStats(rows: RowGroup[], cols: ColumnGroup[], idx: CoverageIndex): MatrixStats {
-  const inds = cols.flatMap(c => c.indicators)
-  const s: MatrixStats = { places: 0, indicators: inds.length, cells: 0, withValue: 0, withStatus: 0 }
-  for (const g of rows) {
-    for (const p of g.places) {
-      s.places++
-      for (const ind of inds) {
-        const m = cellModel(ind, p, pickRow(idx, p.id, ind))
-        s.cells++
-        if (m.kind === 'value' || m.kind === 'class') s.withValue++
-        if (m.row?.status) s.withStatus++
-      }
-    }
-  }
-  return s
+/** what the status sorts read (src/report/order.ts): the counts above and below and the latest period, per id, from rollups */
+export function statusRank(list: readonly Rollup[]): StatusRank {
+  const by = new Map(list.map(r => [r.id, r]))
+  return { above: id => by.get(id)?.above ?? 0, below: id => by.get(id)?.below ?? 0, latest: id => by.get(id)?.latest?.time ?? null }
 }
+
+/** the latest period of any of the rollups, as a reader says it ("2025", "2025-07"); null when none has a value */
+export function latestOf(list: readonly Rollup[]): string | null {
+  let best: Rollup['latest'] = null
+  for (const r of list) if (r.latest && (!best || r.latest.time > best.time)) best = r.latest
+  return best?.label ?? null
+}
+
+/** the counts the summary and the headers say, in this order, with the glyph of each */
+export const COUNT_PARTS = [
+  { k: 'above', glyph: 'st-above', word: 'above' },
+  { k: 'within', glyph: 'st-within', word: 'within' },
+  { k: 'below', glyph: 'st-below', word: 'below' },
+  { k: 'none', glyph: 'st-none', word: 'without a status' },
+] as const
+
+/** "3 above, 10 within, 1 below, 5 without a status" */
+export const countsText = (c: StatusCounts): string => COUNT_PARTS.map(p => `${c[p.k].toLocaleString('en-US')} ${p.word}`).join(', ')
+
+/** what a row or column header says of its cells: "3 above, 10 within, 1 below, 5 without a status; latest 2025" */
+export const headerCounts = (r: Rollup | undefined): string =>
+  r ? `${countsText(r)}${r.latest ? `; latest ${r.latest.label}` : ''}` : 'no cells with a value'
+
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString('en-US')} ${n === 1 ? one : many}`
+
+/** the head of the summary line: "241 places × 20 indicators" */
+export const summaryHead = (places: number, indicators: number) => `${plural(places, 'place', 'places')} × ${plural(indicators, 'indicator', 'indicators')}`
+
+/** the summary line above the grid: "241 places × 20 indicators: 50 above, 262 within, 31 below, 224 without a status; latest 2025" */
+export function summaryText(places: number, indicators: number, r: Rollups): string {
+  const latest = latestOf(r.places)
+  return `${summaryHead(places, indicators)}: ${countsText(r.total)}${latest ? `; latest ${latest}` : ''}`
+}
+
+// ---- paging: the grid shows the places a page at a time ----
+
+/** the places one page of the grid shows */
+export const PAGE_SIZE = 60
+
+export interface Paged {
+  /** the groups cut to the page: a group with none of its places on the page is left out, one cut in two keeps its head */
+  rows: RowGroup[]
+  /** the page shown (1-based, within 1..pages), the number of pages, and the first and last place shown (1-based) of the total */
+  page: number
+  pages: number
+  from: number
+  to: number
+  total: number
+}
+
+/** the page `page` (1-based; out of range is the nearest page) of the places in order, across their groups */
+export function pageRows(rows: RowGroup[], page = 1, size = PAGE_SIZE): Paged {
+  const total = rows.reduce((n, g) => n + g.places.length, 0)
+  const pages = Math.max(1, Math.ceil(total / size))
+  const p = Math.min(pages, Math.max(1, Math.floor(Number.isFinite(page) ? page : 1)))
+  const start = (p - 1) * size, end = Math.min(total, start + size)
+  const out: RowGroup[] = []
+  let at = 0
+  for (const g of rows) {
+    const lo = Math.max(start, at), hi = Math.min(end, at + g.places.length)
+    if (lo < hi) out.push({ ...g, places: g.places.slice(lo - at, hi - at) })
+    at += g.places.length
+  }
+  return { rows: out, page: p, pages, from: total ? start + 1 : 0, to: end, total }
+}
+
+/** "places 61 to 120 of 241"; "241 places" when they fit on one page */
+export const pageText = (pg: Paged) => (pg.pages > 1 ? `places ${pg.from} to ${pg.to} of ${pg.total.toLocaleString('en-US')}` : plural(pg.total, 'place', 'places'))
+
+// ---- the fold: the OBIS series without a status rule, one row (or column) each ----
+
+/**
+ * the series that fold in the Matrix: OBIS counts of records and species with no status rule (they track sampling effort), as
+ * @oceanmetrics/catalog's `isObisWithoutRule` folds them on a place's cards (`STATUS_RULES` is the package's)
+ */
+export const foldsInMatrix = (ind: Pick<Indicator, 'id' | 'status_method'>) => ind.id.startsWith('obis:') && !STATUS_RULES.has(ind.status_method)
+
+export interface SeriesFold {
+  series: string
+  title: string
+  /** the indicator whose row carries the disclosure: the series' lead on display, else its first */
+  lead: string
+  /** the other indicators of the series on display, folded away unless open */
+  rest: Indicator[]
+  open: boolean
+}
+
+/**
+ * the matrix-wide fold (the per-place rule is @oceanmetrics/catalog `foldSeriesWithoutRule`): in each column group, a series that
+ * folds (`foldsInMatrix`) and has two or more indicators on display becomes one row, its lead (or first) indicator, with a
+ * disclosure; open (its id in `open`), its other indicators follow the lead, together. `folds` is keyed by the lead's id.
+ */
+export function foldColumns(cols: ColumnGroup[], open: ReadonlySet<string> = new Set(), fold: (i: Indicator) => boolean = foldsInMatrix): { cols: ColumnGroup[]; folds: Map<string, SeriesFold> } {
+  const folds = new Map<string, SeriesFold>()
+  const out = cols.map(g => {
+    const bySeries = new Map<string, Indicator[]>()
+    for (const i of g.indicators) if (fold(i)) bySeries.set(i.series, [...(bySeries.get(i.series) ?? []), i])
+    const done = new Set<string>()
+    const indicators: Indicator[] = []
+    for (const i of g.indicators) {
+      const members = fold(i) ? bySeries.get(i.series)! : null
+      if (!members || members.length < 2) { indicators.push(i); continue }
+      if (done.has(i.series)) continue
+      done.add(i.series)
+      const lead = members.find(m => m.lead) ?? members[0]
+      const rest = members.filter(m => m !== lead)
+      const isOpen = open.has(i.series)
+      folds.set(lead.id, { series: i.series, title: lead.series_title ?? i.series, lead: lead.id, rest, open: isOpen })
+      indicators.push(lead, ...(isOpen ? rest : []))
+    }
+    return { term: g.term, indicators }
+  })
+  return { cols: out, folds }
+}
+
+/** the disclosure's words: "Show 8 more of OBIS (fish)" / "Hide 8 more of OBIS (fish)" */
+export const foldWords = (f: SeriesFold) => `${f.open ? 'Hide' : 'Show'} ${f.rest.length} more of ${f.title}`

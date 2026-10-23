@@ -3,8 +3,8 @@
 // report's style. the status itself is cardModel()'s, which is assess() in @oceanmetrics/status: the same model the Place view's
 // card draws, so a panel here and a card there cannot disagree.
 import type { ReportSpec } from '../../../../src/report/spec.ts'
+import { valuesUrl } from '@oceanmetrics/catalog/cards'
 import type { Catalog, Indicator } from '../data.ts'
-import { valuesUrl } from '../delivery.ts'
 import { pickRow, valuesCollOf } from '../matrix.ts'
 import type { CoverageIndex, Place } from '../matrix.ts'
 import { cardModel } from '../place.ts'

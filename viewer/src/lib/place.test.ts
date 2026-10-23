@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parquetReadObjects } from 'hyparquet'
-import { cardModel, contractColumns, coveredIndicators, defaultMethod, fileName, grainsOf, groupCards, indexCoverage, placeCitation, placeCoverage, placeCsv, primaryGrain, seriesOf, toggleGrains } from './place.ts'
+import { placeCitation } from '@oceanmetrics/catalog/cards'
+import { cardModel, contractColumns, coveredIndicators, defaultMethod, fileName, grainsOf, groupCards, indexCoverage, placeCard, placeCoverage, placeCsv, primaryGrain, seriesOf, toggleGrains } from './place.ts'
 import { placeParquet } from './parquetOut.ts'
 import { groupByPlace, normalizeValueRow } from './valuesData.ts'
 import type { PlaceRow } from './valuesData.ts'
@@ -232,5 +233,29 @@ describe('reading values', () => {
     const by = groupByPlace([r, { ...r, place_id: 'B:2' }, r])
     expect([...by.keys()]).toEqual(['A:1', 'B:2'])
     expect(by.get('A:1')).toHaveLength(2)
+  })
+})
+
+describe('the shared card (@oceanmetrics/catalog cardsFor, the places page’s words)', () => {
+  const cov = (o: Partial<CoverageRow>) => ({
+    place_id: 'NMS:A', place_name: 'A', coll: 'places', indicator: 'x:y', time_grain: 'year', n_periods: 20, last_time: '2025-01-01', last_value: 16.05,
+    last_class: null, status_method: 'iea-sd', status: 'above', trend: 'up', why: null, sentence: 'SST in A was above.', ...o,
+  }) as CoverageRow
+  const cite = 'P. D. Values: Ocean Metrics Indicators, manifest 2026.10.22, x:y, CC BY 4.0, https://oceanmetrics.io/indicators/'
+  const i = ind({ citation: cite, collections: [{ coll: 'places', places: 1, rows: 1, path: 'values/indicator=x:y/coll=places/data.parquet' }] })
+  it('gives the title, status word, sentence, method, the citation with the place clause and the Reproduce block of a coverage row', () => {
+    const c = placeCard({ version: '2026.10.22' }, i, 'NMS:A', cov({}), 'https://s.test/ind/')!
+    expect([c.title, c.statusWord, c.caption, c.sentence, c.glyph, c.trendGlyph, c.period, c.value]).toEqual(
+      ['Sea surface temperature (X)', 'above its own record', 'Above its own record · trend up', 'SST in A was above.', 'st-above', 'tr-up', '2025', '16.1'])
+    expect(c.methodLabel).toBe('iea-sd: the mean of the last 5 years against 1 SD of the long-term mean (IEA)')
+    expect(c.citation).toBe('P. D. Values: Ocean Metrics Indicators, manifest 2026.10.22, x:y, place NMS:A, CC BY 4.0, https://oceanmetrics.io/indicators/')
+    expect(c.reproduce.valuesUrl).toBe('https://s.test/ind/values/indicator=x:y/coll=places/data.parquet')
+    expect(c.reproduce.config[0]).toBe('place_id: NMS:A')
+    expect(c.reproduce.hash).toMatch(/^[0-9a-f]{12}$/)
+  })
+  it('a method that is not a status rule says so; no row (or no value) gives no card', () => {
+    expect(placeCard({ version: 'v' }, ind({ status_method: 'values' }), 'NMS:A', cov({ status: null, trend: null }), 'b/')!.statusWord).toBe('no status rule')
+    expect(placeCard({ version: 'v' }, i, 'NMS:A', null, 'b/')).toBeNull()
+    expect(placeCard({ version: 'v' }, i, 'NMS:A', cov({ last_value: null }), 'b/')).toBeNull()
   })
 })

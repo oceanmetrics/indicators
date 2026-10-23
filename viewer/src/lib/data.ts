@@ -186,6 +186,8 @@ export function collTitle(coll: string, layers: Layers = {}, sets: readonly Plac
 
 /** a collection in the gazetteer's places browser */
 export const gazetteerHref = (coll: string) => `${GAZETTEER_URL}?layers=${encodeURIComponent(coll)}`
+/** a place's record page on the places site, the front door of a place: https://oceanmetrics.io/places/p/<id> (colons kept) */
+export const placesPageHref = (placeId: string) => `${GAZETTEER_URL}p/${encodeURIComponent(placeId).replace(/%3A/gi, ':')}`
 /** a place in the gazetteer's places browser (the ids keep their colons, as the browser writes them) */
 export const gazetteerPlaceHref = (coll: string, placeId: string) =>
   `${gazetteerHref(coll)}&place=${encodeURIComponent(placeId).replace(/%3A/gi, ':')}`

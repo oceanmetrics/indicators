@@ -5,6 +5,7 @@
 // plain (which figures, which are left out and why, the files); `buildSwZip` adds the browser's part: the palette, the PNGs, the
 // archive. the status, sentence and alt text are the card model's (@oceanmetrics/status).
 import type { ReportSpec } from '../../../../src/report/spec.ts'
+import { configHash, configLines } from '@oceanmetrics/catalog/cards'
 import { specId } from '../../../../src/report/spec.ts'
 import { swFolder } from '../../../../src/report/sanctuarywatch.ts'
 import type { SwFigure } from '../../../../src/report/sanctuarywatch.ts'
@@ -13,7 +14,6 @@ import type { SwColors } from '../../../../src/report/swBundle.ts'
 import { zipStore } from '../../../../src/report/zip.ts'
 import type { ZipFile } from '../../../../src/report/zip.ts'
 import type { Catalog, Indicator } from '../data.ts'
-import { configHash, configLines } from '../delivery.ts'
 import type { Place } from '../matrix.ts'
 import { clipYears, seriesOf } from '../place.ts'
 import { cellKey, modelFor } from './cells.ts'
@@ -61,7 +61,7 @@ export function swFigureFor(ind: Indicator, place: Place, result: CellResult | u
     points, method: m.method, recent: recentFor(ind, ctx.spec), result: m.result, sentence: m.sentence, alt: m.alt,
     program: { title: producer?.name ?? ind.producer.name, url: producer?.url },
     permalink: ctx.permalink(place, ind),
-    configHash: configHash(configLines(ind, place, manifest.version)),
+    configHash: configHash(configLines(ind, place.id, manifest.version)),
     manifestVersion: manifest.version,
     tab: onms?.label ?? '',
   }

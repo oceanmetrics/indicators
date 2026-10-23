@@ -21,7 +21,7 @@ npm run check                                     # svelte-check + tsc
 npm run dev                                       # viewer on http://localhost:5181/ (reads catalog/)
 node viewer/scripts/shoot.mjs [--only <name>]     # screenshots -> docs/shots/; look at them
 node viewer/scripts/shoot.mjs --url https://oceanmetrics.io/indicators/ --out docs/shots/live   # the deployed site
-node viewer/scripts/keys.mjs [--url <site>]       # keyboard: cell -> drawer -> Esc -> focus back; place link -> Place view; default matrix (indicators in rows) cell round trip, places-as-rows (#axes=p), remove button -> xp=/xi=; the order: Alt+arrow and the Move buttons, a drag, grouping off, the Order control
+node viewer/scripts/keys.mjs [--url <site>]       # keyboard: cell -> drawer -> Esc -> focus back; place link -> the places page (new tab); the sort select (ps=below), the pager (page=2), an OBIS fold (unfold=); default matrix (indicators in rows) cell round trip, places-as-rows (#axes=p), remove button -> xp=/xi=; the order: Alt+arrow and the Move buttons, a drag, grouping off, the Order control
 npm run icons:paths && npm run icons:build && npm run icons:sheet   # after any change to brand/ sources
 ```
 
@@ -71,13 +71,20 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   (`viewer/src/lib/selection.ts`, the Select section above the tabs) is shared by the Matrix, Map, Report and Place views: the report spec's
   own `places` and `indicators` rules, in the hash as `pi`, `px` (place ids, `coll:<slug>`, `set:<id>`; default `coll:places`) and `ii`, `ix`
   (`*` = leads, `all`, `cat:`, `series:`, ids). The old keys (`colls`, `xp`, `xi`, `ai`, `leads`, a Map's `coll`) are read as the same selection on
-  parse. Other hash keys: `q`, `vocab`, `depth`, `cell`, `axes=p`, `empty=1`, `t` (shared by every view since 2026-10-22; the Map reads it, the Matrix from
+  parse. Other hash keys: `q`, `vocab`, `depth`, `cell`, the Matrix's `page` (60 places a page) and `unfold` (the OBIS series opened), `axes=p`, `empty=1`, `t` (shared by every view since 2026-10-22; the Map reads it, the Matrix from
   build week 3), `t2` (the compare mode's second period, shared like `t`), the Map's `anom=1` and `layer=<kind>:<id>[:<variable>]` (the layer slot, `map/layerSlot.ts`; `grid:dhw_5km:CRW_SST`), and the order `ps pg po is ig io` (README "Matrix view"). The place picker lists every polygon
   collection of the gazetteer; the gazetteer's places are read lazily (`gazetteerPlaces.ts`), never for the default selection.
+- **The cards and the Matrix summary come from `@oceanmetrics/catalog`** (`/cards`; 0.3.0, shared with the places page): `cardsFor` (through `place.ts`
+  `placeCard`) gives the Place view's card words, citation with the place clause and Reproduce block; `valuesUrl`, `duckdbSnippet`, `configLines`, `configHash`
+  and `placeCitation` are imported wherever the viewer shows them (never copied back: the hash of a known place is pinned in `delivery.test.ts`), and the status,
+  trend and method words and the status note are `@oceanmetrics/status`'s. The Matrix's summary line, header counts and status sorts read `rollups`
+  (`matrix.ts`: `selectionRollups`, `statusRank`); the OBIS fold (`foldColumns`) uses the package's `STATUS_RULES`; the grid pages at `PAGE_SIZE` (60) with
+  `pageRows`. A rule the viewer needs that a place's card needs too belongs in the package (platform), not here.
 - **The order of places and indicators** (`src/report/order.ts`, `ReportSpec.order`) is part of the shared selection: sort key, grouping on or off and a custom id list
   per axis (`ps pg po` / `is ig io`; `po`/`io` lead with `g:<group id>` entries). One tested ordering function serves the Matrix (`selectionRows`, `groupColumns`), the Report (`buildReport`), the Map's
   table (`map/tableOrder.ts`) and the pickers; the moves (drag, Alt+arrow) are pure functions there too and `viewer/src/lib/reorder.ts` only wires them to the header cells. `lat`/`lon` (bbox
-  centre, `src/coverage/centre.ts`) are the only way places are ordered by position: never recompute them elsewhere. The default order is left out of `report.json`.
+  centre, `src/coverage/centre.ts`) are the only way places are ordered by position: never recompute them elsewhere. The status sorts (`ps=above|below|recent`,
+  `is=series|above|below`) read a `StatusRank` the caller makes from rollups (`usesRank`); without one they read as A-Z. The default order is left out of `report.json`.
 - **The Map view** (`viewer/src/lib/map/`): every group of the selection is a layered part (`selection.ts`: a group chosen in part is
   restricted to its places); classes, legends and the table come from `classes.ts` (status and trend
   only through `@oceanmetrics/status`); reference collections (Marine Regions `mr_*`) are drawn by Marine Regions' own WMS

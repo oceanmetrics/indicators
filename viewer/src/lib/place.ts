@@ -2,10 +2,12 @@
 // vocabulary and series, what a card shows for a grain and a status method, the CSV text and the file names.
 // the status, trend, sentence and alt text are never computed here: assess() in @oceanmetrics/status does it, on the
 // place's rows, in the browser, with the options the coverage builder used, so a card's default equals its coverage row.
+import { cardsFor } from '@oceanmetrics/catalog/cards'
+import type { IndicatorCard as PlaceCard, IndicatorsManifest } from '@oceanmetrics/catalog/cards'
 import { assess, categoricalAlt, categoricalSentence, completeGrid, noValues, periodLabel } from '@oceanmetrics/status'
 import type { Grain, MethodId, Point, Status, StatusResult, Trend } from '@oceanmetrics/status'
 import type { CoverageRow } from '../../../src/coverage/build.ts'
-import type { Indicator, Term, Vocab, VocabId } from './data.ts'
+import type { Indicator, Manifest, Term, Vocab, VocabId } from './data.ts'
 import { METHOD_IDS } from './hash.ts'
 import { groupColumns, indexCoverage, pickRow } from './matrix.ts'
 import type { CoverageIndex, Place } from './matrix.ts'
@@ -14,12 +16,6 @@ import type { StackModel } from './chart.ts'
 import type { PlaceRow, ValueRow } from './valuesData.ts'
 
 export { METHOD_IDS }
-export const METHOD_LABELS: Record<MethodId, string> = { 'iea-sd': 'iea-sd', 'names-pct': 'names-pct', values: 'values' }
-export const METHOD_NOTES: Record<MethodId, string> = {
-  'iea-sd': 'The recent mean against the long-term mean ± 1 SD of the place’s own record (CCIEA).',
-  'names-pct': 'The recent mean against the 10th and 90th percentiles of the place’s own record (NaMES).',
-  values: 'The values as they are, with no status.',
-}
 
 // ---- a place's coverage ----
 
@@ -215,7 +211,23 @@ function categoricalCard(ind: Indicator, placeName: string, rows: ValueRow[], gr
   }
 }
 
-// ---- downloads and the citation ----
+// ---- the shared card ----
+
+export type { PlaceCard }
+
+/**
+ * the card the places page shows for an indicator at a place (@oceanmetrics/catalog `cardsFor`): title, status word and
+ * caption, the sentence, the method label and note, the citation with the place clause and the Reproduce block, read from
+ * the place's coverage row (`cov`, the row a Matrix cell shows). null without a row with a value. the viewer's card draws
+ * these words and adds what only it has: the chart, the grain and method switches, the table and the downloads.
+ */
+export function placeCard(manifest: Pick<Manifest, 'version'>, ind: Indicator, placeId: string, cov: CoverageRow | null, base: string): PlaceCard | null {
+  if (!cov) return null
+  const m = { version: manifest.version, indicators: [ind] } as unknown as IndicatorsManifest
+  return cardsFor([cov] as Parameters<typeof cardsFor>[0], m, { placeId, base })[0] ?? null
+}
+
+// ---- downloads ----
 
 export const CONTRACT_COLUMNS = ['place_id', 'coll', 'indicator', 'time_grain', 'time', 'class', 'value', 'n', 'sd', 'unit'] as const
 
@@ -260,16 +272,4 @@ export function placeCsv(rows: PlaceRow[]): string {
   const lines = [cols.join(',')]
   for (const r of sortRows(rows)) lines.push(cols.map(c => csvCell((r as Record<string, unknown>)[c])).join(','))
   return lines.join('\n') + '\n'
-}
-
-/**
- * the manifest's citation with the place added to its "Values:" clause, e.g. "... Values: Ocean Metrics Indicators,
- * manifest 2026.10.20, erddap:dhw_5km:CRW_SST:mean, place NMS:FKNMS, CC BY 4.0, https://oceanmetrics.io/indicators/".
- * a manifest without a citation gets the clause alone.
- */
-export function placeCitation(ind: Pick<Indicator, 'id' | 'citation'>, placeId: string): string {
-  const c = ind.citation?.trim() ?? ''
-  const at = `${ind.id}, `
-  if (c.includes(`Values: `) && c.includes(at)) return c.replace(at, `${at}place ${placeId}, `)
-  return `${c}${c ? ' ' : ''}Values: Ocean Metrics Indicators, ${ind.id}, place ${placeId}.`
 }

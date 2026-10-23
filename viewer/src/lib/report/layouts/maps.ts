@@ -2,8 +2,8 @@
 // sheet (one indicator over the chosen places, the Map view's model). the drawing is MapCanvas and the classes are
 // map/classes.ts; reference geometry (Marine Regions) is only ever drawn by its own WMS (map/parts.ts decides that).
 import type { CoverageRow } from '../../../../../src/coverage/build.ts'
+import { valuesUrl } from '@oceanmetrics/catalog/cards'
 import type { Catalog, Indicator } from '../../data.ts'
-import { valuesUrl } from '../../delivery.ts'
 import type { Place } from '../../matrix.ts'
 import type { MapItem } from '../../map/classes.ts'
 import { groupOf, valuesCollsOfGroup } from '../../map/pick.ts'

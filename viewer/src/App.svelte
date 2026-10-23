@@ -1,15 +1,14 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte'
   import { Button, Header, Notice } from '@marinebon/ui'
-  import { Icon } from '../../src/icons/index.ts'
   import { loadCatalog, loadLayers, resolveDataBase, collTitle } from './lib/data.ts'
   import type { Catalog, Indicator, Layers } from './lib/data.ts'
-  import { carryOver, DEFAULT_STATE, groupHref, mapToMatrixHref, matrixHref, matrixToMapHref, parseHash, placeHref, placeToMapHref, serializeHash } from './lib/hash.ts'
+  import { carryOver, DEFAULT_STATE, groupHref, mapToMatrixHref, matrixHref, matrixToMapHref, parseHash, placeToMapHref, serializeHash } from './lib/hash.ts'
   import type { ViewState } from './lib/hash.ts'
-  import { indicatorsCustom, placesCustom } from '../../src/report/order.ts'
-  import type { Shown } from '../../src/report/order.ts'
+  import { indicatorsCustom, placesCustom, usesRank } from '../../src/report/order.ts'
+  import type { OrderSpec, Shown } from '../../src/report/order.ts'
   import { expandIndicators, expandPlaces } from '../../src/report/spec.ts'
-  import { cellModel, groupColumns, indexCoverage, matrixStats, pickRow, selectionRows, withValues } from './lib/matrix.ts'
+  import { cellModel, foldColumns, groupColumns, indexCoverage, pageRows, pickRow, ROW_CAP, selectionRollups, selectionRows, statusRank, withValues } from './lib/matrix.ts'
   import { producerCredits } from './lib/delivery.ts'
   import { APP_NAME, TAGLINE, pageTitle } from './lib/brand/brand.ts'
   import type { Brand } from './lib/brand/brand.ts'
@@ -19,6 +18,7 @@
   import Toolbar from './lib/Toolbar.svelte'
   import Matrix from './lib/Matrix.svelte'
   import MatrixLegend from './lib/MatrixLegend.svelte'
+  import MatrixBar from './lib/MatrixBar.svelte'
   import Drawer from './lib/Drawer.svelte'
   import ViewNav from './lib/ViewNav.svelte'
   import { placeCoverage } from './lib/place.ts'
@@ -86,7 +86,11 @@
 
   const title = (coll: string) => collTitle(coll, layers, catalog?.manifest.place_sets)
   const total = (coll: string) => layers[coll]?.n ?? null
-  const patch = (p: Partial<ViewState>) => { view = { ...view, ...p } }
+  // a new selection, order or search starts the Matrix on its first page (a removal or a move keeps the page: they pass it)
+  const patch = (p: Partial<ViewState>) => {
+    const reset = view.view === 'matrix' && !('page' in p) && ('spec' in p || 'q' in p)
+    view = { ...view, ...p, ...(reset ? { page: 1 } : {}) }
+  }
 
   // ---- the selection: places and indicators as rules (the hash's pi, px, ii, ix) expanded against this catalog ----
   const sets = $derived(catalog?.manifest.place_sets ?? [])
@@ -108,13 +112,25 @@
   // the order the selection is shown in (the Select section's Order, or a drag): places grouped by collection and indicators by the
   // vocabulary's categories, both A-Z by default
   const order = $derived(view.spec.order)
-  const rows = $derived(idx ? selectionRows(chosen, idx, view.q, order.places, title) : [])
-  const allCols = $derived(catalog ? groupColumns(selected, catalog.manifest.vocabularies, view.vocab, order.indicators) : [])
+  // a status sort (most above, most below, most recent) reads the counts of the chosen places by the chosen indicators
+  const ranked = $derived(catalog && usesRank(order) ? selectionRollups(catalog.coverage, chosen, selected) : null)
+  const rows = $derived(idx ? selectionRows(chosen, idx, view.q, order.places, title, ROW_CAP, ranked ? statusRank(ranked.places) : undefined) : [])
+  const allCols = $derived(catalog ? groupColumns(selected, catalog.manifest.vocabularies, view.vocab, order.indicators, ranked ? statusRank(ranked.indicators) : undefined) : [])
   // an indicator with no value for any place on display is hidden, unless the reader asks for it or named it by hand
   const cols = $derived(idx && !view.showEmpty ? withValues(allCols, rows, idx, namedIndicators(view.spec.indicators)) : allCols)
   const nHidden = $derived(allCols.reduce((n, g) => n + g.indicators.length, 0) - cols.reduce((n, g) => n + g.indicators.length, 0))
   const displayed = $derived(rows.flatMap(g => g.places))
-  const stats = $derived(idx ? matrixStats(rows, cols, idx) : null)
+  const shownInds = $derived(cols.flatMap(g => g.indicators))
+  // the summary above the grid and the counts of each header: the rollups of the places and indicators on display (every page)
+  const summary = $derived(catalog ? selectionRollups(catalog.coverage, displayed, shownInds) : null)
+  const counts = $derived(summary ? { places: new Map(summary.places.map(r => [r.id, r])), indicators: new Map(summary.indicators.map(r => [r.id, r])) } : undefined)
+  // the OBIS series without a status rule fold into one row each (unfold= opens them), and the grid shows 60 places a page (page=)
+  const folded = $derived(foldColumns(cols, new Set(view.unfold)))
+  const paged = $derived(pageRows(rows, view.page))
+  const nFolded = $derived([...folded.folds.values()].reduce((n, f) => n + (f.open ? 0 : f.rest.length), 0))
+  const pageHref = (page: number) => '#' + serializeHash({ ...view, page })
+  const toggleFold = (series: string) => patch({ unfold: view.unfold.includes(series) ? view.unfold.filter(x => x !== series) : [...view.unfold, series] })
+  const setOrder = (o: OrderSpec) => patch({ spec: withSelection(view, { order: o }).spec })
   const credits = $derived(catalog ? producerCredits(catalog.manifest) : [])
   const opened = $derived.by(() => {
     if (!catalog || !idx || !view.cell) return null
@@ -166,14 +182,13 @@
     return withSelection(view, { places: groupSelection(selectionOf(view), coll).places })
   })
   const backHref = $derived(matrixHref(cameFrom, backState, view.place && view.ind ? { place: view.place, indicator: view.ind } : null))
-  const linkToPlace = (placeId: string, coll: string) => placeHref(view, placeId, coll)
 
   // ---- removing from the display: a place goes in px, an indicator in ix (or out of the rules that hold it) ----
   // (the toggling rules load with the first removal, as with the pickers' ticks)
   async function hide(kind: 'place' | 'indicator', id: string) {
     const { toggleIndicator, togglePlace } = await import('./lib/report/tree.ts')
-    if (kind === 'place') patch({ spec: withSelection(view, { places: togglePlace(view.spec.places, universe, id, false, sets) }).spec })
-    else if (catalog) patch({ spec: withSelection(view, { indicators: toggleIndicator(view.spec.indicators, catalog.manifest.indicators, id, false) }).spec })
+    if (kind === 'place') patch({ spec: withSelection(view, { places: togglePlace(view.spec.places, universe, id, false, sets) }).spec, page: view.page })
+    else if (catalog) patch({ spec: withSelection(view, { indicators: toggleIndicator(view.spec.indicators, catalog.manifest.indicators, id, false) }).spec, page: view.page })
   }
 
   // ---- moving a header: the arrangement now on display becomes that axis's custom order ----
@@ -182,7 +197,7 @@
     const next = axis === 'places'
       ? { ...order, places: placesCustom(displayed, shown, order.places, title) }
       : { ...order, indicators: indicatorsCustom(cols.flatMap(g => g.indicators), shown, order.indicators, view.vocab, catalog.manifest.vocabularies[view.vocab].terms) }
-    patch({ spec: withSelection(view, { order: next }).spec })
+    patch({ spec: withSelection(view, { order: next }).spec, page: view.page })
   }
 
   // ---- the drawer ----
@@ -261,17 +276,14 @@
       {/if}
     {:else if catalog && idx}
       <Toolbar {view} onchange={patch} />
-      <p class="summary" role="status" aria-live="polite">
-        <Icon name="view-matrix" size={18} />
-        <span>
-          {stats?.places} {stats?.places === 1 ? 'place' : 'places'} × {stats?.indicators} {stats?.indicators === 1 ? 'indicator' : 'indicators'} on display ·
-          {stats?.withValue} of {stats?.cells} cells have a value · {stats?.withStatus} have a status{#if nHidden}
-          {' '}· {nHidden} {nHidden === 1 ? 'indicator' : 'indicators'} hidden: no value for these places (turn on "Show indicators without values here"){/if}
-        </span>
-      </p>
+      {#if summary}
+        <MatrixBar places={displayed.length} indicators={shownInds.length} {summary} {paged} {order} onorder={setOrder} {pageHref} />
+      {/if}
+      {#if nHidden}<p class="summary">{nHidden} {nHidden === 1 ? 'indicator' : 'indicators'} hidden: no value for these places (turn on "Show indicators without values here")</p>{/if}
+      {#if nFolded}<p class="summary">{nFolded} OBIS {nFolded === 1 ? 'indicator is' : 'indicators are'} folded into the row of their series (counts of records and species have no status rule): “Show more” opens one</p>{/if}
       <MatrixLegend vocab={view.vocab} />
-      <Matrix {catalog} {idx} {cols} {rows} vocab={view.vocab} depth={view.depth} axes={view.axes} {order} titles={title} totals={total} open={view.cell} onopen={open}
-        onhide={hide} placeHref={linkToPlace} onmove={move} />
+      <Matrix {catalog} {idx} cols={folded.cols} rows={paged.rows} folds={folded.folds} ontogglefold={toggleFold} {counts} vocab={view.vocab} depth={view.depth} axes={view.axes} {order}
+        titles={title} totals={total} open={view.cell} onopen={open} onhide={hide} onmove={move} />
     {/if}
   </div>
 </main>

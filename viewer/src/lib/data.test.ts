@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { absoluteBase, collTitle, gazetteerHref, gazetteerPlaceHref, loadCatalog, normalizeRow, parseLayers, resolveDataBase } from './data.ts'
+import { absoluteBase, collTitle, gazetteerHref, gazetteerPlaceHref, loadCatalog, placesPageHref, normalizeRow, parseLayers, resolveDataBase } from './data.ts'
 
 describe('resolveDataBase', () => {
   it('?data= wins and always ends in a slash', () => {
@@ -42,6 +42,10 @@ describe('collection titles', () => {
     expect(gazetteerHref('noaa_nerrs')).toBe('https://oceanmetrics.io/places/?layers=noaa_nerrs')
     expect(gazetteerPlaceHref('noaa_nerrs', 'NERRS:WEL')).toBe('https://oceanmetrics.io/places/?layers=noaa_nerrs&place=NERRS:WEL')
     expect(gazetteerPlaceHref('boem_wind_leases', 'BOEM:OCS-A 0506')).toBe('https://oceanmetrics.io/places/?layers=boem_wind_leases&place=BOEM:OCS-A%200506')
+  })
+  it('a place name in the Matrix links to its record page on the places site, the colons kept', () => {
+    expect(placesPageHref('NMS:CINMS')).toBe('https://oceanmetrics.io/places/p/NMS:CINMS')
+    expect(placesPageHref('MR:8439/a')).toBe('https://oceanmetrics.io/places/p/MR:8439%2Fa')
   })
 })
 

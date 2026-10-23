@@ -8,13 +8,17 @@
   // grouping off on an axis the group headers (and the bands) of that axis are not drawn. every header can be moved: dragged onto
   // another header of its group (a whole group onto another group), or with Alt and the arrow keys, or with the small move buttons
   // that appear on hover and focus (always on a touch screen); reorder.ts has the rules, `onmove` reports the new arrangement.
+  // a place's name links to its record page on the places site (the front door of a place); every cell opens the drawer, whose
+  // links lead to the Place view. each header says its counts (above, within, below, without a status, the latest period) on
+  // hover and focus, always on a touch screen. an OBIS series without a status rule is one row (or column), its lead, with a
+  // disclosure that shows the rest (matrix.ts `foldColumns`, `ontogglefold`). the rows given are one page of the places.
   import { tick } from 'svelte'
   import { Icon } from '../../../src/icons/index.ts'
-  import { gazetteerHref } from './data.ts'
+  import { gazetteerHref, placesPageHref } from './data.ts'
   import type { Catalog, Indicator, VocabId } from './data.ts'
-  import { cellModel, computedOf, pickRow, shortPlaceName } from './matrix.ts'
+  import { cellModel, computedOf, COUNT_PARTS, foldWords, headerCounts, pickRow, shortPlaceName } from './matrix.ts'
   import { requestHref } from './nextSteps.ts'
-  import type { ColumnGroup, CoverageIndex, Place, RowGroup } from './matrix.ts'
+  import type { ColumnGroup, CoverageIndex, Place, Rollup, RowGroup, SeriesFold } from './matrix.ts'
   import type { Axes, Depth } from './hash.ts'
   import type { OrderSpec, Shown } from '../../../src/report/order.ts'
   import { createReorder } from './reorder.ts'
@@ -40,12 +44,17 @@
     onopen: (placeId: string, indicator: string) => void
     /** remove a place or an indicator from the display */
     onhide: (kind: 'place' | 'indicator', id: string) => void | Promise<void>
-    /** the href of a place's view */
-    placeHref: (placeId: string, coll: string) => string
     /** a header was moved (dragged, or by the keys): the arrangement of an axis now on display */
     onmove: (axis: OrderAxis, shown: Shown[]) => void
+    /** the folded series, by the id of the indicator that carries the disclosure, and the toggle */
+    folds?: Map<string, SeriesFold>
+    ontogglefold?: (series: string) => void
+    /** the rollups of each place and indicator on display, for the counts of its header */
+    counts?: { places: Map<string, Rollup>; indicators: Map<string, Rollup> }
   }
-  let { catalog, idx, cols, rows, vocab, depth, axes = 'indicators', order, titles, totals = () => null, open, onopen, onhide, placeHref, onmove }: Props = $props()
+  let { catalog, idx, cols, rows, vocab, depth, axes = 'indicators', order, titles, totals = () => null, open, onopen, onhide, onmove, folds = new Map(), ontogglefold, counts }: Props = $props()
+  // the indicators shown because their series is unfolded: their headers are marked as part of it
+  const unfolded = $derived(new Set([...folds.values()].filter(f => f.open).flatMap(f => f.rest.map(i => i.id))))
 
   const flat = $derived(cols.flatMap(g => g.indicators))
   const flatPlaces = $derived(rows.flatMap(g => g.places))
@@ -116,9 +125,19 @@
   </span>
 {/snippet}
 
+<!-- a header's counts: glyphs and numbers for the eye, the sentence for a screen reader -->
+{#snippet tally(r: Rollup | undefined)}
+  <span class="cnt" title={headerCounts(r)}>
+    <span class="mbon-sr-only">{headerCounts(r)}</span>
+    {#if r}<span class="cg" aria-hidden="true">{#each COUNT_PARTS as c (c.k)}<span><Icon name={c.glyph} size={12} />{r[c.k]}</span>{/each}{#if r.latest}<span class="lt">{r.latest.label}</span>{/if}</span>{/if}
+  </span>
+{/snippet}
+
 {#snippet placeHead(p: Place, dir: OrderDir)}
-  <a class="pn" href={placeHref(p.id, p.coll)} data-f="link" draggable="false" data-place={p.id} title="{p.name} ({p.id}): open the place view" aria-label="{p.name}, {p.id}: open the place view">{shortPlaceName(p.name)}</a>
+  <a class="pn" href={placesPageHref(p.id)} target="_blank" rel="noopener" data-f="link" draggable="false" data-place={p.id} title="{p.name} ({p.id}): its page on the places site"
+    aria-label="{p.name}, {p.id}: its page on the places site (opens in a new tab)">{shortPlaceName(p.name)}</a>
   <span class="pid">{p.id}</span>
+  {@render tally(counts?.places.get(p.id))}
   {@render mover('places', 'item', p.id, p.name, dir)}
   {@render remove('place', p.id, p.name)}
 {/snippet}
@@ -137,6 +156,11 @@
 {#snippet indHead(ind: Indicator, glyph: ReturnType<typeof asIcon>, dir: OrderDir)}
   <span class="t">{#if glyph}<Icon name={glyph} size={16} />{/if}<span>{ind.short}</span></span>
   <span class="u">{ind.unit_label || 'unitless'} · by {ind.status_grain}</span>
+  {@render tally(counts?.indicators.get(ind.id))}
+  {#if folds.get(ind.id)}
+    {@const f = folds.get(ind.id)!}
+    <button type="button" class="fold" data-f="fold" aria-expanded={f.open} onclick={() => ontogglefold?.(f.series)}><Icon name={f.open ? 'ui-collapse' : 'ui-expand'} size={14} />{foldWords(f)}</button>
+  {/if}
   {@render mover('indicators', 'item', ind.id, ind.short, dir)}
   {@render remove('indicator', ind.id, ind.short)}
 {/snippet}
@@ -189,7 +213,7 @@
         {:else}
           {#each cols as g (g.term.id)}
             {#each g.indicators as ind (ind.id)}
-              <th scope="col" class="colh ind" title={ind.title} use:hd={{ axis: 'indicators', kind: 'item', id: ind.id, dir: 'col' }}>{@render indHead(ind, asIcon(g.term.glyph), 'col')}</th>
+              <th scope="col" class="colh ind" class:inf={unfolded.has(ind.id)} title={ind.title} use:hd={{ axis: 'indicators', kind: 'item', id: ind.id, dir: 'col' }}>{@render indHead(ind, asIcon(g.term.glyph), 'col')}</th>
             {/each}
           {/each}
         {/if}
@@ -203,7 +227,7 @@
           {/if}
           {#each g.indicators as ind (ind.id)}
             <tr>
-              <th class="rowh ind" scope="row" title={ind.title} use:hd={{ axis: 'indicators', kind: 'item', id: ind.id, dir: 'row' }}>{@render indHead(ind, asIcon(g.term.glyph), 'row')}</th>
+              <th class="rowh ind" scope="row" class:inf={unfolded.has(ind.id)} title={ind.title} use:hd={{ axis: 'indicators', kind: 'item', id: ind.id, dir: 'row' }}>{@render indHead(ind, asIcon(g.term.glyph), 'row')}</th>
               {#each flatPlaces as p (p.id)}
                 <td><Cell {ind} place={p} model={model(ind, p)} {depth} groupTitle={titles(p.coll)} open={isOpen(ind, p)} {onopen} /></td>
               {/each}
@@ -274,6 +298,17 @@
   .ind .u { display: block; margin-top: 2px; font: var(--fw-regular) 0.6875rem / 1.3 var(--font-mono); color: var(--text-body); }
   .pn { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; font: var(--fw-medium) var(--text-sm) / 1.25 var(--font-sans); color: var(--text-strong); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
   .pn:hover { color: var(--link); text-decoration-color: currentColor; }
+  /* a header's counts: shown on hover and focus (the space kept, so nothing moves), always on a touch screen */
+  .cnt { display: block; margin-top: 2px; opacity: 0; transition: opacity 0.12s; }
+  th:hover .cnt, th:focus-within .cnt { opacity: 1; }
+  .cg { display: inline-flex; flex-wrap: wrap; gap: 0 var(--space-2); font: var(--fw-regular) 0.6875rem / 1.3 var(--font-mono); color: var(--text-body); }
+  .cg > span { display: inline-flex; align-items: center; gap: 1px; }
+  .cg :global(svg) { color: var(--label-color); }
+  .fold { display: inline-flex; align-items: center; gap: 2px; margin-top: var(--space-1); padding: 1px var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--bg-tint); color: var(--text-strong); font: var(--type-small); font-size: 0.75rem; line-height: 1.3; text-align: left; cursor: pointer; }
+  .fold:hover { border-color: var(--accent); }
+  /* an indicator shown because its series is unfolded */
+  th.inf { box-shadow: inset 3px 0 0 var(--border-strong); }
   .pid { display: block; margin-top: 2px; font: var(--fw-regular) 0.6875rem / 1.3 var(--font-mono); color: var(--text-body); overflow-wrap: anywhere; }
   tr.band .gh { position: sticky; left: var(--space-3); }
   /* a place group's head: its title, then "n of N computed" and the gazetteer link; wraps in a one-column group */
@@ -308,7 +343,8 @@
     .x { opacity: 1; width: 2rem; height: 2rem; top: 0; right: 0; }
     th.colh, th.rowh { padding-right: 2.25rem; }
   }
-  @media (prefers-reduced-motion: reduce) { .x, .mv { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .x, .mv, .cnt { transition: none; } }
+  @media (hover: none) { .cnt { opacity: 1; } }
 
   /* the move buttons: a small bar at the top right of a header (left of the remove button) shown on hover and focus; inside a group's
      title, inline; on a touch screen always shown, in the flow under the header's text */

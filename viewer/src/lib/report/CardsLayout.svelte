@@ -3,6 +3,7 @@
   // indicator. the cards are the Place view's IndicatorCard, so status, sentence and chart are the same. with a status
   // method on, a tab lists exceptions first. skimmer level shows the headline and glyphs only, no chart.
   import { tick } from 'svelte'
+  import { STATUS_WORDS, TREND_WORDS } from '@oceanmetrics/status'
   import { Icon } from '../../../../src/icons/index.ts'
   import type { IconName } from '../../../../src/icons/index.ts'
   import { exceptionRank } from '../../../../src/report/spec.ts'
@@ -10,7 +11,7 @@
   import type { ReportSpec } from '../../../../src/report/spec.ts'
   import type { Catalog, Indicator, Term, VocabId } from '../data.ts'
   import type { Depth } from '../hash.ts'
-  import { cellModel, pickRow, STATUS_WORDS, TREND_WORDS } from '../matrix.ts'
+  import { cellModel, pickRow } from '../matrix.ts'
   import type { ColumnGroup, CoverageIndex, Place } from '../matrix.ts'
   import { asIcon } from '../icons.ts'
   import IndicatorCard from '../IndicatorCard.svelte'

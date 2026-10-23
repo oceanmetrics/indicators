@@ -157,7 +157,33 @@ const focusMove = (axis, kind, id) => async page => {
 const ORDER_NS = 'pi=coll:places,coll:mr_eez&ps=ns&pg=0'
 const ORDER_CUSTOM = 'pi=coll:places,coll:noaa_nerrs&ps=custom&po=g:places,NMS:FKNMS,NMS:CINMS'
 
+// build week 3, the Matrix: the summary line, a sort by the count below, an OBIS series folded and open, page 2 of the political set;
+// both themes at 1280 (one device pixel, so the PNGs stay small) and 390 (matrix_wk3_<what>_<theme>_<width>)
+const M1280 = { width: 1280, height: 900, deviceScaleFactor: 1 }
+const M390 = { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
+// the header counts show on hover (always on a touch screen): the sort shot hovers the first place's header; the fold shots scroll the
+// grid to the series' row
+const hoverFirstPlace = async page => { await page.hover('th[data-ax=places][data-kind=item]'); await new Promise(r => setTimeout(r, 300)) }
+const toFold = async page => {
+  await page.evaluate(() => {
+    const b = document.querySelector('.box'), f = b?.querySelector('button.fold')?.closest('tr'), h = b?.querySelector('thead')
+    // the row's top just under the sticky header rows, with the band of its group above it in view
+    if (b && f && h) b.scrollTop = f.getBoundingClientRect().top - b.getBoundingClientRect().top + b.scrollTop - h.getBoundingClientRect().height - 48
+  })
+  await new Promise(r => setTimeout(r, 300))
+}
+const WK3 = [
+  ['summary', ''],
+  ['sort_below', 'ps=below&is=below', hoverFirstPlace],
+  ['fold_closed', 'pi=set:political&ii=*,series:obis-fish:*', toFold],
+  ['fold_open', 'pi=set:political&ii=*,series:obis-fish:*&unfold=obis-fish', toFold],
+  ['page2', 'pi=set:political&page=2'],
+]
 const SHOTS = [
+  ...WK3.flatMap(([what, hash, act]) => ['light', 'dark'].flatMap(theme => [
+    [`matrix_wk3_${what}_${theme}_1280`, 'oceanmetrics', theme, M1280, hash, act],
+    [`matrix_wk3_${what}_${theme}_390`, 'oceanmetrics', theme, M390, hash, act],
+  ])),
   ['matrix_oceanmetrics_light', 'oceanmetrics', 'light', DESKTOP, ''],
   ['matrix_oceanmetrics_dark', 'oceanmetrics', 'dark', DESKTOP, ''],
   ['matrix_mbon_light', 'mbon', 'light', DESKTOP, ''],

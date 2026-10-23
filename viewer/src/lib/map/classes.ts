@@ -3,13 +3,12 @@
 // assess() in @oceanmetrics/status does it, on the place's series cut at the period shown, with the options the coverage
 // builder uses, so at the latest period the map and the coverage row cannot disagree. the colours are token names
 // (`--map-seq-3`); the components resolve them against the theme.
-import { assess, fmt, grainNoun, periodLabel, quantile7 } from '@oceanmetrics/status'
+import { assess, fmt, grainNoun, periodLabel, quantile7, STATUS_WORDS, TREND_WORDS } from '@oceanmetrics/status'
 import type { Grain, MethodId, Status, Trend } from '@oceanmetrics/status'
 import type { CoverageRow } from '../../../../src/coverage/build.ts'
 import type { IconName } from '../../../../src/icons/index.ts'
 import type { Indicator } from '../data.ts'
 import type { MapColor } from '../hash.ts'
-import { STATUS_WORDS, TREND_WORDS } from '../matrix.ts'
 import { defaultMethod, seriesOf } from '../place.ts'
 import type { PlaceRow } from '../valuesData.ts'
 

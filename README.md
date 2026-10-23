@@ -108,7 +108,8 @@ but the Place view's body; the Place view carries it in its hash and its links).
 - shared by every view: `vocab`, `depth`, `axes=p` (places as rows; the old `axes=t` reads as the default), `empty=1` (show the indicators without values),
   `t` (the period, `2024` or `2024-07`; none = the latest). One `t` drives the Map, the layer under it and, with the period scrubber of build week 3
   (2026-11-13 to 11-19), the Matrix; until then the Matrix, the Report and the Place view carry it untouched, so it survives a switch of views.
-- Matrix only: `q` (a place search that narrows the selection; the toolbar shows it as a chip) and `cell` (an open drawer: `place|indicator`).
+- Matrix only: `q` (a place search that narrows the selection; the toolbar shows it as a chip), `cell` (an open drawer: `place|indicator`), `page` (the page of
+  the grid, 60 places a page; 1 is left out) and `unfold` (the OBIS series shown open: series ids, `unfold=obis-fish`).
 - **Old links still open on the same places and indicators** (read when the hash is parsed, dropped on the next write): `colls=a,b` is `pi=coll:a,coll:b`
   (`set:` stays), `xp` is `px`, `xi` is `ix`, `ai` joins `ii` beside `*`, `leads=0` is `ii=all`, and a Map link's `coll=<slug>` is `pi=coll:<slug>`
   with its `ind` joined to `ii`. A Report link's `pi=*` keeps meaning every place.
@@ -131,12 +132,17 @@ and opens a popover (a full-width sheet at 600 px and below; Esc closes it and f
 layouts, the Map's table and the pickers; `ReportSpec.order`), chosen with the **Order** control of the Select section (a button that says
 what differs from "A to Z"; its panel loads on the first open) or by moving a header. Hash keys, shared by every view and carried by the tab links;
 the defaults write nothing:
-- `ps`: the place sort, `az` (default: the groups A-Z by title, the places A-Z by name), `ns` (north to south), `sn`, `we` (west to east), `custom`. North, south, west and east
+- `ps`: the place sort, `az` (default: the groups A-Z by title, the places A-Z by name), `ns` (north to south), `sn`, `we` (west to east), `above`, `below` (the count of the
+  place's cells above or below their own record, most first), `recent` (the most recent period with a value first), `custom`. North, south, west and east
   are by the centre of the place's bbox (`lat` and `lon`: coverage rows, and for a place picked from the whole gazetteer the same
   `src/coverage/centre.ts` on the index's bbox; the antimeridian is unwrapped first, so a place across it is centred on the right side); a place with no
   position goes last. `pg=0`: places not grouped, one flat list in which any place can go anywhere (every place north to south across the sanctuaries and the EEZs).
 - `is`: the indicator sort, `az` (default: grouped by the vocabulary's categories, the groups A-Z by label with "Other" last, the indicators A-Z by short title),
-  `vocab` (the vocabulary's own term order, a series together with its lead first, then the manifest order), `custom`. `ig=0`: indicators not grouped.
+  `vocab` (the vocabulary's own term order, a series together with its lead first, then the manifest order), `series` (the groups A-Z, a series together with its
+  lead first), `above`, `below` (the count of places above or below, most first), `custom`. `ig=0`: indicators not grouped.
+- The **status sorts** (`above`, `below`, `recent`) read a `StatusRank`: the counts of the chosen places by the chosen indicators, from `@oceanmetrics/catalog`
+  `rollups` (`selectionRollups`, `statusRank` in `matrix.ts`); a tie is A-Z. The Matrix and the Report pass it (`usesRank`); the Map's table and the pickers have no
+  counts and read a status sort as A-Z. The Matrix's two sort selects (below) write `ps` and `is`, so a status sort is shared with the other views like any order.
 - `po`, `io`: the custom order, read only with `ps=custom` / `is=custom`: a comma list of ids. A grouped axis may begin with **group entries**, `g:<group id>`
   (`g:places`, `g:mr_eez` for places; `g:<term id>` for indicators, e.g. `g:drivers`), which order the groups; the id entries order the items of each group by their place in
   the list (an item moves only within its group while the axis is grouped). An id the selection does not hold is ignored; an item or group that is not listed follows the listed ones,
@@ -152,6 +158,30 @@ neighbours move it by a click or a tap, and are always shown on a touch screen, 
 "Reset both" in the Order panel goes back. The place picker lists a group's places in the order too, and the indicator picker its categories and series. In the Report the places,
 the groups and every layout that lists them follow it; the Scorecard and the Cards keep their exceptions-first order only while the axis has the default order, so an order the reader chose is
 what they see (`style=values` is the way to a plain A-Z Scorecard). The Map's table is by class, then value, until an order is chosen for the places; then it follows it.
+
+**The summary, the sorts, the fold and the pages** (build week 3; `MatrixBar.svelte` wires the rules of `matrix.ts`). Above the grid one line says the
+selection on display, from `@oceanmetrics/catalog` `rollups` over the places (every page) by the indicators shown: "18 places × 19 indicators: 11 above, 94
+within, 12 below, 118 without a status · latest 2025", with the status glyphs (one cell per place × indicator; "without a status" is a value with no status: no
+rule, a categorical indicator, or too short a record). Every place and indicator header says the same counts of its own cells (an indicator's over every page) and its latest period (a sentence
+for a screen reader, glyphs and numbers for the eye), on hover and focus, always on a touch screen. Two native selects, **Sort places** (Name A to Z, Most above,
+Most below, Most recent period) and **Sort indicators** (A to Z, Series order leads first, Most above, Most below), write `ps` / `is`; a sort chosen in the Order
+control (north to south, custom) shows in them too. **The OBIS fold**: an OBIS series without a status rule (counts of records and species track sampling
+effort) with two or more indicators on display is one row (or column), its lead, with a disclosure "Show 8 more of OBIS (fish)" (`foldColumns`, the matrix-wide
+counterpart of the package's per-place `foldSeriesWithoutRule`; the rule `foldsInMatrix` uses the package's `STATUS_RULES`); open, the series follows its lead,
+together, each member marked at its header's edge. The open series are in the hash, `unfold=obis-fish,obis-all`. **The pages**: the grid shows 60 places a page
+(`pageRows`, `PAGE_SIZE`), across their groups (a group cut by a page keeps its head), with Previous and Next links ("places 61 to 120 of 303 · page 2 of 6",
+`page=2` in the hash; a page out of range is the nearest). The pages are links, so each is a permalink with the selection and the sort; a new selection, order or
+search starts on page 1, a removal or a move keeps the page. The columns (the indicators with a value) are the same on every page. **A place's name** links to
+its record page on the places site, `https://oceanmetrics.io/places/p/<id>` (`placesPageHref`, a new tab), the front door of a place; every cell still opens the
+drawer, whose "Open in place view" is the deep Place view.
+
+**The cards** of the Place view (`IndicatorCard.svelte`) say what the places page's cards say, from the same rules (`@oceanmetrics/catalog` `cardsFor` through
+`place.ts` `placeCard`): the title, the status glyph and word, the sentence (coverage's until the browser has computed its own), the method label and note, the
+citation with the place clause and a **Reproduce** block (the values url, a DuckDB query for the place, the configuration lines and their hash). Around them the
+viewer keeps what only it has: the chart, the grain and method switches, the table, the downloads and the four elements. The values url, the DuckDB one-liner,
+the configuration lines and hash (`configHash`: the hash of a known place never changes, `delivery.test.ts` pins the package's two), the citation with the place
+clause, the status, trend and method words and the status note are the packages' (`@oceanmetrics/catalog/cards`, `@oceanmetrics/status`), imported wherever the
+viewer shows them (the drawer, the Report's dossier and SanctuaryWatch export, the Map).
 
 **Context carried between views:** every link to another view carries the selection and the shared keys (`hash.ts`: `carryOver`); each view keeps its
 own keys as it was left. Matrix -> Map opens the indicator and place of the last opened cell; Map -> Matrix opens the drawer on the cell of the
@@ -430,6 +460,15 @@ package's COG protocol chunks (219.6 kB, requested on the first `cog://`, which 
 With the compare mode (2026-10-23: `t2`, `anom` and `swipe` in the hash, `compare.ts`, the swipe handle, the kit's Toggle, the slice cache, the
 companion slot, the anomaly SQL) the entry is 97.6 kB (+0.2, the hash keys), the other JS 197.0 kB, the map JS 320.0 kB of 330 (+3.6) and the
 engine JS 139.5 kB of 160 (+0.3, `gridAnomaly.ts`); nothing was raised.
+
+With the shared cards and the Matrix of build week 3 (2026-10-23) the entry is 102.6 kB of 110 (+5.0) and **the budget of all JS but the map is raised
+from 200 to 205 kB**, now 201.8 kB (+4.8 over 197.0). The reason: (1) the viewer's card words, citation with the place clause and Reproduce block now come
+from `@oceanmetrics/catalog` 0.3.0 (`cardsFor`, `placeCitation`, `reproduceFor`, `configHash`, `rollups`), the one implementation the places page reads
+too; a package module lands whole in one chunk, with every export some chunk uses, so the Drawer's `configHash` in the entry pulls `cardsFor` (the
+Place view's) up front with it: +3.4 kB over the copies it replaced, measured with the packages installed and the code unchanged (97.6 -> 100.0 entry,
+197.0 -> 200.4 all but the map); (2) the Matrix's summary line, the sort selects, the header counts, the OBIS fold and the pager are entry code (the
+Matrix is the first screen): +1.4 kB. Nothing could move to a lazy chunk without moving the Matrix. The CSS is 14.6 kB of 15 (+0.5: the summary bar,
+the header counts and the fold button); nothing in the map or the engine changed.
 
 ## Brand and icons
 

@@ -4,6 +4,7 @@
   // the Select section above the tabs, the same selection as the Matrix and the Map. it holds no state of its own: every change
   // goes out through `onspec` as a new spec, so the report is always a permalink.
   import { Button, Select, Toggle } from '@marinebon/ui'
+  import { METHOD_NOTES } from '@oceanmetrics/status'
   import { Icon } from '../../../../src/icons/index.ts'
   import type { IconName } from '../../../../src/icons/index.ts'
   import { DEFAULT_SPEC, LAYOUT_IDS, LAYOUTS } from '../../../../src/report/spec.ts'
@@ -12,7 +13,6 @@
   import type { CoverageIndex } from '../matrix.ts'
   import { METHOD_IDS, DEPTHS } from '../hash.ts'
   import type { Depth } from '../hash.ts'
-  import { METHOD_NOTES } from '../place.ts'
   import { availablePresets, PRESETS, presetOf } from './presets.ts'
   import type { ReportModel } from './report.ts'
   import Fixes from './Fixes.svelte'

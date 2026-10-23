@@ -1,22 +1,25 @@
 <script lang="ts">
-  // one indicator for the place: title with its category glyph (and the GOOS badge for the EOV grouping), the status
-  // sentence and glyphs from @oceanmetrics/status computed here in the browser, the chart, a grain toggle and a method switch,
-  // a table, downloads of this place's rows, the citation and the four elements. loads only its own values file;
-  // its loading and its errors are its own.
+  // one indicator for the place. the words are the places page's card (@oceanmetrics/catalog `cardsFor`, via placeCard):
+  // title, status word, sentence, method, the citation with the place clause and the Reproduce block. what only the viewer
+  // has is added around them: the category glyph (and the GOOS badge for the EOV grouping), the status recomputed in the
+  // browser with @oceanmetrics/status (the same as coverage's for the manifest's method; another method on request), the
+  // chart, a grain toggle and a method switch, a table, downloads of this place's rows and the four elements. loads only
+  // its own values file; its loading and its errors are its own.
   import { Button } from '@marinebon/ui'
+  import { placeCitation, valuesUrl } from '@oceanmetrics/catalog/cards'
   import { Icon } from '../../../src/icons/index.ts'
   import type { IconName } from '../../../src/icons/index.ts'
-  import { fmt, periodLabel } from '@oceanmetrics/status'
+  import { fmt, METHOD_NOTES, periodLabel, STATUS_NOTE, STATUS_WORDS, TREND_WORDS } from '@oceanmetrics/status'
   import type { MethodId, Grain } from '@oceanmetrics/status'
   import type { CoverageRow } from '../../../src/coverage/build.ts'
   import type { Catalog, Indicator, Term, VocabId } from './data.ts'
-  import { badgeUrl, valuesUrl } from './delivery.ts'
-  import { GOOS_CREDIT, STATUS_NOTE } from './credits.ts'
+  import { badgeUrl } from './delivery.ts'
+  import { GOOS_CREDIT } from './credits.ts'
   import { downloadBlob } from './download.ts'
   import type { Depth } from './hash.ts'
-  import { STATUS_WORDS, TREND_WORDS, valuesCollOf } from './matrix.ts'
+  import { valuesCollOf } from './matrix.ts'
   import type { Place } from './matrix.ts'
-  import { cardModel, defaultMethod, fileName, METHOD_IDS, METHOD_NOTES, placeCitation, placeCsv } from './place.ts'
+  import { cardModel, defaultMethod, fileName, METHOD_IDS, placeCard, placeCsv } from './place.ts'
   import type { CardOptions } from './place.ts'
   import { loadPlaceRows } from './valuesData.ts'
   import type { PlaceRow } from './valuesData.ts'
@@ -60,7 +63,9 @@
   let tries = $state(0)
   let badgeOk = $state(true)
 
-  const url = $derived(valuesUrl(catalog.base, ind, valuesCollOf(ind, place, cov)))
+  // the places page's card of this place and indicator, from its coverage row (null without one)
+  const card = $derived(placeCard(catalog.manifest, ind, place.id, cov, catalog.base))
+  const url = $derived(card ? card.reproduce.valuesUrl : valuesUrl(catalog.base, ind, valuesCollOf(ind, place, cov)))
   $effect(() => {
     void tries
     const u = url
@@ -79,11 +84,20 @@
   const rows = $derived(load.s === 'ok' ? load.rows : [])
   const eov = $derived(catalog.manifest.vocabularies.eov.terms.find(t => t.id === ind.category.eov))
   const glyph = $derived(asIcon(term.glyph))
-  const citation = $derived(placeCitation(ind, place.id))
+  const citation = $derived(card?.citation ?? placeCitation(ind, place.id))
   const isDefault = $derived(wanted === defaultMethod(ind))
-  // the sentence from the coverage table until the browser has computed its own, and only when it is the same method
-  const sentence = $derived(model ? model.sentence : isDefault && cov?.sentence ? cov.sentence : '')
-  const statusIcon = $derived<IconName | null>(model ? (model.method === 'values' ? null : model.status ? (`st-${model.status}` as IconName) : 'st-none') : null)
+  // the card's sentence (coverage's) until the browser has computed its own, and only when it is the same method
+  const sentence = $derived(model ? model.sentence : isDefault && card?.sentence ? card.sentence : '')
+  // the status glyph and word: the browser's once the values are in, the card's (coverage's) before, for the manifest's method
+  const marks = $derived.by<{ glyph: IconName; word: string; trend: string | null } | null>(() => {
+    if (model) {
+      if (model.kind !== 'continuous' || model.method === 'values') return null
+      return { glyph: (model.status ? `st-${model.status}` : 'st-none') as IconName, word: STATUS_WORDS[model.status ?? 'none'], trend: model.trend }
+    }
+    return card?.hasRule && isDefault ? { glyph: card.glyph as IconName, word: card.statusWord, trend: card.trend } : null
+  })
+  // the method line: the card's label and note for the manifest's method, the note of another one asked for
+  const methodLine = $derived(model && model.method !== defaultMethod(ind) ? METHOD_NOTES[model.method] : card ? `Method: ${card.methodLabel}. ${card.methodNote}` : METHOD_NOTES[model?.method ?? defaultMethod(ind)])
   const unit = $derived(ind.unit_label ?? '')
   const GRAIN_NAME: Record<string, string> = { year: 'Year', month: 'Month', decade: 'Decade', day: 'Day', all: 'All time' }
   const dec = $derived(ind.decimals ?? 2)
@@ -107,7 +121,7 @@
       <span class="glyph"><Icon name={glyph} size={22} /></span>
     {/if}
     <div class="titles">
-      <h4 id="t-{uid}{ind.id}" tabindex="-1">{ind.title}</h4>
+      <h4 id="t-{uid}{ind.id}" tabindex="-1">{card?.title ?? ind.title}</h4>
       <p class="sub">{unit || 'unitless'} · status by {ind.status_grain}{model?.grain && model.grain !== ind.status_grain ? ` · shown by ${model.grain}` : ''}</p>
     </div>
   </header>
@@ -119,13 +133,13 @@
     </div>
   {:else}
     <p class="sentence" class:pending={!model}>{sentence || 'Loading the values…'}</p>
+    {#if marks}
+      <ul class="marks om-marks">
+        <li><Icon name={marks.glyph} size={22} /><span>{marks.word}</span></li>
+        {#if marks.trend}<li><Icon name={`tr-${marks.trend}` as IconName} size={22} /><span>trend {TREND_WORDS[marks.trend as keyof typeof TREND_WORDS]}</span></li>{/if}
+      </ul>
+    {/if}
     {#if model}
-      {#if model.kind === 'continuous' && model.method !== 'values'}
-        <ul class="marks om-marks">
-          {#if statusIcon}<li><Icon name={statusIcon} size={22} /><span>{model.status ? STATUS_WORDS[model.status] : 'no status'}</span></li>{/if}
-          {#if model.trend}<li><Icon name={`tr-${model.trend}` as IconName} size={22} /><span>trend {TREND_WORDS[model.trend]}</span></li>{/if}
-        </ul>
-      {/if}
       {#if model.kind === 'empty'}
         <p class="note om-note-s">This place has no values for this indicator.</p>
       {:else if model.kind === 'categorical'}
@@ -157,8 +171,10 @@
         {#if model.kind === 'continuous'}
           <p class="note om-note-s">
             {#if model.grain !== ind.status_grain}Values only: a status is given at the {ind.status_grain} grain.
-            {:else}{METHOD_NOTES[model.method]}{#if model.method !== 'values'}{' '}{STATUS_NOTE}{/if}{/if}
+            {:else}{methodLine}{#if model.method !== 'values'}{' '}{STATUS_NOTE}{/if}{/if}
           </p>
+        {:else if card}
+          <p class="note om-note-s">{card.caption}. {methodLine}</p>
         {/if}
       {/if}
 
@@ -194,6 +210,20 @@
         <p class="citation"><span class="mbon-label">Cite</span> {citation}</p>
         {#if !still}<CopyButton text={citation} label="Copy citation" />{/if}
       </div>
+      {#if card && !still}
+        <details class="four repro">
+          <summary><span class="mbon-label">Reproduce</span></summary>
+          {#if card.reproduce.valuesUrl}
+            <p class="small"><span class="mbon-label">Values</span> <a href={card.reproduce.valuesUrl} target="_blank" rel="noopener">{card.reproduce.valuesUrl}</a></p>
+            <pre class="code om-code">{card.reproduce.snippet}</pre>
+            <CopyButton text={card.reproduce.snippet ?? ''} label="Copy DuckDB SQL" />
+          {:else}
+            <p class="small">The manifest lists no values file for this place’s collection.</p>
+          {/if}
+          <p class="small"><span class="mbon-label">Config hash</span> <code>{card.reproduce.hash}</code></p>
+          <pre class="code om-code">{card.reproduce.config.join('\n')}</pre>
+        </details>
+      {/if}
       {#if vocab === 'eov' && eov}
         <p class="credit">GOOS EOV: {eov.label}. Badge used unmodified. {GOOS_CREDIT}</p>
       {/if}
@@ -235,5 +265,8 @@
   .four > :global(.els) { margin-top: var(--space-2); }
   .cite { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
   .citation { margin: 0; flex: 1 1 18rem; font: var(--type-small); font-size: 0.8125rem; line-height: 1.5; color: var(--text-body); overflow-wrap: anywhere; }
+  .repro > :not(summary) { margin-top: var(--space-2); }
+  .repro .small { margin-bottom: 0; font: var(--type-small); font-size: 0.8125rem; color: var(--text-body); overflow-wrap: anywhere; }
+  .repro pre { margin-bottom: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
   .credit { margin: 0; font: var(--type-small); font-size: 0.75rem; color: var(--text-body); }
 </style>

@@ -3,15 +3,16 @@
   // place, method, delivery, in the pipeline colours), the hashed configuration, the citation and the GOOS badge.
   // a dialog: Esc closes, Tab stays inside, focus goes to Close on open and the caller returns it to the cell.
   import { onMount } from 'svelte'
+  import { configHash, configLines } from '@oceanmetrics/catalog/cards'
   import { Icon } from '../../../src/icons/index.ts'
   import type { IconName } from '../../../src/icons/index.ts'
-  import { spanLabel } from '@oceanmetrics/status'
+  import { spanLabel, STATUS_NOTE, STATUS_WORDS, TREND_WORDS } from '@oceanmetrics/status'
   import type { Catalog, Indicator, VocabId } from './data.ts'
-  import { configHash, configLines, badgeUrl } from './delivery.ts'
-  import { EOV_GLYPH_CREDIT, GOOS_CREDIT, STATUS_NOTE } from './credits.ts'
+  import { badgeUrl } from './delivery.ts'
+  import { EOV_GLYPH_CREDIT, GOOS_CREDIT } from './credits.ts'
   import { mapHref, placeHref } from './hash.ts'
   import type { Carry, Depth } from './hash.ts'
-  import { classText, STATUS_WORDS, TREND_WORDS, periodText, valueText, valuesCollOf } from './matrix.ts'
+  import { classText, periodText, valueText, valuesCollOf } from './matrix.ts'
   import type { CellModel, Place } from './matrix.ts'
   import type { GroupCount } from './nextSteps.ts'
   import NextSteps from './NextSteps.svelte'
@@ -46,7 +47,7 @@
   let root: HTMLElement | undefined = $state()
   let closeBtn: HTMLButtonElement | undefined = $state()
 
-  const lines = $derived(configLines(ind, place, m.version))
+  const lines = $derived(configLines(ind, place.id, m.version))
   const hash = $derived(configHash(lines))
   // a cell with a value reads its sentence; any other cell reads its way forward (NextSteps)
   const headline = $derived(row?.sentence ?? '')

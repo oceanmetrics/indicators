@@ -14,7 +14,9 @@
 //   the Place view carry it untouched, so it survives a switch of views. t2 (a second period in the same grammar; none = compare
 //   off) is shared like t: the Map's compare mode draws the layer at t and at t2 with a swipe between them (map/compare.ts),
 //   and the other views carry it.
-// - Matrix: q (place search, narrows the selection), cell (an open drawer: place_id|indicator).
+// - Matrix: q (place search, narrows the selection), cell (an open drawer: place_id|indicator), page (the page of the grid, 60
+//   places a page, 1-based; 1 is left out), unfold (the folded series opened: a comma list of series ids, `obis-fish,obis-all`).
+//   the Matrix's sort select writes the order's ps and is (the status sorts above, below, recent and series: src/report/order.ts).
 // - Place: place (a place_id), coll (its group; kept for old links, the place is found by its id), method
 //   (iea-sd | names-pct | values: overrides every continuous card's status method), ind (the indicator opened: its card
 //   comes first).
@@ -74,6 +76,9 @@ export interface ViewState {
   proj: 'globe' | null
   /** the layer under the Map (`erddap:dhw_5km:CRW_SST`), or null for none */
   layer: string | null
+  /** the Matrix's page (1-based) and the folded series it shows open */
+  page: number
+  unfold: string[]
   /** the report spec: its `places` and `indicators` are the selection every view shares; its other keys are the Report's (the default in every other view) */
   spec: ReportSpec
 }
@@ -81,7 +86,7 @@ export interface ViewState {
 export const DEFAULT_STATE: ViewState = {
   view: 'matrix', q: '', vocab: 'onms', depth: 'swim', cell: null,
   place: null, coll: null, method: null, ind: null,
-  axes: 'indicators', showEmpty: false, color: null, t: null, t2: null, anom: false, swipe: null, cls: null, grain: null, proj: null, layer: null, spec: DEFAULT_SPEC,
+  axes: 'indicators', showEmpty: false, color: null, t: null, t2: null, anom: false, swipe: null, cls: null, grain: null, proj: null, layer: null, page: 1, unfold: [], spec: DEFAULT_SPEC,
 }
 
 /** a period in the hash: "2024", "2024-07", "2024-07-15" */
@@ -141,6 +146,8 @@ export function parseHash(hash: string): ViewState {
     grain: MAP_GRAINS.includes(kv.get('grain') as Grain) ? (kv.get('grain') as Grain) : null,
     proj: kv.get('proj') === 'globe' ? 'globe' : null,
     layer: layer ? formatLayerKey(layer) : null,
+    page: view === 'matrix' && /^\d+$/.test(kv.get('page') ?? '') ? Math.max(1, Number(kv.get('page'))) : 1,
+    unfold: view === 'matrix' ? [...new Set((kv.get('unfold') ?? '').split(',').map(x => x.trim()).filter(Boolean))] : [],
     // outside the Report only the selection is read; the Report's other keys are its own
     spec: view === 'report' ? spec : selectionSpec(spec),
   }
@@ -202,6 +209,8 @@ export function serializeHash(s: ViewState): string {
   if (s.vocab !== DEFAULT_STATE.vocab) parts.push('vocab=' + s.vocab)
   if (s.depth !== DEFAULT_STATE.depth) parts.push('depth=' + s.depth)
   if (s.cell) parts.push('cell=' + enc(s.cell.place) + '|' + enc(s.cell.indicator))
+  if (s.page > 1) parts.push('page=' + s.page)
+  if (s.unfold.length) parts.push('unfold=' + s.unfold.map(enc).join(','))
   if (s.axes === 'places') parts.push('axes=p')
   if (s.showEmpty) parts.push('empty=1')
   if (s.t) parts.push('t=' + s.t)

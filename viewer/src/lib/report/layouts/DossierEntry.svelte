@@ -4,15 +4,14 @@
   // DuckDB query). the values are read when the entry comes near the screen (or at once when `all`, for print), so a
   // dossier of a hundred figures does not read a hundred records on load.
   import { onMount } from 'svelte'
+  import { placeCitation } from '@oceanmetrics/catalog/cards'
+  import { METHOD_NOTES, STATUS_NOTE, STATUS_WORDS, TREND_WORDS } from '@oceanmetrics/status'
   import { Icon } from '../../../../../src/icons/index.ts'
   import type { IconName } from '../../../../../src/icons/index.ts'
   import type { ReportSpec } from '../../../../../src/report/spec.ts'
   import type { Catalog, Indicator } from '../../data.ts'
   import type { Depth } from '../../hash.ts'
-  import { STATUS_WORDS, TREND_WORDS } from '../../matrix.ts'
   import type { CoverageIndex, Place } from '../../matrix.ts'
-  import { METHOD_NOTES, placeCitation } from '../../place.ts'
-  import { STATUS_NOTE } from '../../credits.ts'
   import CopyButton from '../../CopyButton.svelte'
   import StackChart from '../../StackChart.svelte'
   import TimeChart from '../../TimeChart.svelte'
@@ -99,7 +98,7 @@
         </ul>
         {#if depth === 'dive'}
           <ul class="cfg">{#each rep.config as l (l)}<li><code>{l}</code></li>{/each}</ul>
-          {#if rep.sql}<pre class="sql om-code">{rep.sql}</pre><CopyButton text={rep.sql} label="Copy query" />{/if}
+          {#if rep.snippet}<pre class="sql om-code">{rep.snippet}</pre><CopyButton text={rep.snippet} label="Copy query" />{/if}
         {/if}
       </div>
     {/if}

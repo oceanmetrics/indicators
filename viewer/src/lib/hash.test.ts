@@ -230,6 +230,28 @@ describe('the Matrix edit keys (flip, show empty)', () => {
     expect(serializeHash(st({ view: 'place', place: 'NMS:A', axes: 'places' }))).toBe('view=place&place=NMS:A&axes=p')
     expect(parseHash('#view=report&axes=p').axes).toBe('places')
   })
+  it('the page and the unfolded series: written after the cell, read back; page 1 and none are left out', () => {
+    const s = st({ cell: { place: 'NMS:A', indicator: 'x:y' }, page: 3, unfold: ['obis-fish', 'obis-all'], ps: undefined } as Partial<ViewState>)
+    expect(serializeHash(s)).toBe('cell=NMS:A|x:y&page=3&unfold=obis-fish,obis-all')
+    expect(parseHash('#' + serializeHash(s))).toEqual(s)
+    expect(serializeHash(st({ page: 1, unfold: [] }))).toBe('')
+  })
+  it('a page that is not a whole number is page 1; an unfold list drops blanks and repeats', () => {
+    expect(parseHash('#page=two').page).toBe(1)
+    expect(parseHash('#page=0').page).toBe(1)
+    expect(parseHash('#page=-2').page).toBe(1)
+    expect(parseHash('#unfold=obis-fish,,obis-fish').unfold).toEqual(['obis-fish'])
+  })
+  it('the sort select writes the order keys: ps=below, is=series', () => {
+    const s = parseHash('#ps=below&is=series&page=2')
+    expect([s.spec.order.places.sort, s.spec.order.indicators.sort, s.page]).toEqual(['below', 'series', 2])
+    expect(serializeHash(s)).toBe('ps=below&is=series&page=2')
+  })
+  it('the page and the unfolded series are the Matrix\'s: no other view reads or writes them', () => {
+    expect(parseHash('#view=map&ind=x:y&page=2&unfold=a').page).toBe(1)
+    expect(serializeHash({ ...st({ view: 'map', ind: 'x:y' }), page: 2, unfold: ['a'] })).toBe('view=map&ind=x:y')
+    expect(serializeHash({ ...st({ view: 'place', place: 'NMS:A' }), page: 2 })).toBe('view=place&place=NMS:A')
+  })
   it('the Matrix-only keys (q, cell) do not leak into a Place or a Map hash', () => {
     expect(serializeHash({ ...st({ view: 'place', place: 'NMS:CINMS' }), q: 'x', cell: { place: 'a:b', indicator: 'c:d' } })).toBe('view=place&place=NMS:CINMS')
     expect(serializeHash({ ...st({ view: 'map', ind: 'x:y' }), q: 'x' })).toBe('view=map&ind=x:y')

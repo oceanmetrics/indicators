@@ -13,21 +13,21 @@
   // the next steps. Compare (the hash's t2, compare.ts) draws the same layer at a second period left of a swipe handle, or with
   // anom=1 the difference t2 - t per cell; the legend names both periods.
   import { onMount, untrack } from 'svelte'
+  import { valuesUrl } from '@oceanmetrics/catalog/cards'
   import { Button, Notice, Select, Toggle } from '@marinebon/ui'
   import { Icon } from '../../../../src/icons/index.ts'
-  import { periodLabel } from '@oceanmetrics/status'
+  import { periodLabel, STATUS_WORDS, TREND_WORDS } from '@oceanmetrics/status'
   import type { MethodId } from '@oceanmetrics/status'
   import { expandIndicators } from '../../../../src/report/spec.ts'
   import type { Catalog, Layers } from '../data.ts'
   import { groupHref, mapToMatrixHref, placeHref } from '../hash.ts'
   import type { MapColor, ViewState } from '../hash.ts'
-  import { cellModel, indexCoverage, isLiveProducer, orderGroups, STATUS_WORDS, TREND_WORDS } from '../matrix.ts'
+  import { cellModel, indexCoverage, isLiveProducer, orderGroups } from '../matrix.ts'
   import type { CoverageIndex, Place } from '../matrix.ts'
-  import { defaultMethod, METHOD_LABELS } from '../place.ts'
+  import { defaultMethod } from '../place.ts'
   import { includeIndicator, withSelection } from '../selection.ts'
   import { loadValuesFile } from '../valuesData.ts'
   import type { PlaceRow } from '../valuesData.ts'
-  import { valuesUrl } from '../delivery.ts'
   import { computedGroups } from '../nextSteps.ts'
   import NextSteps from '../NextSteps.svelte'
   import IndicatorPicker from '../pick/IndicatorPicker.svelte'
@@ -365,7 +365,7 @@
         <span class="mbon-label">Method</span>
         <div class="row">
           {#each methodChoices as id (id)}
-            <Button variant="quiet" size="sm" pressed={model.method === id} onclick={() => onpatch({ method: id === method ? null : id })}>{METHOD_LABELS[id]}</Button>
+            <Button variant="quiet" size="sm" pressed={model.method === id} onclick={() => onpatch({ method: id === method ? null : id })}>{id}</Button>
           {/each}
         </div>
       </div>
