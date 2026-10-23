@@ -34,7 +34,9 @@ const MAP = { width: 1440, height: 1500, deviceScaleFactor: 2 }
 const MAP_PHONE = { width: 390, height: 2400, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
 const SST = 'view=map&ind=erddap:dhw_5km:CRW_SST:mean&pi=coll:places'
 const MPA = 'view=map&ind=sdg:ER_MRN_MPA&pi=coll:mr_eez&color=value'
-const LAYER = SST + '&grain=month&t=2024-07&layer=erddap:dhw_5km:CRW_SST'
+// the layer under the map: a grid slice of the dataset at the step of t, computed in the browser. --layer swaps the dataset
+// (`--layer grid:jplMURSST41mday:sst`, the oceanmetrics mirror, when PacIOOS does not answer)
+const LAYER = SST + '&grain=month&t=2024-07&layer=' + arg('--layer', 'grid:dhw_5km:CRW_SST')
 const FKNMS = 'view=place&place=NMS:FKNMS'
 const FKNMS_SST = 'cell=NMS:FKNMS|erddap:dhw_5km:CRW_SST:mean'
 // the way forward from an empty cell: Wells (a NERRS reserve) has no sea surface temperature computed (not computed yet), and the
@@ -207,10 +209,14 @@ const SHOTS = [
   ['map_sst_status_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, SST + '&color=status'],
   ['map_sst_status_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, SST + '&color=status'],
   ['map_sst_departure_oceanmetrics_light', 'oceanmetrics', 'light', MAP, SST + '&color=departure'],
-  // the layer under the map (Day 6: the dataset's own ERDDAP WMS, until the renderer of build week 2) at a month of 2024
+  // the layer under the map: a grid slice computed in the browser (DuckDB-WASM) at a month of 2024
   ['map_layer_sst_oceanmetrics_light', 'oceanmetrics', 'light', MAP, LAYER],
   ['map_layer_sst_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, LAYER],
   ['map_layer_sst_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, LAYER],
+  // framed on one place, where the slice's cells show: the dataset's own lattice inside the place, the class on the outline
+  ['map_layer_sst_cinms_oceanmetrics_light', 'oceanmetrics', 'light', MAP, LAYER + '&place=NMS:CINMS'],
+  ['map_layer_sst_fknms_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, LAYER + '&place=NMS:FKNMS'],
+  ['map_layer_sst_cinms_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, LAYER + '&place=NMS:CINMS'],
   ['map_sdg1451_value_oceanmetrics_light', 'oceanmetrics', 'light', MAP, MPA],
   ['map_sdg1451_value_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, MPA],
   // OBIS, the CoastWatch OBIS replacement: species of fish per EEZ, by year and by decade
@@ -363,9 +369,9 @@ try {
     await page.setViewport(vp)
     const errors = []
     page.on('pageerror', e => errors.push(String(e)))
-    page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
+    page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); else if (m.text().startsWith('[om]')) console.log('  ', m.text()) })
     const embed = name.startsWith('embed_')
-    await page.goto(`${URL_BASE}${embed ? 'embed/' : ''}?brand=${brand}&theme=${theme}${DATAQ}${hash ? '#' + hash : ''}`, { waitUntil: 'networkidle0' })
+    await page.goto(`${URL_BASE}${embed ? 'embed/' : ''}?brand=${brand}&theme=${theme}${DATAQ}${hash ? '#' + hash : ''}`, { waitUntil: 'networkidle0', timeout: 120000 })
     await page.waitForSelector(embed ? 'main.embed[data-state=done]' : '.lens[data-state=done]', { timeout: 30000 })
     // a report is ready when its layout is drawn and no card or recomputation is still waiting
     if (hash.includes('view=report')) {
@@ -376,10 +382,13 @@ try {
     }
     // a Place view is ready when it has cards and none is still loading
     if (hash.includes('view=map')) await page.waitForSelector('.map[data-state=done]', { timeout: 60000 })
-    // the layer under the map arrives after its collection is read, and its WMS tiles after that: the legend names it, then the map is idle again
+    // the layer under the map: its collection is read, then the engine boots, the polygons and axes arrive and the slice is
+    // computed; the legend says "loading the slice" until it is drawn (or says why not), then the map is idle again
     if (hash.includes('layer=')) {
-      await page.waitForFunction(() => /Layer:/.test(document.querySelector('.legend')?.textContent ?? ''), { timeout: 30000 })
-      await new Promise(r => setTimeout(r, 300))
+      const t0 = Date.now()
+      await page.waitForFunction(() => { const t = document.querySelector('.legend')?.textContent ?? ''; return /Layer:/.test(t) && !/loading the slice/.test(t) }, { timeout: 180000 })
+      console.log('   layer legend settled in', Date.now() - t0, 'ms:', await page.evaluate(() => [...document.querySelectorAll('.legend .note')].map(n => n.textContent).join(' | ')))
+      await new Promise(r => setTimeout(r, 500))
       await page.waitForSelector('.map[data-state=done]', { timeout: 90000 })
     }
     if (hash.includes('view=place')) await page.waitForFunction(() => document.querySelector('article.card') && !document.querySelector('article.card[aria-busy="true"]'), { timeout: 30000 })
