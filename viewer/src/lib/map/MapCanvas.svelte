@@ -13,7 +13,7 @@
   // (compare.ts) adds a second slot of the same layer (`slot2`, ids `slot:grid@t2`) just above the first, clipped to the left of
   // the swipe handle by two custom layers around its fill that set and clear the WebGL scissor box: one map, two layer groups.
   // with the anomaly the second slot is drawn whole and the first is hidden. the cell under the pointer (or a tap) goes out as
-  // `oncell`: each slot's cell there (`cellAt`, map 0.3.0, read from the slices themselves, so the hidden slot of the anomaly
+  // `oncell`: each slot's cell there (`cellAt`, map 0.3.1, read from the slices themselves, so the hidden slot of the anomaly
   // and both halves of the swipe answer); the words are gridLayer.ts `cellReadout`.
   import { onMount, untrack } from 'svelte'
   import { Map as MlMap, NavigationControl, ScaleControl } from 'maplibre-gl'

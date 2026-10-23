@@ -104,7 +104,7 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   WebGL scissor (`swipeLayers.ts`; one map, never a second canvas or a `setFilter` per frame); both slots on one scale (the union of their ranges), one slice per
   period (`sliceCache.ts`), `t2 - t` in the engine's SQL (`gridAnomaly.ts`); `t` and `t2` are periods of the layer's grain, so erddap-places' `md` has no counterpart. `t2` may also be a year range
   (`2003-2012`): the mean per cell of its periods at the month of `t`, at most `MAX_MEAN_PERIODS` (12) slices, three at once, averaged in the engine's SQL
-  (`meanRows`/`meanSql`). Build week 2's other parity rows: the cell readout (`GridSlot.cellAt`, map 0.3.0; words in `gridLayer.ts` `cellReadout`, a box
+  (`meanRows`/`meanSql`). Build week 2's other parity rows: the cell readout (`GridSlot.cellAt`, map 0.3.1; words in `gridLayer.ts` `cellReadout`, a box
   beside the pointer and a "Cell:" legend line), the cells sliced in the legend (`cellCountLine`, `cellRows`; the mask counted per place in `gridSource.ts`),
   every ERDDAP request through `patientFetch` and a Retry on a failed slice (`GridSlot.retry()`, `problemText`), the palette (`pal=`, `rampChoices`,
   `GridSlot.setRamp`; the anomaly keeps `balance`), and `l` for compare on and off (`viewer/src/lib/keys.ts`, Help ▾ → Keyboard shortcuts; update `SHORTCUTS`

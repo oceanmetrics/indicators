@@ -267,7 +267,7 @@ values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` 
   `@oceanmetrics/engine` (the mask, the lobes, the ERDDAP requests, DuckDB-WASM, the slice) on MapLibre 6 (named imports: it has no
   default export). `MapCanvas.svelte` calls `setupMapLibre` once a page with MapLibre's worker module (`maplibre-gl-worker.mjs?worker&url`;
   `vite.config.ts` names worker chunks `.mjs`, which MapLibre 6's `importScriptInWorkers` requires) and registers `pmtiles://` (`setup.ts`:
-  one setup a page for every map, given the same three functions each time). Both packages come from npm (`@oceanmetrics/map` ^0.3.0 for the
+  one setup a page for every map, given the same three functions each time). Both packages come from npm (`@oceanmetrics/map` ^0.3.1 for the
   cell readout, the counts, the palette and the Retry; `@oceanmetrics/engine` ^0.1.1).
 - **The basemap** is CARTO's positron (light) or dark-matter (dark) through `composeStyle(baseStyle(theme), { theme, dem: false })`:
   the GEBCO sea floor, isobaths, land mask and undersea names are built and in the bucket, but `storage.oceanmetrics.io/basemap/`
@@ -348,7 +348,7 @@ values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` 
 - **The cell readout** (rows 17, 37): hovering a cell (a tap on a phone) shows a small box beside the pointer and a "Cell:" line in the
   legend with the cell's value, unit and period, the centre and, for a boundary cell, the share inside the place; in the compare mode
   both periods and the difference `t2 - t` (the anomaly's sign). Each slot answers from its own last slice (`GridSlot.cellAt`,
-  `@oceanmetrics/map` 0.3.0's `cellLocator` over the dataset's lattice), so both halves of the swipe and the hidden slot under the
+  `@oceanmetrics/map` 0.3.1's `cellLocator` over the dataset's lattice), so both halves of the swipe and the hidden slot under the
   anomaly answer; the words are `gridLayer.ts` `cellReadout`.
 - **The cells sliced** (row 19): the legend says "Cells: 101,923 sliced in 14 places (9,163 on a boundary) · with data: 100,982 at
   2024-07, 100,982 at 2016-07" (`cellCountLine`; the mask is counted lobe by lobe in `gridSource.ts`, the slices by `GridSlot.counts()`)
