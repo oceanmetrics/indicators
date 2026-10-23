@@ -46,6 +46,15 @@ jobs:
           npx vitest run src
       - name: build the catalog (erddap-places, eco-indicators and obis rebuilt, SDG pulled from the published catalog)
         run: scripts/build_catalog.sh catalog
+      # the change feed (build week 5): the built coverage against the PUBLISHED one (read over HTTPS before the publish
+      # replaces it; the build wiped the folder), through @oceanmetrics/catalog/changes: catalog/changes/<date>.json and
+      # .parquet, changes/latest.json and the Atom feeds catalog/feeds/*.xml, published by publish_catalog.sh. a failure
+      # here never blocks the catalog; a missed day is recovered from the bucket's versions (scripts/backfill_changes.mjs)
+      - name: change files and feeds (diff against the published coverage)
+        continue-on-error: true
+        run: |
+          export PATH=/opt/homebrew/bin:$PATH
+          npm run -s changes:build -- catalog --prev https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/coverage.parquet
       # the SanctuaryWatch pilot figures (plan §7): the bundle for CINMS, its PNGs drawn by the deployed embed route,
       # published under indicators/sanctuarywatch/ so each figure.png keeps a stable URL. a failure here never blocks
       # the catalog

@@ -44,7 +44,7 @@ WHERE time_grain = 'year' ORDER BY place_id, time;
 | `config/` | YAML | `indicators.yml` (categories, series, lead, preferred, kind, min_periods), the vocabularies, and `place_sets.yml` (named lists of place groups: the manifest's `place_sets`) |
 | `om_indicators/` | Python (uv) | producer adapters (writing through `om_extract.contract`), manifest builder, coverage check, CLI `om-ind` |
 | `tests/` | pytest | one test per rule, exact-row fixtures |
-| `src/coverage/` | TypeScript (Node) | values → `coverage.parquet` |
+| `src/coverage/` | TypeScript (Node) | values → `coverage.parquet`; `changes.ts`: the change files and Atom feeds (`@oceanmetrics/catalog/changes`) |
 | `@oceanmetrics/status` | TypeScript (package) | the status methods (`iea-sd`, `names-pct`, `values`): the **only** implementation, used by the coverage builder and the viewer. It lives in https://github.com/oceanmetrics/platform (`packages/status`, with its tests and the R cross-check against ecoidx) and comes from npm: `npm install` here picks it up, and a change to a status method is made in `oceanmetrics/platform` and released there, then taken here by bumping the version range |
 | `brand/` | Python, Node | icon pipeline (MDI by export name + generated glyphs + traced GOOS EOV glyphs), themes, favicons |
 | `assets/goos-eov/` | PNG, WebP | the GOOS EOV badges, unmodified (see its `SOURCE.md`) |
@@ -72,6 +72,8 @@ uv run om-ind obis --out catalog             # the latest obis-h3 release's plac
 uv run om-ind manifest --out catalog         # catalog/indicators.json
 npm run coverage:build -- catalog            # catalog/coverage.parquet (statuses from `@oceanmetrics/status`; place_coll from the gazetteer index, see `--gazetteer-index`, `--layers`)
 uv run om-ind validate catalog               # every values file and coverage.parquet against the schemas
+npm run changes:build -- catalog             # catalog/changes/<date>.{json,parquet}, changes/latest.json, feeds/*.xml: the build against the published coverage (--prev, --published <url|folder|none>, --date)
+node --experimental-strip-types scripts/backfill_changes.mjs [out] [--publish]   # the past change files from the bucket's coverage.parquet versions (AWS profile)
 
 npm run dev                                  # the viewer on http://localhost:5181/, reading catalog/
 node viewer/scripts/shoot.mjs                # screenshots -> docs/shots/ (both themes, both brands, 390 px)
@@ -250,6 +252,24 @@ back to the Place view; `?theme=` and `?brand=` work as in the app, and `main.em
   https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/, which the viewer uses (one round trip fewer).
   To refresh the SDG series from the places prototype:
   `SDG_VALUES=../places/proto/eez_indicators/data/values.json scripts/build_catalog.sh && scripts/publish_catalog.sh`.
+- **Changes and feeds** (build week 5): after the build, the step "change files and feeds" (`npm run changes:build`,
+  `src/coverage/changes.ts`) diffs the built `coverage.parquet` against the **published** one (read over HTTPS before
+  the publish replaces it: the build wipes `catalog/`) with `@oceanmetrics/catalog/changes` `diffCoverage`: one row per
+  place × indicator at the card's row whose status word changed (`status`), whose latest period advanced (`period`) or
+  that gained its first value (`new`). It writes `catalog/changes/<YYYY-MM-DD>.json` and `.parquet` (only on a day with
+  changes; merged with the day's published file, so a re-run adds only what is new), `catalog/changes/latest.json` (every
+  build: `checked_at`, the last non-empty day, the last 30 files) and the Atom feeds `catalog/feeds/all.xml`,
+  `coll=<slug>.xml`, `set=<id>.xml`, `place=<id>.xml` (every place with a coverage row, an empty feed until its first
+  change; the newest 100 entries of the last 30 files) with `feeds/index.json`, each validated against its schema.
+  `scripts/publish_changes.sh` uploads them (called by `publish_catalog.sh` after `coverage.parquet` and before
+  `indicators.json`; `latest.json` last; nothing deleted). The step is `continue-on-error`: a failure never blocks the
+  catalog, and a missed day is recovered from the bucket's object versions with `scripts/backfill_changes.mjs` (the same
+  diff over each consecutive pair of `coverage.parquet` versions; `--publish` uploads through `publish_changes.sh`). A
+  request run (`requests.yml`) writes them too. The feeds are read at
+  `https://storage.oceanmetrics.io/indicators/feeds/<file>` (`application/atom+xml`; the storage Worker serves `.xml` and
+  `.atom` keyless). Backfilled on 2026-10-23 over the 16 version pairs since 10-20: 16,871 `new` on 10-20 (15,764 the
+  first full build), 1 `status` on 10-21 (NMS:PMNM's CRW SST, a first status: above its own record), 1 `new` on 10-22,
+  868 `new` on 10-23 (OBIS `place_exact` for the 18 sanctuaries; 2,664 coverage rows).
 - **Viewer:** `.github/workflows/pages.yml` tests, builds (`VITE_BASE=/indicators/`) and checks the size budget on
   every push touching the viewer, then deploys to https://oceanmetrics.io/indicators/.
 

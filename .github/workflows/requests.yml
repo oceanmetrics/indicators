@@ -205,6 +205,9 @@ jobs:
               --content-type application/json --cache-control "public, max-age=300" --only-show-errors
           fi
           scripts/build_catalog.sh
+          # the change feed, as in catalog.yml: a computed place is a change (its first values); a failure never blocks the publish
+          npm run -s changes:build -- catalog --prev https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/coverage.parquet \
+            || echo "::warning::the change files were not written; recover them with scripts/backfill_changes.mjs"
           scripts/publish_catalog.sh
       - name: answer the issue
         if: steps.cap.outputs.over != '1' && (env.REQ_FAMILY == 'cmems' || steps.stats.outputs.mode == 'publish')

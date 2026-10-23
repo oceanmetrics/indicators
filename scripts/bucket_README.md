@@ -18,6 +18,13 @@ FROM read_parquet('https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/ind
 WHERE time_grain = 'year' ORDER BY place_id, time;
 ```
 
+- `changes/<YYYY-MM-DD>.json` and `.parquet`: what changed in a day's build, one row per place × indicator
+  (`kind`: `status` when the status word changed, `new` for a first value, `period` for a later period), with the
+  sentence feeds and mails use; `changes/latest.json`: when the catalog was last checked, the last day with a change and
+  the last 30 change files. Schemas `changes-row` and `changes-latest` in `@oceanmetrics/catalog`.
+- `feeds/`: Atom feeds of the changes: `all.xml`, `coll=<collection>.xml`, `set=<place set>.xml` and
+  `place=<place id>.xml` (e.g. `feeds/place=NMS:CINMS.xml`), listed in `feeds/index.json`. Statuses are relative to each
+  place's own record, never better or worse.
 - `producers/cmems/`: the Copernicus Marine place producer's own output (`index.json`, and `<dataset>/<variable>/<place>/`
   with `data.parquet` and `provenance.json`), for the places a maintainer accepted from a request. It is not the catalog: the
   daily build reads it into `values/`, and the catalog sync never deletes it.
