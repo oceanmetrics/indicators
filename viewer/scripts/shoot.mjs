@@ -283,6 +283,7 @@ const SHOTS = [
   ['drawer_live_oceanmetrics_light_390', 'oceanmetrics', 'light', PHONE, LIVE],
   ['drawer_na_oceanmetrics_light', 'oceanmetrics', 'light', TALL, NA],
   ['drawer_na_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PHONE, NA],
+  ['place_obis_onthemap_CINMS_oceanmetrics_light', 'oceanmetrics', 'light', PLACE, 'view=place&place=NMS:CINMS&ind=obis:es50'],
   ['place_opened_FKNMS_oceanmetrics_light', 'oceanmetrics', 'light', PLACE, OPENED],
   ['place_opened_FKNMS_oceanmetrics_dark', 'oceanmetrics', 'dark', PLACE, OPENED],
   ['place_opened_FKNMS_oceanmetrics_light_390', 'oceanmetrics', 'light', PLACE_PHONE, OPENED],

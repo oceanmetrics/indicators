@@ -22,6 +22,7 @@
   import type { Place } from './matrix.ts'
   import { cardModel, defaultMethod, fileName, METHOD_IDS, placeCard, placeCsv } from './place.ts'
   import type { CardOptions } from './place.ts'
+  import { obisAtlasUrl } from './obisAtlas.ts'
   import { loadPlaceRows } from './valuesData.ts'
   import type { PlaceRow } from './valuesData.ts'
   import { asIcon } from './icons.ts'
@@ -112,6 +113,8 @@
     downloadBlob(new Blob([buf], { type: 'application/vnd.apache.parquet' }), fileName(place.id, ind.id, 'parquet'))
   }
   const cell = (v: number | null) => fmt(v, dec)
+  // an OBIS card opens the atlas's OBIS H3 layer on the same EOV and indicator, all years, with the place selected (null for the other metrics)
+  const atlasHref = $derived(obisAtlasUrl(ind.id, place))
 </script>
 
 <article class="card" class:focused data-ind={ind.id} aria-labelledby="t-{uid}{ind.id}" aria-busy={load.s === 'loading'}>
@@ -198,6 +201,7 @@
       <div class="actions" role="group" aria-label="Downloads for this place and indicator">
         <Button variant="quiet" size="sm" onclick={csv}><Icon name="ui-download" size={16} />CSV</Button>
         <Button variant="quiet" size="sm" onclick={parquet}><Icon name="ui-download" size={16} />Parquet</Button>
+        {#if atlasHref}<a class="maplink" href={atlasHref} target="_blank" rel="noopener noreferrer">On the map (Ocean Metrics Atlas) ↗</a>{/if}
         <span class="n om-role">{rows.length} {rows.length === 1 ? "row" : "rows"}, all grains</span>
       </div>
 
@@ -259,6 +263,7 @@
   th[scope='row'], thead th:first-child { text-align: left; font-weight: var(--fw-medium); color: var(--text-strong); }
   thead th { position: sticky; top: 0; background: var(--bg-tint); color: var(--text-strong); font-weight: var(--fw-semibold); }
   .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+  .maplink { font-size: var(--text-sm, 0.875rem); }
   .four > summary { cursor: pointer; padding: var(--space-1) 0; list-style: none; display: flex; align-items: center; gap: var(--space-2); }
   .four > summary::-webkit-details-marker { display: none; }
   .four > summary::before { content: '+'; font: var(--fw-bold) 1rem / 1 var(--font-mono); color: var(--label-color); width: 1rem; }
