@@ -1,6 +1,7 @@
 <script lang="ts">
   // the view switch: Matrix, Map and Report as links (each keeps the last state it was left in, so switching back restores
-  // it), plus the place being read when the Place view is open. links, not buttons: every view is a permalink.
+  // it), plus the place being read when the Place view is open. links, not buttons: every view is a permalink. the Map's
+  // small subtitle says what is there besides the places (Ben 2026-10-23); it is left out on a phone.
   import { Icon } from '../../../src/icons/index.ts'
   import type { ViewKind } from './hash.ts'
 
@@ -16,7 +17,7 @@
 
 <nav class="views" aria-label="Views">
   <a href={matrixHref} aria-current={current === 'matrix' ? 'page' : undefined}><Icon name="view-matrix" size={18} />Matrix</a>
-  <a href={mapHref} aria-current={current === 'map' ? 'page' : undefined}><Icon name="view-map" size={18} />Map</a>
+  <a href={mapHref} aria-current={current === 'map' ? 'page' : undefined}><Icon name="view-map" size={18} />Map<span class="sub">layers · then vs now</span></a>
   <a href={reportHref} aria-current={current === 'report' ? 'page' : undefined}><Icon name="view-report" size={18} />Report</a>
   {#if current === 'place' && placeName}
     <span class="here" aria-current="page"><Icon name="view-place" size={18} /><span class="pn">{placeName}</span></span>
@@ -34,6 +35,8 @@
   .views a:hover { color: var(--text-strong); border-bottom-color: var(--border-strong); }
   .views [aria-current='page'] { color: var(--text-strong); border-bottom-color: var(--brand); }
   .views :global(svg) { color: var(--label-color); flex: none; }
+  .sub { font: var(--fw-regular) var(--text-xs) / 1.2 var(--font-sans); color: var(--text-body); }
+  @media (max-width: 600px) { .sub { display: none; } }
   .here { min-width: 0; max-width: 100%; }
   .pn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22rem; min-width: 0; }
 </style>

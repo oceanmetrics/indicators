@@ -27,6 +27,7 @@
   import { groupSelection, includeIndicator, includePlace, namedIndicators, selectionOf, withSelection } from './lib/selection.ts'
   import { SOURCE_HREF } from './lib/credits.ts'
   import { SHORTCUTS } from './lib/keys.ts'
+  import { TRY_THESE, tryHref } from './lib/tryThese.ts'
 
   let { brand }: { brand: Brand } = $props()
 
@@ -249,6 +250,9 @@
   <a href={SOURCE_HREF} target="_blank" rel="noopener">Source on GitHub</a>
   <a href={issueHref} target="_blank" rel="noopener">Feedback (GitHub issue)</a>
   {#if catalog}<a href={catalog.base + 'indicators.json'} target="_blank" rel="noopener">Manifest (indicators.json)</a>{/if}
+  <hr />
+  <span class="mbon-label">Try these</span>
+  {#each TRY_THESE as t (t.id)}<a href={tryHref(t)} title={t.sentence} onclick={() => close()}>{t.label}</a>{/each}
 {/snippet}
 {#snippet feedback()}<span class="fb"><Button variant="quiet" size="sm" href={issueHref} target="_blank">Feedback</Button></span>{/snippet}
 

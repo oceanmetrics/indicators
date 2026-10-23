@@ -320,6 +320,14 @@ values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` 
   At z2 core's z0-5 tiles are fetched beside far's (the same tiles twice: the package README's "Known" note), which is about a third
   of the z2 bytes; gating core's layers from z6 in `@oceanmetrics/map` would save it. The regional tier costs only its header and root
   directory (17 kB) outside z9-10.
+- **Finding the map's features** (Ben 2026-10-23: he could not find the layer under the map or Then vs Now without asking). With no layer, the
+  "Layer under the map" select stands out in a tinted box that says "Add a layer under the map: sea surface temperature, chlorophyll, …", with one
+  click to MUR SST at the latest period (`viewer/src/lib/map/startLayer.ts`: `DEFAULT_LAYER` `grid:jplMURSST41mday:sst`, named in the select by
+  `withDefaultLayer` since no manifest indicator lists it) and the hint that Compare then opens Then vs Now. The Map tab reads "Map" with a small
+  "layers · then vs now" at 1280 (left out under 600 px). Help ▾ → **Try these** lists five views in the shoot script's grammar
+  (`viewer/src/lib/tryThese.ts` `TRY_THESE`, tested: the layer, Then vs Now, the difference, a ten-year mean as Then, one place); the same five
+  are on oceanmetrics.io `/docs/` "Maps" (oceanmetrics.github.io `data/examples.json`): change both together. Shots `map_start_*`,
+  `help_try_these_*`.
 - **The layer under the map** (`layer=<kind>:<id>[:<variable>]`, e.g. `layer=grid:dhw_5km:CRW_SST`; the "Layer under the map" select beside the
   Period scrubber; Day 6's `layer=erddap:...` links open the same layer and are written back as `grid:`): a **grid slice** of an ERDDAP dataset
   drawn under the places at the step of `t` (the period's first day, `2024-07` -> `2024-07-01`; the dataset's latest step when `t` is

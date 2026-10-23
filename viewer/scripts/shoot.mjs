@@ -119,7 +119,7 @@ const fullscreen = mode => async page => {
 }
 // the kit's Menu in the header (Help): open its panel
 const openMenu = async page => {
-  await page.evaluate(() => document.querySelector('header .mbon-menu button')?.click())
+  await page.evaluate(() => (document.querySelector('header .mbon-menu button') ?? document.querySelector('.nav-end .mbon-menu button'))?.click())
   await page.waitForSelector('.mbon-menu .panel', { timeout: 5000 })
 }
 // build week 2 (the parity rows): the cell readout under a pointer (a tap at 390), the palette, a failed slice and its Retry, the
@@ -483,6 +483,12 @@ const SHOTS = [
   ['matrix_mbon_light_indicators_picker', 'mbon', 'light', DESKTOP, REMOVED, openPicker('Indicators')],
   ['matrix_oceanmetrics_dark_indicators_picker_390', 'oceanmetrics', 'dark', PHONE, REMOVED, openPicker('Indicators')],
   ['help_menu_oceanmetrics_dark', 'oceanmetrics', 'dark', DESKTOP, '', openMenu],
+  // finding the map's features (Ben 2026-10-23): the Map with no layer (the select stands out, one click to MUR SST, the Compare
+  // hint; the tab's "layers · then vs now" at 1280, left out at 390) and Help → Try these
+  ['map_start_oceanmetrics_light_1280', 'oceanmetrics', 'light', M1280, SST],
+  ['map_start_oceanmetrics_dark_1280', 'oceanmetrics', 'dark', M1280, SST],
+  ['map_start_oceanmetrics_light_390', 'oceanmetrics', 'light', M390, SST],
+  ['help_try_these_oceanmetrics_light_1280', 'oceanmetrics', 'light', M1280, SST, openMenu],
   ['help_menu_mbon_dark', 'mbon', 'dark', DESKTOP, '', openMenu],
 ]
 
@@ -554,7 +560,7 @@ try {
       const { data } = await cdp.send('Page.captureScreenshot', { format: 'png' })
       writeFileSync(resolve(OUT, name + '.png'), Buffer.from(data, 'base64'))
     }
-    else await page.screenshot({ path: resolve(OUT, name + '.png'), fullPage: !name.includes('_full') && !hash.includes('cell=') && !hash.includes('view=place') && !hash.includes('view=report') && !hash.includes('layer=') && !embed })
+    else await page.screenshot({ path: resolve(OUT, name + '.png'), fullPage: !name.includes('_full') && !name.startsWith('map_start') && !name.startsWith('help_try') && !hash.includes('cell=') && !hash.includes('view=place') && !hash.includes('view=report') && !hash.includes('layer=') && !embed })
     // a page-level sideways scroll is a layout bug at any width
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     console.log(name, overflow > 0 ? `PAGE OVERFLOW ${overflow}px` : 'ok', errors.length ? errors : '')

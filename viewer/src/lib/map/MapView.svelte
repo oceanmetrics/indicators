@@ -48,6 +48,7 @@
   import { compareToggle, shortcutFor } from '../keys.ts'
   import { defaultWindow } from './timeWindow.ts'
   import TimeScrubber from './TimeScrubber.svelte'
+  import { COMPARE_HINT, DEFAULT_LAYER, EMPTY_LAYER_LINE, withDefaultLayer } from './startLayer.ts'
   import SwipeHandle from './SwipeHandle.svelte'
   import { compareLegendLine, defaultT2, isYearRange, parseYearRange, rangeLabel, rangeMonth, yearRangeChoices } from './compare.ts'
   import { loadGazetteer } from './gazetteer.ts'
@@ -238,7 +239,7 @@
     } catch (e) { slotError = `The layer ${layerKey} cannot be drawn here (${e instanceof Error ? e.message : String(e)}).` }
     return () => { live = false }
   })
-  const layerOptions = $derived(layerChoices(m.indicators, ind, view.layer))
+  const layerOptions = $derived(withDefaultLayer(layerChoices(m.indicators, ind, view.layer)))
   const slotLegend = $derived.by(() => { void slotTick; return slot?.legend() ?? null })
   // the places the slice covers: their fills give way to it (MapCanvas), the ones it leaves out keep theirs
   const sliced = $derived.by(() => { void slotTick; return slicedIds(sliceSel.places, (slot as GridLayerSlot | null)?.leftOut?.() ?? [], slotLegend, !!slot) })
@@ -479,8 +480,14 @@
       {#if valuesError}<span class="warn" role="status">The record did not load, so only the latest period is shown ({valuesError}).</span>
       {:else if !values && periods.length < 2}<span class="hint" role="status">Loading the record for the period slider…</span>{/if}
     </div>
-    <div class="group layer" bind:this={layerBox}>
+    <!-- no layer yet: the select stands out, with one click to MUR SST at the latest month and the way to Then vs Now (startLayer.ts) -->
+    <div class="group layer" class:start={!view.layer} bind:this={layerBox}>
+      {#if !view.layer}<p class="start-line">{EMPTY_LAYER_LINE}</p>{/if}
       <Select label="Layer under the map" value={view.layer ?? ''} options={layerOptions} onchange={(v: string) => onpatch({ layer: v || null })} />
+      {#if !view.layer}
+        <div class="row"><Button size="sm" onclick={() => onpatch({ layer: DEFAULT_LAYER, t: null })}>MUR SST, latest month</Button></div>
+        <span class="hint">{COMPARE_HINT}</span>
+      {/if}
       {#if keyNote}<span class="hint" role="status">{keyNote}</span>{/if}
     </div>
     <!-- the difference keeps its own diverging ramp: no palette to choose then -->
@@ -574,6 +581,8 @@
   .group { display: grid; gap: var(--space-2); min-width: 0; }
   .group.slide { min-width: min(20rem, 100%); flex: 1; max-width: 32rem; }
   .group.layer { width: min(18rem, 100%); }
+  .group.layer.start { width: min(26rem, 100%); padding: var(--space-3); background: var(--bg-tint); border: 1px solid var(--brand); border-radius: var(--radius-md); }
+  .start-line { margin: 0; font: var(--fw-semibold) var(--text-sm) / 1.35 var(--font-sans); color: var(--text-strong); }
   .group.compare { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-2) var(--space-5); min-width: 0; flex: 1 1 100%; }
   /* wide enough for a year range's "mean of 2003–2012" with the select's arrow */
   .group.compare .with { width: min(13rem, 100%); }
