@@ -1,5 +1,6 @@
 # the manifest builder: exact entries from a tiny catalog, and one test per rule it enforces.
 import datetime as dt
+import json
 
 import pytest
 import yaml
@@ -430,3 +431,12 @@ def test_an_indicator_with_two_producers_files_states_the_family_producers_datas
   assert i["dataset"] == DATASET and i["producer"]["name"] == "noaa-onms/eco-indicators"
   assert [(c["coll"], c["places"], c["rows"]) for c in i["collections"]] == [("mr_eez", 1, 2), ("places", 1, 2)]
   assert "computed on request by om_indicators.producers.cmems_place" in i["method"]["summary"]
+
+
+def test_the_manifest_writes_the_storage_host():
+  """regression 2026-10-23: GAZETTEER and the obis producer's catalog were path-style S3 (72 + 20 of indicators.json's
+  urls, rewritten on cutover day); they follow om_extract.storage now, so no producer url is on S3"""
+  assert m.GAZETTEER == "https://storage.oceanmetrics.io/gazetteer"
+  assert m.PRODUCERS["obis"]["catalog"] == "https://storage.oceanmetrics.io/obis-h3/latest.json"
+  assert m.PRODUCERS["erddap"]["catalog"] == "https://storage.oceanmetrics.io/gazetteer/stats/collection.json"
+  assert "s3.us-east-1" not in json.dumps(m.PRODUCERS)

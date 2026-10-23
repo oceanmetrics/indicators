@@ -33,7 +33,7 @@
     "@duckdb/duckdb-wasm": "1.32.0",
     "@marinebon/ui": "github:marinebon/ui#v0.4.0",
     "@mdi/js": "7.4.47",
-    "@oceanmetrics/catalog": "^0.5.1",
+    "@oceanmetrics/catalog": "^0.6.0",
     "@oceanmetrics/engine": "^0.1.2",
     "@oceanmetrics/map": "^0.3.1",
     "@oceanmetrics/nav": "^0.1.0",

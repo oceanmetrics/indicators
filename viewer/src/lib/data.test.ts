@@ -6,10 +6,10 @@ describe('resolveDataBase', () => {
     expect(resolveDataBase('?data=https://example.org/ind', false)).toBe('https://example.org/ind/')
     expect(resolveDataBase('?data=./other/', true)).toBe('./other/')
   })
-  it('defaults to the repo catalog in dev and the published bucket in a build', () => {
+  it('defaults to the repo catalog in dev and the storage host in a build (catalog 0.6.0, the cutover of 2026-10-23)', () => {
     expect(resolveDataBase('', true)).toBe('./catalog/')
-    expect(resolveDataBase('?brand=mbon', false)).toBe('https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/')
-    expect(resolveDataBase('?data=', false)).toBe('https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/')
+    expect(resolveDataBase('?brand=mbon', false)).toBe('https://storage.oceanmetrics.io/indicators/')
+    expect(resolveDataBase('?data=', false)).toBe('https://storage.oceanmetrics.io/indicators/')
   })
   it('a relative base is made absolute against the page', () => {
     expect(absoluteBase('./catalog/', 'http://localhost:5181/index.html')).toBe('http://localhost:5181/catalog/')

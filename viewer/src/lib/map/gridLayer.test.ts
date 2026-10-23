@@ -103,7 +103,7 @@ describe('the legend and the credit', () => {
     expect(unitLabel('1')).toBeNull()
   })
   it('reads a dataset\'s collection from the gazetteer', () => {
-    expect(collectionUrl('dhw_5km')).toBe('https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer/erddap/dhw_5km/collection.json')
+    expect(collectionUrl('dhw_5km')).toBe('https://storage.oceanmetrics.io/gazetteer/erddap/dhw_5km/collection.json')
   })
 })
 

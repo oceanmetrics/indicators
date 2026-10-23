@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 import pyarrow.compute as pc
 import yaml
+from om_extract.storage import storage_host_from_env, storage_url
 
 from . import contract
 from .schema import load_schema
@@ -24,14 +25,17 @@ from .schema import load_schema
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG = ROOT / "config"
 GOOS_MANIFEST = ROOT / "assets" / "goos-eov" / "manifest.json"
-GAZETTEER = "https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer"
+# the hosts the manifest writes follow the storage rule (OM_STORAGE, else om_extract.storage's default: the storage host
+# since the cutover of 2026-10-23); was path-style S3, 92 urls of indicators.json rewritten on cutover day
+STORAGE = storage_host_from_env()
+GAZETTEER = storage_url("gazetteer", host=STORAGE)
 VALUES_LICENSE = "CC-BY-4.0"
 SITE = "https://oceanmetrics.io/indicators/"
 
 PRODUCERS = {
   "erddap": {
     "name": "erddap-places", "url": "https://github.com/oceanmetrics/erddap-places",
-    "catalog": "https://storage.oceanmetrics.io/gazetteer/stats/collection.json",
+    "catalog": storage_url("gazetteer/stats/collection.json", host=STORAGE),
     "n_meaning": "time steps of the dataset averaged into the period (days, 8-day composites or months)",
     "method": {
       "kind": "precomputed-exact",
@@ -79,7 +83,7 @@ PRODUCERS = {
   },
   "obis": {
     "name": "obisindicators", "url": "https://github.com/marinebon/obisindicators",
-    "catalog": "https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/obis-h3/latest.json",
+    "catalog": storage_url("obis-h3/latest.json", host=STORAGE),
     "n_meaning": "OBIS occurrence records inside the place in the period (every metric of a place and EOV shares one n)",
     "cite_dataset": True,
     "method": {

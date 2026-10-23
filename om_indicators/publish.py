@@ -14,7 +14,7 @@ from pathlib import Path
 import requests
 from om_extract.storage import storage_host_from_env, storage_url
 
-# the catalog root on the storage host: OM_STORAGE, else om_extract.storage's default (path-style S3 until the cutover)
+# the catalog root on the storage host: OM_STORAGE, else om_extract.storage's default (the storage host since 0.6.3)
 PUBLIC_BASE = storage_url("indicators/", host=storage_host_from_env())
 
 
