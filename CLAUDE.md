@@ -119,6 +119,11 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   `.ts` (`places.ts`, `placesTree.ts`, `indicators.ts`, `indicatorsTree.ts`; the `*Tree` files and the panels load on the
   first open, so keep them out of the entry). Shared look-alike CSS lives once in `viewer/src/app.css` as `om-*` classes
   (gzip is per file, so a copy in every stylesheet costs): the CSS budget was met that way, not raised.
+- **The top bar is `@oceanmetrics/nav`'s `<om-nav current="indicators">`** (npm dependency; Ocean Metrics instance only): the lens word, the Help `Menu`, Feedback and `ThemeToggle` go in its slot, `theme` comes from the
+  viewer's resolved theme (`navAttrs()`), `changes-href` is `https://oceanmetrics.io/alerts/`. It is registered by `if (brand !== 'mbon') import('@oceanmetrics/nav/define')` in `main.ts` (a lazy chunk, 4.9 kB; a static
+  import would make the MBON instance pay for it, which keeps the kit `Header`). Never copy the bar back into the viewer.
+- **"Watch these places" / "Watch this place"** link to `https://oceanmetrics.io/alerts/` with the report's own rules (`watchHref()`, `src/report/watch.ts`: `pi px ii ix title`, or `place=<id>` for one place and nothing else) and the Place view's
+  `place=<id>` (`watchPlaceHref()`). The keys are the form's (`oceanmetrics.github.io` `static/js/alerts.js`); a change there is a change here, with its tests.
 - **Statuses are statistical, never better/worse.** No ONMS colours, no ▲ ▬ ▼; glyphs `st-above|within|below`,
   `tr-up|flat|down` differ in shape, and captions say "relative to its own record".
 - **The contract** is `om_extract.contract` (oceanmetrics/extract, a dependency: a git source pinned to a commit in `[tool.uv.sources]` of

@@ -9,6 +9,7 @@
   import { Button, Menu, Notice } from '@marinebon/ui'
   import { Icon } from '../../../../src/icons/index.ts'
   import { LAYOUTS, specId, specJson, specParams } from '../../../../src/report/spec.ts'
+  import { watchHref } from '../../../../src/report/watch.ts'
   import { isDefaultAxis } from '../../../../src/report/order.ts'
   import type { Fix, ReportSpec } from '../../../../src/report/spec.ts'
   import type { Catalog, Layers } from '../data.ts'
@@ -201,6 +202,7 @@
     </div>
     <div class="acts om-row">
       <Button variant="quiet" size="sm" pressed={editing} onclick={() => (editing = !editing)}><Icon name="ui-settings" size={16} />{editing ? 'Close builder' : 'Edit'}</Button>
+      <Button variant="quiet" size="sm" href={watchHref(spec)} target="_blank">Watch these places<span class="mbon-sr-only"> by email (opens in a new tab)</span></Button>
       <Menu label="Export" align="end">
         {#snippet children(close)}
           <button type="button" onclick={() => { saveJson(); close() }}>report.json</button>

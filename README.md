@@ -229,6 +229,12 @@ it prints the last picture, in the theme on screen). The MapLibre chunk loads wh
 that have a value; cells with no value are listed under the report with a prefilled
 GitHub issue. Print (Export, Print) hides the app chrome, prints the title, permalink and report id, and uses the light theme.
 
+**Watch these places** (beside Edit and Export; "Watch this place" in the Place view's meta line) opens `https://oceanmetrics.io/alerts/` in a new tab with
+the report's own selection rules: `pi`, `px`, `ii`, `ix` (the places always named, the others only when they differ from the default) and the report's `title`
+(`watchHref()` in `src/report/watch.ts`, tested on three selections; the layout and style keys are left out, since they do not change what is watched). A selection of
+one place id and nothing else is `?place=<id>`, as the Place view's link always is (`watchPlaceHref()`). The form (the site's `static/js/alerts.js`) reads exactly those
+keys, so a live report and its subscription pick up what is published later.
+
 **Export, SanctuaryWatch bundle** builds `sanctuarywatch_<place or report id>.zip` in the browser (a store-only ZIP writer,
 `src/report/zip.ts`, loaded with the export): for every place x indicator whose status is iea-sd or names-pct at the year
 grain, a folder `<place>__<indicator>/` with `data.json`, `settings.json`, `settings.md`, `captions.md`, `alt.txt`,
@@ -513,7 +519,7 @@ People" (PPG-26-197).
 
 ## Size budget
 
-`node scripts/size-budget.mjs` after `npm run build`, in gzip: entry JS ≤ 110 kB, all JS except the map chunk ≤ 200 kB,
+`node scripts/size-budget.mjs` after `npm run build`, in gzip: entry JS ≤ 110 kB, all JS except the map chunk ≤ 210 kB (200 until 2026-10-23, 205 until the bar),
 the map chunk (MapLibre, pmtiles and the map components) ≤ 330 kB, CSS except the map's ≤ 15 kB, the map's CSS ≤ 15 kB.
 At the first deploy (2026-10-20) the entry was 86.5 kB and the CSS 6.7 kB. The map chunk has its own budget because
 MapLibre is about 230 kB gzip and is loaded only when the Map view is opened. With the two pickers (2026-10-20) the entry is 107.0 kB and the CSS 14.98 kB (107.6 and 15.0 with the place sets: their code is the Map's or lives in the lazy panels, and their rules reuse `om-*` classes): the picker panels and their rules load on the first open, and rules that several components repeated live once in `viewer/src/app.css` as `om-*` classes (gzip is per file, so each copy cost bytes). Nothing was raised for the pickers. With the globe and full screen (2026-10-20) the entry is 108.1 kB (the hash key, three icons and the overlay tokens, which live in the inlined theme files) and the CSS 14.99 kB: the `--map-sea` and `--overlay-*` tokens and the Menu rule are in `brand/themes/*.css` (inlined in the JS), not in the entry CSS. Nothing was raised. With the shared selection and the Select section (2026-10-20) the entry was 109.7 kB and the CSS 14.9 kB before the merge with the globe and the report layouts (the toggling rules of `report/tree.ts` load with the first tick or removal, the gazetteer's index loader and the picker panels on first use; the Tree's look-alike CSS moved rather than grew).  After the three merges of 2026-10-20 (globe, report layouts, shared selection) the entry was 111.3 kB, over budget; the
@@ -565,8 +571,19 @@ The second pass of build week 2 (2026-10-23: the fit by viewport, `placeBox`, th
 0.4 kB to the map JS (324.3 of 330), 0.1 to the entry (103.5 of 110) and to all JS but the map (203.3 of 205); the CSS is unchanged, and the
 engine is 140.3 of 160 with engine 0.1.2's `patientFetch` (`c125f2f`), not this pass. Nothing was raised.
 
+With the shared bar (2026-10-23: `<om-nav>` from `@oceanmetrics/nav` 0.1.0, the "Watch these places" links, `OmHeader.svelte` and the inline mark retired) the entry is
+101.0 kB of 110, all JS but the map 206.1 kB (was 203.4) and **its budget is raised from 205 to 210 kB**. The reason: the bar's `define` chunk is 4.9 kB gzip and loads
+only for the Ocean Metrics instance (`main.ts`: `if (brand !== 'mbon') import('@oceanmetrics/nav/define')`), minus 2.2 kB for the header copy and the mark it replaces.
+The alternative, a static import into the entry, would make the MBON instance pay for a bar it never shows. The CSS is unchanged in budget.
+
 ## Brand and icons
 
+- **The bar:** the Ocean Metrics instance wears the shared bar of the apps and the site, `<om-nav current="indicators">`
+  ([`@oceanmetrics/nav`](https://github.com/oceanmetrics/platform/tree/main/packages/nav) 0.1.0: the mark, the three doors, place search, "What changed" and Docs).
+  The lens word, the Help menu, Feedback and the theme toggle sit in its slot; `theme` is the viewer's resolved theme (`navAttrs()` in `viewer/src/lib/brand/brand.ts`),
+  "What changed" goes to `https://oceanmetrics.io/alerts/` (the feeds and the subscription form). The element is a lazy chunk (`main.ts`:
+  `if (brand !== 'mbon') import('@oceanmetrics/nav/define')`), and the MBON instance keeps the kit's `Header` and never loads it. The earlier copy of the kit's Header
+  (`OmHeader.svelte`) and the inline mark are retired.
 - **Themes** (`brand/themes/`): `oceanmetrics` maps the [Ocean Metrics brand v1](https://oceanmetrics.io/brand/v1/)
   onto the semantic tokens of [`@marinebon/ui`](https://marinebon.org/ui/) (teal brand, one sun action with dark ink);
   `mbon` is the kit's own tokens. The viewer switches with `?brand=oceanmetrics|mbon` and `?theme=light|dark`.

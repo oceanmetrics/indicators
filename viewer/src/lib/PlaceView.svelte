@@ -23,6 +23,7 @@
   import IndicatorPicker from './pick/IndicatorPicker.svelte'
   import { placesWithValue } from './pick/indicatorsTree.ts'
   import { placeLabel } from './pick/places.ts'
+  import { watchPlaceHref } from '../../../src/report/watch.ts'
   import type { CoverageIndex } from './matrix.ts'
 
   interface Props {
@@ -137,7 +138,7 @@
     <header class="top">
       <span class="mbon-label">Place · {titles(place.coll)}</span>
       <h2 class="om-h2" id="pv-title" tabindex="-1" bind:this={title}>{place.name}</h2>
-      <p class="meta om-meta"><code>{place.id}</code> <span aria-hidden="true">·</span> <a href={gazetteerPlaceHref(place.coll, place.id)} target="_blank" rel="noopener">in the gazetteer<Icon name="ui-external" size={14} /><span class="mbon-sr-only"> (opens in a new tab)</span></a> <span aria-hidden="true">·</span> {covered.length} indicators, {withStatus} with a status relative to their own record</p>
+      <p class="meta om-meta"><code>{place.id}</code> <span aria-hidden="true">·</span> <a href={gazetteerPlaceHref(place.coll, place.id)} target="_blank" rel="noopener">in the gazetteer<Icon name="ui-external" size={14} /><span class="mbon-sr-only"> (opens in a new tab)</span></a> <span aria-hidden="true">·</span> <a href={watchPlaceHref(place.id, place.name)} target="_blank" rel="noopener">Watch this place<span class="mbon-sr-only"> by email (opens in a new tab)</span></a> <span aria-hidden="true">·</span> {covered.length} indicators, {withStatus} with a status relative to their own record</p>
     </header>
 
     <section class="controls om-controls" aria-label="Place view controls">
