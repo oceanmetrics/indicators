@@ -1,7 +1,8 @@
 // screenshots with the real catalog: the Matrix (matrix_<brand>_<theme>[_390].png, places as rows matrix_*_placerows*,
 // the place and indicator pickers open matrix_*_places_picker and matrix_*_indicators_picker, the Select section select_*, a group
 // nothing is computed for uncomputed_*, the drawer), the Place view (place_<place>_<brand>_<theme>[_390].png), the
-// Map view (map_<indicator>_<color>_<theme>[_390].png; the layer under it map_layer_*, the compare mode map_compare_*), the Report view (report_*: the Scorecard, the Cards report, the
+// Map view (map_<indicator>_<color>_<theme>[_390].png; the layer under it map_layer_*, the compare mode map_compare_*, build week 2's cell
+// readout, palette, Retry and year-range Then map_wk2_*), the Report view (report_*: the Scorecard, the Cards report, the
 // open builder over budget, the print preview, Small multiples, the Quad plot, the Map sheet and the Dossier), the order of the rows
 // and columns (order_*: the Order control open, a flat north-to-south order in both orientations, a custom order, a drag in progress with
 // its drop bar and a refused drop, the move buttons on focus) and the embed route (embed_*).
@@ -9,7 +10,7 @@
 //   node viewer/scripts/shoot.mjs [--url http://localhost:5181/] [--only matrix_mbon_dark] [--out docs/shots/live] [--data <catalog base URL>]
 // --data reads the catalog from another base (`?data=`), for example the published one while catalog/ is being rebuilt.
 import { spawn } from 'node:child_process'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import puppeteer from 'puppeteer-core'
@@ -41,6 +42,9 @@ const LAYER = SST + '&grain=month&t=2024-07&layer=' + arg('--layer', 'grid:dhw_5
 // difference. MUR monthly from the oceanmetrics mirror (PacIOOS has been down); 1280 wide, as the gate asks
 const COMPARE = SST + '&grain=month&t=2024-07&t2=2016-07&layer=' + arg('--compare-layer', 'grid:jplMURSST41mday:sst')
 const WIDE = { width: 1280, height: 1500, deviceScaleFactor: 2 }
+// build week 2: the layer over one place (the retry shots), and the year-range Then over it
+const LAYER_ONE = 'view=map&ind=erddap:dhw_5km:CRW_SST:mean&pi=NMS:CINMS&place=NMS:CINMS&grain=month&t=2024-07&layer=' + arg('--compare-layer', 'grid:jplMURSST41mday:sst')
+const RANGE = LAYER_ONE + '&t2=2003-2012'
 const FKNMS = 'view=place&place=NMS:FKNMS'
 const FKNMS_SST = 'cell=NMS:FKNMS|erddap:dhw_5km:CRW_SST:mean'
 // the way forward from an empty cell: Wells (a NERRS reserve) has no sea surface temperature computed (not computed yet), and the
@@ -110,6 +114,46 @@ const fullscreen = mode => async page => {
 const openMenu = async page => {
   await page.evaluate(() => document.querySelector('header .mbon-menu button')?.click())
   await page.waitForSelector('.mbon-menu .panel', { timeout: 5000 })
+}
+// build week 2 (the parity rows): the cell readout under a pointer (a tap at 390), the palette, a failed slice and its Retry, the
+// year-range Then. the readout: the pointer goes over the frame from (fx, fy) outward until the readout box shows (a tap until
+// the legend's Cell line does)
+const hoverCell = (fx, fy, tap = false) => async page => {
+  const b = await page.evaluate(() => { const r = document.querySelector('.frame').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height } })
+  // taps further apart and slower than a double tap (which would zoom the map)
+  const step = tap ? 36 : 14, wait = tap ? 700 : 60
+  for (let ring = 0; ring < (tap ? 6 : 14); ring++) {
+    for (let k = 0; k < Math.max(1, ring * 6); k++) {
+      const a = (2 * Math.PI * k) / Math.max(1, ring * 6)
+      const x = b.x + b.w * fx + Math.cos(a) * ring * step, y = b.y + b.h * fy + Math.sin(a) * ring * step
+      if (tap) await page.touchscreen.tap(x, y); else await page.mouse.move(x, y)
+      await new Promise(r => setTimeout(r, wait))
+      const got = await page.evaluate(() => document.querySelector('.legend .cell')?.textContent ?? '')
+      if (got) {
+        console.log('   readout:', got)
+        return
+      }
+    }
+  }
+  console.log('   readout: none found')
+}
+// a failed slice: every slab request of the slice answers 404 (the mirror's own failure, made certain), until `failing.on` is off
+const failing = { on: true }
+const failSlabs = async page => {
+  failing.on = true
+  await page.setRequestInterception(true)
+  page.on('request', r => {
+    if (r.isInterceptResolutionHandled()) return
+    if (failing.on && /\/griddap\/[^?]+\.parquet/.test(r.url())) r.respond({ status: 404, contentType: 'text/html', body: '<html>Error {code=404; message="Not Found: Your query produced no matching results."}</html>' })
+    else r.continue()
+  })
+}
+// then the server answers again and Retry is pressed: the slice draws
+const retryNow = async page => {
+  failing.on = false
+  await page.evaluate(() => [...document.querySelectorAll('.legend button')].find(b => b.textContent?.trim() === 'Retry')?.click())
+  await page.waitForFunction(() => { const t = document.querySelector('.legend')?.textContent ?? ''; return !/no data:|loading the slice/.test(t) && /°C/.test(t) }, { timeout: 180000 })
+  await new Promise(r => setTimeout(r, 1500))
 }
 const EEZ_OBIS = 'view=map&ind=obis:species&pi=coll:mr_eez'
 // the political ocean: the EEZs (Marine Regions' WMS) over the high seas by FAO area (the FAO major areas' PMTiles), one scale
@@ -256,6 +300,30 @@ const SHOTS = [
   ['map_compare_sst_cinms_anom_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, COMPARE + '&place=NMS:CINMS&anom=1'],
   ['map_compare_sst_cinms_globe_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, COMPARE + '&place=NMS:CINMS&proj=globe&swipe=0.35'],
   ['map_compare_sst_cinms_anom_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, COMPARE + '&place=NMS:CINMS&anom=1'],
+  // build week 2: the cell readout (both periods and the difference), at 1280 by a hover and at 390 by a tap
+  ['map_wk2_hover_cinms_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, COMPARE + '&place=NMS:CINMS', hoverCell(0.3, 0.33)],
+  ['map_wk2_hover_cinms_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, COMPARE + '&place=NMS:CINMS', hoverCell(0.65, 0.36)],
+  ['map_wk2_hover_cinms_anom_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, COMPARE + '&place=NMS:CINMS&anom=1', hoverCell(0.45, 0.36)],
+  ['map_wk2_hover_layer_cinms_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, COMPARE.replace(/&t2=[^&]+/, '') + '&place=NMS:CINMS', hoverCell(0.45, 0.36)],
+  ['map_wk2_hover_cinms_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, COMPARE + '&place=NMS:CINMS', hoverCell(0.35, 0.4, true)],
+  ['map_wk2_hover_cinms_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, COMPARE + '&place=NMS:CINMS', hoverCell(0.6, 0.4, true)],
+  // the palette: Spectral reversed (erddap-places' red = warm) on the swipe, the legend's ramp with it
+  ['map_wk2_palette_cinms_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, COMPARE + '&place=NMS:CINMS&pal=spectral_r'],
+  ['map_wk2_palette_cinms_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, COMPARE + '&place=NMS:CINMS&pal=viridis'],
+  ['map_wk2_palette_cinms_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, COMPARE + '&place=NMS:CINMS&pal=spectral_r'],
+  ['map_wk2_palette_cinms_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, COMPARE + '&place=NMS:CINMS&pal=viridis'],
+  // a failed slice (every slab answers 404 here) and its Retry; then the server answers and Retry draws it
+  ['map_wk2_retry_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, LAYER_ONE, null, failSlabs],
+  ['map_wk2_retry_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, LAYER_ONE, null, failSlabs],
+  ['map_wk2_retry_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, LAYER_ONE, null, failSlabs],
+  ['map_wk2_retry_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, LAYER_ONE, null, failSlabs],
+  ['map_wk2_retried_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, LAYER_ONE, retryNow, failSlabs],
+  // the year-range Then: t2=2003-2012, the mean of July 2003..2012 (one place sliced, so ten slices stay light on the mirror)
+  ['map_wk2_range_cinms_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, RANGE],
+  ['map_wk2_range_cinms_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, RANGE],
+  ['map_wk2_range_cinms_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, RANGE],
+  ['map_wk2_range_cinms_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, RANGE],
+  ['map_wk2_range_cinms_anom_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, RANGE + '&anom=1'],
   ['map_sdg1451_value_oceanmetrics_light', 'oceanmetrics', 'light', MAP, MPA],
   ['map_sdg1451_value_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, MPA],
   // OBIS, the CoastWatch OBIS replacement: species of fish per EEZ, by year and by decade
@@ -402,10 +470,11 @@ if (!(await alive(URL_BASE))) {
 mkdirSync(OUT, { recursive: true })
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] })
 try {
-  for (const [name, brand, theme, vp, hash, act] of SHOTS) {
+  for (const [name, brand, theme, vp, hash, act, pre] of SHOTS) {
     if (ONLY && !name.includes(ONLY)) continue
     const page = await browser.newPage()
     await page.setViewport(vp)
+    if (pre) await pre(page)
     const errors = []
     page.on('pageerror', e => errors.push(String(e)))
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); else if (m.text().startsWith('[om]')) console.log('  ', m.text()) })
@@ -425,7 +494,7 @@ try {
     // computed; the legend says "loading the slice" until it is drawn (or says why not), then the map is idle again
     if (hash.includes('layer=')) {
       const t0 = Date.now()
-      await page.waitForFunction(() => { const t = document.querySelector('.legend')?.textContent ?? ''; return /Layer:|Compare:|Difference:/.test(t) && !/loading the slice/.test(t) }, { timeout: 180000 })
+      await page.waitForFunction(() => { const t = document.querySelector('.legend')?.textContent ?? ''; return /Layer:|Compare:|Difference:/.test(t) && !/loading the slice/.test(t) }, { timeout: 300000 })
       console.log('   layer legend settled in', Date.now() - t0, 'ms:', await page.evaluate(() => [...document.querySelectorAll('.legend .note')].map(n => n.textContent).join(' | ')))
       await new Promise(r => setTimeout(r, 500))
       await page.waitForSelector('.map[data-state=done]', { timeout: 90000 })
@@ -440,6 +509,13 @@ try {
     const legend = name.startsWith('legend_') ? await page.$('#legend') : null
     if (legend) await legend.screenshot({ path: resolve(OUT, name + '.png') })
     // a full-page shot resizes the viewport, so the map (62dvh) asks for new tiles: a layer's slow WMS tiles would be missing from it
+    // a hover shot is taken by the protocol itself: puppeteer's screenshot makes the page see the pointer leave (a mouseout), which
+    // clears the readout it is meant to show
+    else if (name.includes('_hover')) {
+      const cdp = await page.createCDPSession()
+      const { data } = await cdp.send('Page.captureScreenshot', { format: 'png' })
+      writeFileSync(resolve(OUT, name + '.png'), Buffer.from(data, 'base64'))
+    }
     else await page.screenshot({ path: resolve(OUT, name + '.png'), fullPage: !name.includes('_full') && !hash.includes('cell=') && !hash.includes('view=place') && !hash.includes('view=report') && !hash.includes('layer=') && !embed })
     // a page-level sideways scroll is a layout bug at any width
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)

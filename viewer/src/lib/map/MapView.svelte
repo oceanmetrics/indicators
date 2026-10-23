@@ -11,7 +11,10 @@
   // computed in the browser over the places drawn, gridKind.ts). the Period scrubber moves `t` and the window [t - w, t] behind it.
   // the group's members that are not computed are drawn faint (and as a small hollow circle from far away), and a click on one offers
   // the next steps. Compare (the hash's t2, compare.ts) draws the same layer at a second period left of a swipe handle, or with
-  // anom=1 the difference t2 - t per cell; the legend names both periods.
+  // anom=1 the difference t2 - t per cell; the legend names both periods. t2 may be a year range (2003-2012): the mean of its
+  // periods at the month of t, at most 12 (compare.ts). the layer's palette is the hash's `pal` (a ramp of @oceanmetrics/map);
+  // the cell under the pointer (or a tap) is read out beside it and in the legend, the legend counts the cells sliced (in all
+  // and per place), and a failed slice gets a Retry. `l` turns the compare mode on and off (keys.ts).
   import { onMount, untrack } from 'svelte'
   import { valuesUrl } from '@oceanmetrics/catalog/cards'
   import { Button, Notice, Select, Toggle } from '@marinebon/ui'
@@ -39,11 +42,14 @@
   import type { LayerSlot } from './layerSlot.ts'
   import { gridKind } from './gridKind.ts'
   import type { GridLayerSlot } from './gridKind.ts'
-  import { layerChoices, leftOutLine, slicedIds, slicePlaces, slicePlacesKey, slotLegendLine, stepDate } from './gridLayer.ts'
+  import { cellCountLine, cellReadout, cellRows, layerChoices, leftOutLine, palOf, rampChoices, readoutPlace, slicedIds, slicePlaces, slicePlacesKey, slotLegendLine, stepDate } from './gridLayer.ts'
+  import { defaultRampFor, RAMPS } from '@oceanmetrics/map'
+  import type { CellProps, GridSlot } from '@oceanmetrics/map'
+  import { compareToggle, shortcutFor } from '../keys.ts'
   import { defaultWindow } from './timeWindow.ts'
   import TimeScrubber from './TimeScrubber.svelte'
   import SwipeHandle from './SwipeHandle.svelte'
-  import { compareLegendLine, defaultT2 } from './compare.ts'
+  import { compareLegendLine, defaultT2, isYearRange, parseYearRange, rangeLabel, rangeMonth, yearRangeChoices } from './compare.ts'
   import { loadGazetteer } from './gazetteer.ts'
   import type { GazLayer } from './gazetteer.ts'
   import { buildParts, partsBbox } from './parts.ts'
@@ -214,9 +220,12 @@
   let slotTick = $state(0)
   // a string, so a new hash (a new t) does not make the slot again: `view` is a new object each time, only update(t) runs then
   const layerKey = $derived(view.layer)
+  // a Retry after the slot itself failed to load (its collection) makes it again
+  let slotTry = $state(0)
   $effect(() => {
     const spec = parseLayerKey(layerKey)
     void sliceKey
+    void slotTry
     slot = null
     slotError = ''
     if (!spec || !haveParts) return
@@ -237,7 +246,8 @@
   // ---- compare: the same layer at a second period t2 (the hash's), left of the swipe; or t2 - t per cell (anom=1) ----
   const compareOn = $derived(!!view.t2)
   const anomOn = $derived(!!view.t2 && view.anom)
-  const slot2T = $derived(stepDate(view.t2))
+  // a year range stays as it is: the companion averages its periods at the month of t
+  const slot2T = $derived(isYearRange(view.t2) ? view.t2 : stepDate(view.t2))
   let slot2 = $state.raw<LayerSlot | null>(null)
   let slot2Tick = $state(0)
   $effect(() => {
@@ -257,14 +267,20 @@
   const swipeF = $derived(swipeLive ?? swipeHash)
   const t2Options = $derived.by(() => {
     if (!model) return []
-    const opts = periods.map(p => ({ value: periodToT(p, model.grain), label: periodLabel(p, model.grain) }))
-    if (view.t2 && !opts.some(o => o.value === view.t2)) opts.unshift({ value: view.t2, label: view.t2 })
+    const opts: { value: string; label: string; group?: string }[] = periods.map(p => ({ value: periodToT(p, model.grain), label: periodLabel(p, model.grain) }))
+    opts.push(...yearRangeChoices(periods, view.t))
+    if (view.t2 && !opts.some(o => o.value === view.t2)) opts.unshift({ value: view.t2, label: isYearRange(view.t2) ? `mean of ${view.t2.replace('-', '–')}` : view.t2 })
     return opts
   })
   const t2Default = $derived(model ? defaultT2(periods, idxNow, win) : null)
   const periodOf = (t: string | null) => (t && model ? periodLabel(t, model.grain) : 'the latest time')
+  // a year range's Then: "mean of 2003-07..2012-07", with what it held once its slices are in
+  const t2Range = $derived(parseYearRange(view.t2))
+  const meanInfo = $derived.by(() => { void slot2Tick; return t2Range ? (slot2 as GridLayerSlot | null)?.meanInfo?.() ?? null : null })
+  const rangeShort = $derived(t2Range && model ? rangeLabel(t2Range, rangeMonth(slotT, periods.at(-1) ?? null), t => periodLabel(t, model.grain)) : null)
+  const rangeLong = $derived(t2Range && model ? rangeLabel(t2Range, rangeMonth(slotT, periods.at(-1) ?? null), t => periodLabel(t, model.grain), meanInfo) : null)
   // the periods asked for (a slot's legend has its t only once mounted)
-  const leftLabel = $derived(periodOf(slot2T))
+  const leftLabel = $derived(rangeShort ?? periodOf(slot2T))
   const rightLabel = $derived(periodOf(slotT))
 
   const placeName = (id: string) => places?.find(p => p.id === id)?.name ?? idx?.places.find(p => p.id === id)?.name ?? titles(id)
@@ -276,9 +292,78 @@
     const left = g?.leftOut ? leftOutLine(g.leftOut(), g.without(), placeName) : ''
     void slot2Tick
     const l2 = slot2?.legend() ?? null
-    const line = l2 ? compareLegendLine({ title: l.title, via: l.via, first: { ...l, t: slotT }, second: { ...l2, t: slot2T }, anom: anomOn }, t => periodLabel(t, model.grain)) : slotLegendLine(l, t => periodLabel(t, model.grain))
+    const line = l2 ? compareLegendLine({ title: l.title, via: l.via, first: { ...l, t: slotT }, second: { ...l2, t: slot2T }, anom: anomOn, secondLabel: rangeLong ? `Then: ${rangeLong}` : null }, t => periodLabel(t, model.grain)) : slotLegendLine(l, t => periodLabel(t, model.grain))
     return line + (left ? ` · ${left}` : '')
   })
+
+  // ---- the palette (the hash's `pal`): the slot and the compare slot repaint, the anomaly keeps its diverging ramp ----
+  const pal = $derived(palOf(view.pal, RAMPS))
+  const slotVar = $derived(parseLayerKey(view.layer)?.variable ?? '')
+  const palDefault = $derived((slot as GridLayerSlot | null)?.defaultRamp ?? defaultRampFor(slotVar))
+  const palOptions = $derived(rampChoices(palDefault, RAMPS))
+  $effect(() => {
+    const r = pal, a = anomOn
+    const s1 = slot as GridSlot | null, s2 = slot2 as GridSlot | null
+    s1?.setRamp?.(r)
+    if (s2 && !a) s2.setRamp?.(r)
+  })
+
+  // ---- the cells sliced: in all, at each period, and per place ----
+  const countLine = $derived.by(() => {
+    void slotTick; void slot2Tick
+    const g = slot as GridLayerSlot | null
+    if (!g?.perPlace) return null
+    const s2 = slot2 as GridSlot | null
+    return cellCountLine(g.perPlace(), [{ period: rightLabel, counts: g.counts?.() ?? null }, ...(s2 && !anomOn ? [{ period: leftLabel, counts: s2.counts?.() ?? null }] : [])])
+  })
+  const countRows = $derived.by(() => { void slotTick; const pp = (slot as GridLayerSlot | null)?.perPlace?.(); return pp ? cellRows(pp, placeName) : [] })
+
+  // ---- a failed slice: Retry asks for it again (the slot itself, when it did not load) ----
+  const noData = (l: { problem?: string | null } | null) => !!l?.problem?.startsWith('no data')
+  const canRetry = $derived(!!slotError || noData(slotLegend) || noData(slot2Legend))
+  function retry() {
+    if (slotError) { slotTry++; return }
+    if (noData(slotLegend)) (slot as GridSlot | null)?.retry?.()
+    if (noData(slot2Legend)) (slot2 as GridSlot | null)?.retry?.()
+  }
+
+  // ---- the cell under the pointer (or the last tap): beside it, and in the legend ----
+  let hover = $state<{ x: number; y: number; first: CellProps | null; second: CellProps | null } | null>(null)
+  let frameW = $state(0)
+  let frameH = $state(0)
+  const readout = $derived.by(() => {
+    const c = hover
+    if (!c || !model) return null
+    const units = slotLegend?.units ?? null
+    const a = c.first, b = c.second
+    const cell = a ?? b
+    if (!cell) return null
+    if (slot2 && b) {
+      // with the anomaly the second slot holds t2 - t: t2 is t plus it
+      const then = anomOn ? (a && a.value !== null && b.value !== null ? a.value + b.value : null) : b.value
+      return cellReadout({ cell, units, now: { period: rightLabel, value: a?.value ?? null }, then: { period: leftLabel, value: then } })
+    }
+    return a ? cellReadout({ cell: a, units, now: { period: rightLabel, value: a.value } }) : null
+  })
+  const tip = $derived(hover ? readoutPlace(hover.x, hover.y, frameW, frameH) : null)
+  $effect(() => { void layerKey; void slotT; void slot2T; hover = null })
+
+  // ---- the keyboard: `l` turns the compare mode on and off (erddap-places' lens key) ----
+  let layerBox = $state<HTMLElement>()
+  let keyNote = $state('')
+  $effect(() => { if (view.layer) keyNote = '' })
+  function onkey(e: KeyboardEvent) {
+    const el = e.target as HTMLElement | null
+    if (!model || !shortcutFor({ key: e.key, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey, repeat: e.repeat, targetTag: el?.tagName, targetEditable: el?.isContentEditable })) return
+    const r = compareToggle({ on: compareOn, layer: view.layer, t2Default: t2Default ? periodToT(t2Default, model.grain) : null })
+    if (r === 'no-layer') {
+      e.preventDefault()
+      layerBox?.querySelector('select')?.focus()
+      keyNote = 'Choose a layer under the map first: l then compares it at two periods.'
+      return
+    }
+    if (r) { e.preventDefault(); onpatch(r) }
+  }
 
   // ---- the selected place (the hash's `place`): computed, or a member the group has not computed yet ----
   const selectedId = $derived(view.place)
@@ -325,6 +410,8 @@
   let fsEl = $state<HTMLElement>()
   let full = $state<FullMode>('off')
 </script>
+
+<svelte:window onkeydown={onkey} />
 
 {#if !ind || !model}
   <Notice kind="info">No selected indicator has values for the selected places. Choose others in the Select section above{#if onother}, or <button type="button" class="lnk" onclick={onother}>choose another indicator</button>{/if}.</Notice>
@@ -387,9 +474,15 @@
       {#if valuesError}<span class="warn" role="status">The record did not load, so only the latest period is shown ({valuesError}).</span>
       {:else if !values && periods.length < 2}<span class="hint" role="status">Loading the record for the period slider…</span>{/if}
     </div>
-    <div class="group layer">
+    <div class="group layer" bind:this={layerBox}>
       <Select label="Layer under the map" value={view.layer ?? ''} options={layerOptions} onchange={(v: string) => onpatch({ layer: v || null })} />
+      {#if keyNote}<span class="hint" role="status">{keyNote}</span>{/if}
     </div>
+    {#if view.layer}
+      <div class="group layer">
+        <Select label="Palette" value={pal ?? ''} options={palOptions} onchange={(v: string) => onpatch({ pal: v || null })} />
+      </div>
+    {/if}
     <div class="group compare" role="group" aria-label="Compare two periods">
       <Toggle label="Compare" hint={view.layer ? 'the layer at a second period, with a swipe' : 'choose a layer under the map first'} checked={compareOn}
         disabled={!view.layer || periods.length < 2} onchange={(on: boolean) => onpatch(on ? { t2: t2Default ? periodToT(t2Default, model.grain) : null } : { t2: null, anom: false, swipe: null })} />
@@ -408,11 +501,16 @@
 
   <div class="layout" class:full={full !== 'off'} class:expanded={full === 'expanded'} bind:this={fsEl}>
     <div class="mapcol">
-      <div class="frame">
+      <div class="frame" bind:clientWidth={frameW} bind:clientHeight={frameH}>
         {#if parts.length}
           <MapCanvas {parts} {bbox} {colors} line={lineColor} none={noneColor} nofill={nofillColor} faint={faintColor} focus={focusColor} {dark} selected={selectedId} proj={view.proj} {marker}
             {onpick} onstate={s => (drawn = s)} label={`Map of ${ind.short} by place`} {slot} {slotT} {sliced} oncredit={c => (baseCredit = c)}
-            {slot2} {slot2T} swipe={swipeF} anom={anomOn} />
+            {slot2} {slot2T} swipe={swipeF} anom={anomOn} oncell={c => (hover = c)} />
+          {#if readout && tip}
+            <div class="readout" class:fx={tip.flipX} class:fy={tip.flipY} style:left="{tip.left}px" style:top="{tip.top}px" aria-hidden="true">
+              {#each readout as l, i (i)}<span>{l}</span>{/each}
+            </div>
+          {/if}
           {#if slot2 && !anomOn}<SwipeHandle value={swipeF} left={leftLabel} right={rightLabel} onchange={f => (swipeLive = f)} oncommit={f => onpatch({ swipe: f })} />{/if}
           <MapFrameControls target={fsEl} proj={view.proj} onproj={p => onpatch({ proj: p })} bind:mode={full} />
         {:else if layerError}
@@ -427,7 +525,8 @@
     </div>
 
     <aside class="side">
-      <MapLegend {model} unit={ind.unit_label ?? ''} layer={slotLine} ramp={(anomOn ? slot2Legend?.ramp : slotLegend?.ramp) ?? null} rampUnit={slotLegend?.units ?? ''} />
+      <MapLegend {model} unit={ind.unit_label ?? ''} layer={slotLine} ramp={(anomOn ? slot2Legend?.ramp : slotLegend?.ramp) ?? null} rampUnit={slotLegend?.units ?? ''}
+        counts={countLine} rows={countRows} cell={readout ? `Cell: ${readout.join(' · ')}` : ''} onretry={canRetry ? retry : null} />
       <section class="pick" aria-labelledby="pick-h" aria-live="polite">
         <h2 id="pick-h" class="mbon-label">Selected place</h2>
         {#if selectedId}
@@ -484,6 +583,16 @@
   .mapcol { display: grid; gap: var(--space-2); min-width: 0; }
   .frame { position: relative; height: 62dvh; min-height: 24rem; min-width: 0; }
   .msg { display: grid; place-items: center; height: 100%; margin: 0; background: var(--bg-tint); border-radius: var(--radius-md); color: var(--text-body); }
+  /* the cell readout beside the pointer: small, on the overlay surface, never in the pointer's way */
+  .readout {
+    position: absolute; z-index: 4; display: grid; gap: 1px; max-width: min(18rem, 70%); padding: var(--space-1) var(--space-2); pointer-events: none;
+    transform: translate(14px, 14px); background: var(--overlay-bg); border: 1px solid var(--overlay-border); border-radius: var(--radius-sm); box-shadow: var(--overlay-shadow);
+    font: var(--text-xs) / 1.35 var(--font-sans); color: var(--text-strong); font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .readout span:last-child { color: var(--text-body); }
+  .readout.fx { transform: translate(calc(-100% - 14px), 14px); }
+  .readout.fy { transform: translate(14px, calc(-100% - 14px)); }
+  .readout.fx.fy { transform: translate(calc(-100% - 14px), calc(-100% - 14px)); }
   .credits { margin: 0; font: var(--type-small); color: var(--text-body); overflow-wrap: anywhere; }
   .side { display: grid; gap: var(--space-4); min-width: 0; align-content: start; }
 

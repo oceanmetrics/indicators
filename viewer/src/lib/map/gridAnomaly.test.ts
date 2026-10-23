@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { Engine } from '@oceanmetrics/engine'
 import type { Duck } from '@oceanmetrics/engine'
 import type { SliceCell } from '@oceanmetrics/map'
-import { anomalyRows } from './gridAnomaly.ts'
+import { anomalyRows, meanRows } from './gridAnomaly.ts'
 
 // the engine the browser runs, on DuckDB-WASM's node-blocking bundle (as platform's engine tests do)
 const require = createRequire(import.meta.url)
@@ -47,6 +47,29 @@ describe('the anomaly t2 - t per cell, in the engine (DuckDB-WASM)', () => {
     const fake = { insertRows: async () => { asks.push('insert') }, exec: async () => { asks.push('exec'); return [] } }
     expect(await anomalyRows(fake as never, T, [])).toEqual([])
     expect(await anomalyRows(fake as never, [], T2.slice(1, 2))).toEqual([cell(34.125, -119.875, null, 0.5)])
+    expect(asks).toEqual([])
+  })
+})
+
+describe('the mean of a year range per cell, in the engine (row 32)', () => {
+  it('the mean of the periods with data at each cell, null where none has; the tables are dropped after', async () => {
+    const engine = new Engine(nodeDuck)
+    const T3: SliceCell[] = [cell(34.125, -120.125, 17), cell(34.125, -119.875, 18, 0.5), cell(34.375, -120.125, null), cell(34.375, -119.875, null)]
+    expect(await meanRows(engine, [T, T2, T3])).toEqual([
+      cell(34.125, -120.125, 17.625),
+      cell(34.125, -119.875, 17.916666666666668, 0.5),
+      cell(34.375, -120.125, 18.125),
+      cell(34.375, -119.875, 16),
+    ])
+    const left = await engine.exec("SELECT count(*) AS n FROM information_schema.tables WHERE table_name LIKE 'mean_%'")
+    expect(left[0].n).toBe(0)
+  })
+  it('the mean of one slice is that slice; no slices (or only empty ones) is no rows, with no query', async () => {
+    const engine = new Engine(nodeDuck)
+    expect(await meanRows(engine, [T])).toEqual(T)
+    const asks: string[] = []
+    const fake = { insertRows: async () => { asks.push('insert') }, exec: async () => { asks.push('exec'); return [] } }
+    expect(await meanRows(fake as never, [[], []])).toEqual([])
     expect(asks).toEqual([])
   })
 })

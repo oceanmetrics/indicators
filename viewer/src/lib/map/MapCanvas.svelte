@@ -12,7 +12,9 @@
   // only draws: the classes, colours and credits come in as props, and a click goes out as a place id. the compare mode
   // (compare.ts) adds a second slot of the same layer (`slot2`, ids `slot:grid@t2`) just above the first, clipped to the left of
   // the swipe handle by two custom layers around its fill that set and clear the WebGL scissor box: one map, two layer groups.
-  // with the anomaly the second slot is drawn whole and the first is hidden.
+  // with the anomaly the second slot is drawn whole and the first is hidden. the cell under the pointer (or a tap) goes out as
+  // `oncell`: each slot's cell there (`cellAt`, map 0.3.0, read from the slices themselves, so the hidden slot of the anomaly
+  // and both halves of the swipe answer); the words are gridLayer.ts `cellReadout`.
   import { onMount, untrack } from 'svelte'
   import { Map as MlMap, NavigationControl, ScaleControl } from 'maplibre-gl'
   import type { CustomLayerInterface, GeoJSONSource, MapMouseEvent, RasterTileSource, StyleSpecification } from 'maplibre-gl'
@@ -34,7 +36,8 @@
   import type { LayerSlot } from './layerSlot.ts'
   import { GRID_LAYER } from '@oceanmetrics/map'
   import type { GridSlot } from '@oceanmetrics/map'
-  import { scissorBox } from './compare.ts'
+  import { isYearRange, scissorBox } from './compare.ts'
+  import type { CellProps } from '@oceanmetrics/map'
   import { placeSwipePairs } from './swipeLayers.ts'
 
   interface Props {
@@ -78,9 +81,11 @@
     slot2T?: string | null
     swipe?: number
     anom?: boolean
+    /** the cell of each slot under the pointer or a tap (x, y in CSS pixels of the map box); null off the slice or off the map */
+    oncell?: (c: { x: number; y: number; first: CellProps | null; second: CellProps | null } | null) => void
   }
   let { parts, bbox, colors, line, none, nofill, faint, focus, dark, selected, proj = null, marker, onpick, onstate, label, compact = false, fitIds = null, onhover, slot = null, slotT = null, sliced = null, oncredit,
-    slot2 = null, slot2T = null, swipe = 0.5, anom = false }: Props = $props()
+    slot2 = null, slot2T = null, swipe = 0.5, anom = false, oncell }: Props = $props()
 
   let box: HTMLDivElement | undefined = $state()
   let phase = $state<'loading' | 'done'>('loading')
@@ -286,7 +291,7 @@
       })
       m.on('moveend', () => copies(m))
       m.on('resize', () => copies(m))
-      m.on('click', e => void click(m, e))
+      m.on('click', e => { readCell(e); void click(m, e) })
       m.on('mousemove', e => {
         const hit = parts.some((p, i) => (p.kind === 'raster' ? true : !!m.getLayer(`${sid(i)}:fill`) && m.queryRenderedFeatures(e.point, { layers: hitLayers(m, i) }).length > 0))
         m.getCanvas().style.cursor = hit ? 'pointer' : ''
@@ -299,11 +304,21 @@
           })
           onhover(name)
         }
+        readCell(e)
       })
-      m.on('mouseout', () => onhover?.(null))
+      m.on('mouseout', () => { onhover?.(null); oncell?.(null) })
     })()
     return () => { dead = true; clearInterval(poll); ro?.disconnect(); made?.remove(); map = null; ready = false; shown = null; mounted = null; mounted2 = null }
   })
+
+  // ---- the cell under the pointer: each slot's, from its last slice ----
+  const cellOf = (sl: LayerSlot | null, lng: number, lat: number) => (sl as Partial<GridSlot> | null)?.cellAt?.(lng, lat) ?? null
+  function readCell(e: MapMouseEvent) {
+    if (!oncell) return
+    const { lng, lat } = e.lngLat
+    const first = cellOf(mounted, lng, lat), second = cellOf(mounted2, lng, lat)
+    oncell(first || second ? { x: e.point.x, y: e.point.y, first, second } : null)
+  }
 
   const hitLayers = (m: MlMap, i: number) => [`${sid(i)}:fill`, `${sid(i)}:dots`].filter(id => hits(id) && m.getLayer(id))
 
@@ -479,7 +494,8 @@
       const moved = !!slot && mountedT !== slotT
       if (moved) { mountedT = slotT; slot!.update(slotT); waitSlot(m) }
       if (mounted2 !== (mounted && slot2 ? slot2 : null)) { mountSlot2(m); waitSlot(m) }
-      else if (mounted2 && (mounted2T !== slot2T || (anom && moved))) { mounted2T = slot2T; mounted2.update(slot2T); waitSlot(m) }
+      // the anomaly reads the slice at t, and a year range averages the month of t: both follow a new t
+      else if (mounted2 && (mounted2T !== slot2T || ((anom || isYearRange(slot2T)) && moved))) { mounted2T = slot2T; mounted2.update(slot2T); waitSlot(m) }
       else placeSwipe(m)
     }
     setRing(m)

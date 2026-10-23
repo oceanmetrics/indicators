@@ -121,9 +121,9 @@ const signed = (v: number) => (v > 0 ? `+${num(v)}` : v < 0 ? `−${num(-v)}` : 
  * <t2> minus <t>, per cell · <−m> to <+m> <units> · blue lower in <t2>, red higher · <via>". "loading the slice at <p>…"
  * until a period is in, "· <problem>" when it failed
  */
-export function compareLegendLine(o: { title: string; via: string; first: CompareLegend; second: CompareLegend; anom: boolean }, period: (t: string) => string): string {
+export function compareLegendLine(o: { title: string; via: string; first: CompareLegend; second: CompareLegend; anom: boolean; secondLabel?: string | null }, period: (t: string) => string): string {
   const p1 = o.first.t ? period(o.first.t) : 'the latest time'
-  const p2 = o.second.t ? period(o.second.t) : 'the latest time'
+  const p2 = o.secondLabel ?? (o.second.t ? period(o.second.t) : 'the latest time')
   const units = o.second.units ?? o.first.units ?? null
   const u = units ? ` ${units}` : ''
   const states: string[] = []
@@ -140,4 +140,108 @@ export function compareLegendLine(o: { title: string; via: string; first: Compar
   const r = o.first.ramp ?? o.second.ramp
   const range = r ? ` · ${num(r.min)} to ${num(r.max)}${u}` : ''
   return `Compare: ${o.title} · left of the handle ${p2} · right ${p1} · one colour scale over both periods${range}${state} · ${o.via}`
+}
+
+// ---- the climatology Then: t2 as a year range ----
+//
+// erddap-places' Then is a climatology (1985-2005, 2003-2012) or any year range, averaged in the browser. here `t2` may be a
+// year range `2003-2012`: the mean, per cell, of that range's periods at the month of `t` (one slice per period through the
+// shared slices, sliceCache.ts; averaged in the engine's SQL, gridAnomaly.ts `meanRows`), at most MAX_MEAN_PERIODS of them.
+
+/** the most periods a year range averages: one slice each, so at most this many requests per lobe */
+export const MAX_MEAN_PERIODS = 12
+/** erddap-places' two baselines (thenNow/state.ts BASELINES) */
+export const BASELINES = ['1985-2005', '2003-2012'] as const
+
+const RANGE = /^(\d{4})-(\d{4})$/
+
+/** `2003-2012` -> { y0: 2003, y1: 2012 }; null for a period ("2024-07" has a two-digit second part) or a range that runs backwards */
+export function parseYearRange(t: string | null | undefined): { y0: number; y1: number } | null {
+  const m = RANGE.exec(t ?? '')
+  if (!m) return null
+  const y0 = Number(m[1]), y1 = Number(m[2])
+  return y0 <= y1 ? { y0, y1 } : null
+}
+export const isYearRange = (t: string | null | undefined) => parseYearRange(t) !== null
+
+/** the month a year range averages: that of `t` (a step date, "2024-07-01"), else of the dataset's latest step, else January */
+export function rangeMonth(t: string | null, latest: string | null): string {
+  const m = /^\d{4}-(\d{2})/.exec(t ?? latest ?? '')
+  return m ? m[1] : '01'
+}
+
+export interface MeanPlan {
+  /** the step dates averaged, oldest first ("2003-07-01") */
+  periods: string[]
+  /** the years the range names, those outside the dataset's record, and whether the cap cut the rest */
+  asked: number
+  outside: number
+  capped: boolean
+  /** the periods inside the record before the cap */
+  inside: number
+}
+
+/**
+ * the periods of a year range at a month: one a year, those outside the dataset's record (its extent, by month) left out, the
+ * first MAX_MEAN_PERIODS of the rest kept
+ */
+export function yearRangePeriods(range: { y0: number; y1: number }, month: string, extent: { start: string; end: string } | null, cap = MAX_MEAN_PERIODS): MeanPlan {
+  const all: string[] = []
+  for (let y = range.y0; y <= range.y1; y++) all.push(`${y}-${month}`)
+  const lo = extent?.start.slice(0, 7) ?? '', hi = extent?.end.slice(0, 7) ?? '9999-12'
+  const inside = all.filter(p => p >= lo && p <= hi)
+  return { periods: inside.slice(0, cap).map(p => `${p}-01`), asked: all.length, outside: all.length - inside.length, capped: inside.length > cap, inside: inside.length }
+}
+
+/** what the mean was made of, once its slices are in: the plan, and the periods whose slice failed (left out of the mean) */
+export interface MeanInfo extends MeanPlan { failed: string[] }
+
+/**
+ * the Then of a year range as the legend and the swipe caption name it: "mean of 2003-07..2012-07" before its slices are in
+ * (from the range and the month alone), then with what it holds: "(10 periods)", "(12 periods: capped at 12 of 18)", "4 outside
+ * the record", "1 failed: 2007-07"
+ */
+export function rangeLabel(range: { y0: number; y1: number }, month: string, period: (t: string) => string, info?: MeanInfo | null): string {
+  if (!info || !info.periods.length) {
+    const head = `mean of ${period(`${range.y0}-${month}-01`)}..${period(`${range.y1}-${month}-01`)}`
+    return info && !info.periods.length ? `${head} (no period inside the record)` : head
+  }
+  const used = info.periods.filter(p => !info.failed.includes(p))
+  const head = `mean of ${period(info.periods[0])}..${period(info.periods[info.periods.length - 1])}`
+  const bits = [`${used.length} period${used.length === 1 ? '' : 's'}`]
+  if (info.capped) bits[0] += `: capped at ${MAX_MEAN_PERIODS} of ${info.inside}`
+  if (info.outside) bits.push(`${info.outside} outside the record`)
+  if (info.failed.length) bits.push(`${info.failed.length} failed: ${info.failed.map(period).join(', ')}`)
+  return `${head} (${bits.join('; ')})`
+}
+
+/**
+ * the year ranges the "Compare with" select offers: erddap-places' baselines that overlap the record the scrubber walks, and
+ * the ten years before t's year, newest last
+ */
+export function yearRangeChoices(periods: readonly string[], t: string | null): { value: string; label: string; group: string }[] {
+  const years = periods.map(p => Number(p.slice(0, 4))).filter(Number.isFinite)
+  if (!years.length) return []
+  const lo = Math.min(...years), hi = Math.max(...years)
+  const y = t ? Number(t.slice(0, 4)) : hi
+  const out = new Set<string>()
+  for (const b of BASELINES) { const r = parseYearRange(b)!; if (r.y1 >= lo && r.y0 <= hi) out.add(b) }
+  if (y - 10 >= lo) out.add(`${y - 10}-${y - 1}`)
+  return [...out].map(v => ({ value: v, label: `mean of ${v.replace('-', '–')}`, group: 'Then: the mean of a year range' }))
+}
+
+/**
+ * the mean per cell of several slices as tables of `lat, lon, weight, value` (the engine's `insertRows`, a null value as NaN):
+ * one row per cell (its centre rounded to 1e-5 degrees, as `anomalySql` joins), the mean of the periods with data there,
+ * NULL where none has
+ */
+export function meanSql(tables: readonly string[]): string {
+  if (!tables.length || tables.some(t => !TABLE.test(t))) throw new Error(`meanSql: bad table names ${tables.join(', ')}`)
+  return [
+    'SELECT any_value(lat) AS lat, any_value(lon) AS lon, any_value(weight) AS weight,',
+    '  avg(value) FILTER (WHERE value IS NOT NULL AND NOT isnan(value)) AS value',
+    `FROM (${tables.map(t => `SELECT lat, lon, weight, value FROM ${t}`).join(' UNION ALL ')})`,
+    'GROUP BY ROUND(lat, 5), ROUND(lon, 5)',
+    'ORDER BY lat, lon',
+  ].join('\n')
 }

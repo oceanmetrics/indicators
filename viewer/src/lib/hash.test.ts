@@ -465,3 +465,27 @@ describe('the compare mode: t2 (shared like t) and anom=1 (the Map\'s)', () => {
     expect(serializeHash(carryOver(st({ view: 'map', t2: '2010' }), from))).toBe('view=map')
   })
 })
+
+describe('week 2: t2 as a year range, and the layer\'s palette (pal=)', () => {
+  const COMPARE = 'view=map&ind=erddap:dhw_5km:CRW_SST:mean&layer=grid:jplMURSST41mday:sst&t=2024-07&t2=2003-2012'
+  it('t2=2003-2012 (the mean of its years at the month of t) round-trips, with anom and swipe', () => {
+    const s = parseHash('#' + COMPARE)
+    expect(s.t2).toBe('2003-2012')
+    expect(serializeHash(s)).toBe(COMPARE)
+    expect(parseHash('#' + COMPARE + '&anom=1').anom).toBe(true)
+    expect(serializeHash(parseHash('#' + COMPARE + '&swipe=0.3'))).toBe(COMPARE + '&swipe=0.3')
+  })
+  it('a backwards or odd range is no t2', () => {
+    expect(parseHash('#view=map&t2=2012-2003').t2).toBeNull()
+    expect(parseHash('#view=map&t2=2003-12345').t2).toBeNull()
+    expect(parseHash('#view=map&t2=2003-2003').t2).toBe('2003-2003')
+  })
+  it('pal is the layer\'s: written after layer, read only with a layer, a ramp id or its _r', () => {
+    const s = parseHash('#view=map&layer=grid:jplMURSST41mday:sst&pal=spectral_r&t=2024-07')
+    expect(s.pal).toBe('spectral_r')
+    expect(serializeHash(s)).toBe('view=map&layer=grid:jplMURSST41mday:sst&pal=spectral_r&t=2024-07')
+    expect(parseHash('#view=map&pal=viridis').pal).toBeNull()
+    expect(parseHash('#view=map&layer=grid:a:b&pal=Viridis').pal).toBeNull()
+    expect(serializeHash(st({ view: 'map', pal: 'viridis' }))).toBe('view=map')
+  })
+})

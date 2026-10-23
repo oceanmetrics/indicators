@@ -3,7 +3,7 @@
 // run it on the node DuckDB-WASM the browser's engine is.
 import type { Engine } from '@oceanmetrics/engine'
 import type { SliceCell } from '@oceanmetrics/map'
-import { anomalySql } from './compare.ts'
+import { anomalySql, meanSql } from './compare.ts'
 
 let seq = 0
 
@@ -24,5 +24,24 @@ export async function anomalyRows(engine: Pick<Engine, 'insertRows' | 'exec'>, t
     }))
   } finally {
     await engine.exec(`DROP TABLE IF EXISTS ${a}; DROP TABLE IF EXISTS ${b}`, 'anomaly:drop').catch(() => {})
+  }
+}
+
+/** the mean per cell of several slices (a year range's Then), in the engine's SQL: null where no slice has a value */
+export async function meanRows(engine: Pick<Engine, 'insertRows' | 'exec'>, slices: readonly (readonly SliceCell[])[]): Promise<SliceCell[]> {
+  const some = slices.filter(s => s.length)
+  if (!some.length) return []
+  const n = ++seq
+  const names = some.map((_, i) => `mean_${n}_${i}`)
+  const plain = (cs: readonly SliceCell[]) => cs.map(c => ({ lat: c.lat, lon: c.lon, weight: c.weight, value: c.value }))
+  try {
+    for (const [i, s] of some.entries()) await engine.insertRows(plain(s), names[i])
+    const rows = await engine.exec(meanSql(names), 'mean')
+    return rows.map(r => ({
+      lat: Number(r.lat), lon: Number(r.lon), weight: Number(r.weight),
+      value: r.value === null || r.value === undefined || Number.isNaN(Number(r.value)) ? null : Number(r.value),
+    }))
+  } finally {
+    await engine.exec(names.map(t => `DROP TABLE IF EXISTS ${t}`).join('; '), 'mean:drop').catch(() => {})
   }
 }

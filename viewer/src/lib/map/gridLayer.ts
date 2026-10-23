@@ -202,3 +202,145 @@ export function leftOutLine(left: readonly string[], without: readonly string[],
   if (without.length) bits.push(`no polygon to mask here (drawn by their publisher): ${without.map(name).join(', ')}`)
   return bits.join(' · ')
 }
+
+// ---- the cells sliced (the legend's counts) ----
+
+/** one place's share of the mask: its cells and those on its boundary (area weight below 1) */
+export interface PlaceCells { id: string; cells: number; boundary: number }
+
+/** what one slice holds (`@oceanmetrics/map` `sliceCounts`) */
+export interface CountsLike { cells: number; withValue: number; boundary: number }
+
+const n0 = (v: number) => v.toLocaleString('en-US')
+
+/**
+ * the counts the legend states, erddap-places' "462 cells · 278 on the boundary" for every place at once: "Cells: 101,626 sliced
+ * in 17 places (3,120 on a boundary) · with data: 101,500 at 2024-07" (and at the second period in the compare mode). null
+ * until the mask is in
+ */
+export function cellCountLine(perPlace: readonly PlaceCells[] | null, at: readonly { period: string; counts: CountsLike | null }[]): string | null {
+  if (!perPlace) return null
+  const cells = perPlace.reduce((s, p) => s + p.cells, 0)
+  const boundary = perPlace.reduce((s, p) => s + p.boundary, 0)
+  const places = perPlace.filter(p => p.cells > 0).length
+  const data = at.filter(a => a.counts).map(a => `${n0(a.counts!.withValue)} at ${a.period}`)
+  return `Cells: ${n0(cells)} sliced in ${places} place${places === 1 ? '' : 's'} (${n0(boundary)} on a boundary)${data.length ? ` · with data: ${data.join(', ')}` : ''}`
+}
+
+/** the rows of the legend's "cells per place": name, cells, on the boundary, the largest first (a place with none is said) */
+export function cellRows(perPlace: readonly PlaceCells[], name: (id: string) => string): { id: string; name: string; cells: string; boundary: string }[] {
+  return [...perPlace].sort((a, b) => b.cells - a.cells || name(a.id).localeCompare(name(b.id)))
+    .map(p => ({ id: p.id, name: name(p.id), cells: p.cells ? n0(p.cells) : 'none', boundary: n0(p.boundary) }))
+}
+
+// ---- the palette (the hash's `pal`) ----
+
+/** a ramp id the hash may carry: a ramp of `@oceanmetrics/map`, `_r` for it reversed */
+export const PAL = /^[a-z]+(_r)?$/
+
+/** the hash's `pal` when the map package has that ramp, else null (the layer's own default) */
+export function palOf(pal: string | null | undefined, ramps: Readonly<Record<string, unknown>>): string | null {
+  if (!pal || !PAL.test(pal)) return null
+  return Object.hasOwn(ramps, pal.replace(/_r$/, '')) ? pal : null
+}
+
+const KIND_GROUP: Record<string, string> = { sequential: 'Sequential', diverging: 'Diverging', cyclic: 'Cyclic' }
+
+/**
+ * the palette select: the layer's default first (`''`, named), then every ramp of the map package by kind, each also
+ * reversed where that reads (Spectral reversed is erddap-places' red = warm)
+ */
+export function rampChoices(defaultId: string, ramps: Readonly<Record<string, { label: string; kind: string }>>): LayerChoice[] {
+  const lab = (id: string) => { const b = id.replace(/_r$/, ''); return `${ramps[b]?.label ?? b}${id.endsWith('_r') ? ', reversed' : ''}` }
+  const out: LayerChoice[] = [{ value: '', label: `Default (${lab(defaultId)})` }]
+  for (const kind of ['sequential', 'diverging', 'cyclic']) {
+    for (const [id, r] of Object.entries(ramps)) {
+      if (r.kind !== kind) continue
+      out.push({ value: id, label: lab(id), group: KIND_GROUP[kind] })
+      if (kind !== 'cyclic') out.push({ value: `${id}_r`, label: lab(`${id}_r`), group: KIND_GROUP[kind] })
+    }
+  }
+  return out
+}
+
+// ---- the cell readout (hover or tap) ----
+
+/** a number for the readout: one cell's value, so two decimals below 100 (the legend's ends round harder) */
+const rnum = (v: number) => (Math.abs(v) >= 1000 ? v.toFixed(0) : Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2))
+const val = (v: number | null, u: string) => (v === null || !Number.isFinite(v) ? 'no data' : `${rnum(v)}${u}`)
+const signedVal = (v: number | null, u: string) => (v === null || !Number.isFinite(v) ? 'no data' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${rnum(Math.abs(v))}${u}`)
+
+/** a cell centre as people read it: "34.13° N, 120.13° W" (a longitude past 180, the 0..360 frame, back into ±180) */
+export function latLonText(lat: number, lon: number): string {
+  const x = ((((lon + 180) % 360) + 360) % 360) - 180
+  return `${Math.abs(lat).toFixed(2)}° ${lat >= 0 ? 'N' : 'S'}, ${Math.abs(x).toFixed(2)}° ${x >= 0 ? 'E' : 'W'}`
+}
+
+export interface ReadoutCell { lat: number; lon: number; weight: number }
+export interface ReadoutValue { period: string; value: number | null }
+
+/**
+ * the readout of the cell under the pointer (erddap-places' cell popup and Then vs Now readout): its value with the unit and
+ * the period; in the compare mode both periods and the difference `t2 - t` (the anomaly's sign); then the centre and, on a
+ * place's boundary, the share of the cell inside it. lines, short enough for a small box near the pointer
+ */
+export function cellReadout(o: { cell: ReadoutCell; units: string | null; now: ReadoutValue; then?: ReadoutValue | null }): string[] {
+  const u = o.units ? ` ${o.units}` : ''
+  const lines: string[] = []
+  if (o.then) {
+    lines.push(`${o.then.period}: ${val(o.then.value, u)}`, `${o.now.period}: ${val(o.now.value, u)}`)
+    const d = o.then.value !== null && o.now.value !== null ? o.then.value - o.now.value : null
+    lines.push(`${o.then.period} − ${o.now.period}: ${signedVal(d, u)}`)
+  } else lines.push(`${val(o.now.value, u)} in ${o.now.period}`)
+  const share = o.cell.weight < 1 ? ` · ${Math.round(o.cell.weight * 100)} % inside` : ''
+  lines.push(`${latLonText(o.cell.lat, o.cell.lon)}${share}`)
+  return lines
+}
+
+/** where the readout box sits: beside the pointer, flipped to the other side near the frame's right or bottom edge */
+export function readoutPlace(x: number, y: number, width: number, height: number): { left: number; top: number; flipX: boolean; flipY: boolean } {
+  return { left: Math.round(x), top: Math.round(y), flipX: x > width * 0.6, flipY: y > height * 0.7 }
+}
+
+// ---- a server that drops requests (the places page's `patientFetch`, web/src/lib/map/gridLayer.ts) ----
+
+/**
+ * a fetch that asks again when the server drops the request (a 404 or a 5xx, or no answer): the ERDDAP mirror answers the same
+ * url 404 and 200 by turns (two backends, one without the dataset; seen 2026-10-23), so each request is asked up to `tries`
+ * times, `ms` x the try between them. the last answer is returned as it was; another 4xx at once; an abort stops at once
+ */
+export function patientFetch(fetchFn: typeof fetch = (...a) => fetch(...a), tries = 6, ms = 300): typeof fetch {
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    let last: Response | null = null
+    let err: unknown = null
+    for (let i = 0; i < tries; i++) {
+      if (init?.signal?.aborted) throw init.signal.reason ?? new DOMException('aborted', 'AbortError')
+      try {
+        last = await fetchFn(input, init)
+        err = null
+        if (last.ok || (last.status !== 404 && last.status < 500)) return last
+      } catch (e) {
+        if (init?.signal?.aborted) throw e
+        err = e
+      }
+      if (i < tries - 1 && ms > 0) await new Promise(r => setTimeout(r, ms * (i + 1)))
+    }
+    if (err) throw err
+    return last!
+  }) as typeof fetch
+}
+
+/**
+ * a slice's failure as the legend says it after "no data: ": the host and the status, never the server's HTML page or the
+ * whole request url ("erddap.oceanmetrics.io answered HTTP 404 Not Found")
+ */
+export function problemText(e: unknown, host: string): string {
+  const m = String((e as Error)?.message ?? e)
+  const erddap = /^(\d{3})\s*([^:]*?)\s*from ERDDAP/.exec(m)
+  if (erddap) return `${host} answered HTTP ${erddap[1]}${erddap[2] ? ` ${erddap[2]}` : ''}`
+  const url = /https?:\/\/([^/\s]+)\S*/.exec(m)
+  // the status is read outside the url, whose constraints hold numbers of their own ("longitude[(-120.123):1:(...)]")
+  const status = url ? /\b(\d{3})\b/.exec(m.replace(url[0], ''))?.[1] : undefined
+  if (url) return `${url[1]} did not answer${status ? ` (HTTP ${status})` : ''}`
+  return m.length > 160 ? `${m.slice(0, 157)}…` : m
+}

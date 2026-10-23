@@ -1,7 +1,9 @@
 <script lang="ts">
   // the key to the colours: one row per class with its swatch, its words and (status, trend) its glyph, the places in
   // it, and the outline that means "no value". it reads without colour: the words and glyphs say everything the
-  // swatch says.
+  // swatch says. under it the layer: its line, a Retry when its slice failed, the cells sliced (in all and per place), and the
+  // cell under the pointer.
+  import { Button } from '@marinebon/ui'
   import { Icon } from '../../../../src/icons/index.ts'
   import { MODE_LABELS } from './classes.ts'
   import type { MapModel } from './classes.ts'
@@ -15,8 +17,15 @@
     /** the layer's colour ramp, low to high (its numbers are in the layer line too) */
     ramp?: { min: number; max: number; colors: string[] } | null
     rampUnit?: string | null
+    /** the cells sliced, in one line (gridLayer.ts `cellCountLine`), and per place (`cellRows`) */
+    counts?: string | null
+    rows?: { id: string; name: string; cells: string; boundary: string }[]
+    /** the cell under the pointer or the last tap, in one line (gridLayer.ts `cellReadout`) */
+    cell?: string
+    /** set when the slice failed: asks for it again */
+    onretry?: (() => void) | null
   }
-  let { model, unit = '', layer = '', ramp = null, rampUnit = '' }: Props = $props()
+  let { model, unit = '', layer = '', ramp = null, rampUnit = '', counts = null, rows = [], cell = '', onretry = null }: Props = $props()
   const fmt = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2))
   const none = $derived(model.items.filter(i => i.k == null).length)
 </script>
@@ -48,6 +57,20 @@
     </div>
   {/if}
   {#if layer}<p class="note">{layer}</p>{/if}
+  {#if onretry}
+    <p class="retry"><Button variant="primary" size="sm" onclick={onretry}>Retry</Button><span class="note">asks the server for the slice that failed again</span></p>
+  {/if}
+  {#if counts}<p class="note">{counts}</p>{/if}
+  {#if rows.length}
+    <details class="cells">
+      <summary class="note">Cells per place</summary>
+      <table>
+        <thead><tr><th scope="col">place</th><th scope="col">cells</th><th scope="col">on the boundary</th></tr></thead>
+        <tbody>{#each rows as r (r.id)}<tr><th scope="row">{r.name}</th><td>{r.cells}</td><td>{r.boundary}</td></tr>{/each}</tbody>
+      </table>
+    </details>
+  {/if}
+  {#if cell}<p class="note cell">{cell}</p>{/if}
 </section>
 
 <style>
@@ -65,4 +88,10 @@
   .bar { display: block; height: 0.7rem; border-radius: 2px; border: 1px solid var(--border-strong); }
   .ends { display: flex; justify-content: space-between; font: var(--text-xs) / 1.2 var(--font-mono); color: var(--text-body); }
   .note { margin: 0; font: var(--type-small); color: var(--text-body); overflow-wrap: anywhere; }
+  .cell { color: var(--text-strong); font-variant-numeric: tabular-nums; }
+  .retry { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; }
+  .cells summary { cursor: pointer; }
+  .cells table { width: 100%; border-collapse: collapse; font: var(--type-small); color: var(--text-body); font-variant-numeric: tabular-nums; }
+  .cells th, .cells td { padding: 2px var(--space-1); text-align: right; border-bottom: 1px solid var(--border); }
+  .cells th[scope='row'], .cells thead th:first-child { text-align: left; font-weight: normal; color: var(--text-strong); overflow-wrap: anywhere; }
 </style>

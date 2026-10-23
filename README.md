@@ -260,14 +260,15 @@ value (five quantile classes), its departure from the place's own mean (in SD), 
 `@oceanmetrics/status` as of the period shown), the length of its record, or, for a categorical indicator, its largest class or the share of
 one class. The Period scrubber walks the periods. Hash keys: `ind` (the indicator: the hash's when it is in the selection, else the first selected one with
 values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` (the place selected), `color` (`value|departure|status|trend|record|class|share`), `t`
-(shared by every view: `2024` or `2024-07`; none = each place's latest), `t2` (the second period of the compare mode, shared like `t`; absent = off),
+(shared by every view: `2024` or `2024-07`; none = each place's latest), `t2` (the second period of the compare mode, shared like `t`, or a year range `2003-2012`; absent = off),
 `anom` (`1`: the compare mode draws `t2 - t`), `swipe` (the compare handle, 0..1), `cls` (the class `share` maps), `grain`, `proj` (`globe`; absent = the flat map), `layer`
-(the layer under the map, below) and `method`. The grammar did not change with the packages below.
+(the layer under the map, below), `pal` (its palette) and `method`. The grammar did not change with the packages below.
 - **The map stack** is `@oceanmetrics/map` (the slot contract, `setupMapLibre`, the basemap, the ramps, the grid provider) and
   `@oceanmetrics/engine` (the mask, the lobes, the ERDDAP requests, DuckDB-WASM, the slice) on MapLibre 6 (named imports: it has no
   default export). `MapCanvas.svelte` calls `setupMapLibre` once a page with MapLibre's worker module (`maplibre-gl-worker.mjs?worker&url`;
   `vite.config.ts` names worker chunks `.mjs`, which MapLibre 6's `importScriptInWorkers` requires) and registers `pmtiles://` (`setup.ts`:
-  one setup a page for every map, given the same three functions each time). Both packages come from npm (`^0.2.2`, `^0.1.1`).
+  one setup a page for every map, given the same three functions each time). Both packages come from npm (`@oceanmetrics/map` ^0.3.0 for the
+  cell readout, the counts, the palette and the Retry; `@oceanmetrics/engine` ^0.1.1).
 - **The basemap** is CARTO's positron (light) or dark-matter (dark) through `composeStyle(baseStyle(theme), { theme, dem: false })`:
   the GEBCO sea floor, isobaths, land mask and undersea names are built and in the bucket, but `storage.oceanmetrics.io/basemap/`
   (the package's `DEFAULT_TILES`) answers 404 until the storage host lets `basemap` through, and MapLibre schedules no frame while a source
@@ -333,6 +334,35 @@ values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` 
   pairs a day of the year (`md`) across a climatology and a year; here `t` and `t2` are periods of the layer's grain (a month of MUR
   monthly, a year of a yearly grid), each one step of the dataset, so no day-of-year pairing is needed. Its exceedance pill and the
   anomaly series of the Time strip go with the live series (build week 3).
+- **The climatology Then** (build week 2, erddap-places parity row 32): `t2` may be a year range, `t2=2003-2012`, the mean per cell of
+  that range's periods at the month of `t` (July 2003 .. July 2012 for `t=2024-07`; the month of the dataset's latest step when `t` is
+  absent). One slice per period through the shared slices (`sliceCache.ts`), at most three at once (`MEAN_CONCURRENCY`: the mirror
+  drops requests under parallel load), averaged per cell in the engine's SQL (`gridAnomaly.ts` `meanRows`, `compare.ts` `meanSql`: NULL
+  where no period has data). Years outside the dataset's record are left out, and at most 12 periods are averaged (`MAX_MEAN_PERIODS`,
+  the first 12 inside the record); a period whose slice fails is left out of the mean and named. The legend says what the mean held:
+  "Then: mean of 2003-07..2012-07 (10 periods)", "(12 periods: capped at 12 of 18)", "17 outside the record", "1 failed: 2007-07"; the
+  swipe caption says "mean of 2003-07..2012-07". The "Compare with" select offers erddap-places' baselines (1985-2005, 2003-2012) that
+  overlap the record and the ten years before `t`; a link may name any range. With `anom=1` the difference is that mean minus `t`.
+- **The cell readout** (rows 17, 37): hovering a cell (a tap on a phone) shows a small box beside the pointer and a "Cell:" line in the
+  legend with the cell's value, unit and period, the centre and, for a boundary cell, the share inside the place; in the compare mode
+  both periods and the difference `t2 - t` (the anomaly's sign). Each slot answers from its own last slice (`GridSlot.cellAt`,
+  `@oceanmetrics/map` 0.3.0's `cellLocator` over the dataset's lattice), so both halves of the swipe and the hidden slot under the
+  anomaly answer; the words are `gridLayer.ts` `cellReadout`.
+- **The cells sliced** (row 19): the legend says "Cells: 101,923 sliced in 14 places (9,163 on a boundary) · with data: 100,982 at
+  2024-07, 100,982 at 2016-07" (`cellCountLine`; the mask is counted lobe by lobe in `gridSource.ts`, the slices by `GridSlot.counts()`)
+  and "Cells per place" opens a table of each place's cells and boundary cells (`cellRows`); the places left out are named as before.
+- **Retry** (row 20): every ERDDAP request of the slice is patient (`gridLayer.ts` `patientFetch`, the places page's: a 404 or a 5xx is
+  asked again, six tries, 0.3 s x the try between them), and a slice that still fails reads "no data: erddap.oceanmetrics.io answered
+  HTTP 404 Not Found" (`problemText`: the host and the status, never the server's page) with a **Retry** button under the legend line
+  that asks for that slice again (`GridSlot.retry()`; the failed slices are not kept, so only they are fetched). A slot whose collection
+  did not load is made again.
+- **The palette** (rows 30, 82): a "Palette" select beside the layer lists the default (the layer's `defaultRampFor`, thermal for SST)
+  and every ramp of `@oceanmetrics/map` by kind, each also reversed (`rampChoices`); `pal=<ramp>[_r]` in the hash (`pal=spectral_r` is
+  erddap-places' red = warm Spectral), read only with a layer, absent = the default. The slot and the compare slot repaint without a
+  new slice (`GridSlot.setRamp`), the legend's ramp follows; the difference keeps its diverging `balance`.
+- **The keyboard** (row 58): `l`, erddap-places' lens key, turns the compare mode on (at the default second period) and off, the place
+  kept; with no layer under the map it goes to the "Layer under the map" select and says so (`viewer/src/lib/keys.ts`). Help ▾ →
+  *Keyboard shortcuts* lists it with the keys of the Period scrubber, the compare handle, the Matrix headers and Esc.
 - **Every group of the selection is a layered part** of the map, as a place set is (see below): `viewer/src/lib/map/selection.ts` turns the rules into groups; a group chosen in part
   (places picked by id, or some taken away) is drawn restricted to its chosen places (a vector filter; for a Marine Regions group an SLD filter on the
   MRGIDs, up to 120 of them: past that the whole group is drawn). Excluded places are not drawn and not in the legend or the table.
@@ -488,6 +518,11 @@ Place view's) up front with it: +3.4 kB over the copies it replaced, measured wi
 197.0 -> 200.4 all but the map); (2) the Matrix's summary line, the sort selects, the header counts, the OBIS fold and the pager are entry code (the
 Matrix is the first screen): +1.4 kB. Nothing could move to a lazy chunk without moving the Matrix. The CSS is 14.6 kB of 15 (+0.5: the summary bar,
 the header counts and the fold button); nothing in the map or the engine changed.
+
+With build week 2's parity rows (2026-10-23: the cell readout, the counts, the Retry, the palette, the year-range Then, `l` and the
+Keyboard list) the map JS is 323.9 kB of 330 (+3.9), the engine 139.8 of 160 (+0.3: the patient fetch, the mean), all JS but the map
+203.2 of 205 (+1.2: the legend's rows and Retry, `keys.ts` and the Keyboard notice), the entry 103.4 of 110 (+0.7: the Keyboard list),
+the CSS but the map 14.8 of 15 (+0.2, the legend's cell table) and the map's CSS 12.5 of 15. Nothing was raised.
 
 ## Brand and icons
 

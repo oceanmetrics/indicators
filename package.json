@@ -34,7 +34,7 @@
     "@mdi/js": "7.4.47",
     "@oceanmetrics/catalog": "^0.3.0",
     "@oceanmetrics/engine": "^0.1.1",
-    "@oceanmetrics/map": "^0.2.3",
+    "@oceanmetrics/map": "file:../platform-wt-map-wk2/packages/map/oceanmetrics-map-0.3.0.tgz",
     "@oceanmetrics/status": "^0.1.1",
     "apache-arrow": "^17.0.0",
     "hyparquet": "^1.30.1",

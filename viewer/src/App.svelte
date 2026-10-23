@@ -27,10 +27,13 @@
   import type { GazetteerPlaces } from './lib/gazetteerPlaces.ts'
   import { groupSelection, includeIndicator, includePlace, namedIndicators, selectionOf, withSelection } from './lib/selection.ts'
   import { SOURCE_HREF } from './lib/credits.ts'
+  import { SHORTCUTS } from './lib/keys.ts'
 
   let { brand }: { brand: Brand } = $props()
 
   let selectBar = $state<{ showIndicators: () => void } | undefined>()
+  // Help ▾ → Keyboard: the shortcuts (lib/keys.ts), a dismissible notice above the view
+  let keysOpen = $state(false)
   let phase = $state<'loading' | 'done' | 'error'>('loading')
   let error = $state('')
   let catalog = $state.raw<Catalog | null>(null)
@@ -232,6 +235,7 @@
 {#snippet lensWord()}{view.view}{/snippet}
 {#snippet helpItems(close: () => void)}
   <button type="button" onclick={() => { document.getElementById('legend')?.scrollIntoView({ block: 'start' }); close() }}>How to read a cell</button>
+  <button type="button" onclick={() => { keysOpen = true; close() }}>Keyboard shortcuts</button>
   <a href={SOURCE_HREF} target="_blank" rel="noopener">Source on GitHub</a>
   <a href={issueHref} target="_blank" rel="noopener">Feedback (GitHub issue)</a>
   {#if catalog}<a href={catalog.base + 'indicators.json'} target="_blank" rel="noopener">Manifest (indicators.json)</a>{/if}
@@ -247,6 +251,9 @@
 <main class="lens" data-state={phase} data-brand={brand}>
   <div class="wrap">
     <h1 class="mbon-sr-only">{APP_NAME}: {view.view === 'place' ? `${placeName} (place view)` : view.view === 'map' ? 'map of one indicator' : view.view === 'report' ? 'report' : 'places by indicators'}</h1>
+    {#if keysOpen}
+      <Notice kind="info" ondismiss={() => (keysOpen = false)}><span id="keys">Keyboard: {#each SHORTCUTS as k, i (i)}{#if i} · {/if}{#each k.keys as key, j (j)}{#if j}&nbsp;{/if}<kbd>{key}</kbd>{/each} {k.what}{/each}.</span></Notice>
+    {/if}
     {#if catalog && idx && view.view !== 'place'}
       <SelectBar bind:this={selectBar} {view} {catalog} {idx} {layers} {universe} places={chosen} indicators={selected} gazetteer={gaz != null} loading={gazLoading}
         ongazetteer={readGazetteer} onchange={patch} />

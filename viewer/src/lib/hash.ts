@@ -23,7 +23,8 @@
 // - Map: ind (the indicator: one of the selection's), place (the place selected), color (value | departure | status | trend |
 //   record | class | share), cls (the class of `share`), grain (year | decade | month: the grain read; the indicator's status
 //   grain when absent), proj (globe; absent = the flat map), layer (the layer under the map, `<kind>:<id>[:<variable>]`:
-//   map/layerSlot.ts), anom=1 (with t2: the second slice is t2 - t per cell), swipe (with t2 and no anom: the handle's share of
+//   map/layerSlot.ts), pal (the layer's palette, a ramp id of @oceanmetrics/map, `_r` reversed; absent = the layer's default),
+//   anom=1 (with t2: the second slice is t2 - t per cell), swipe (with t2 and no anom: the handle's share of
 //   the width, 0..1 in three decimals; 0.5 is left out), method.
 // - Report: the report spec's own flat keys after the selection (src/report/spec.ts: ctx, layout, status, recent, base,
 //   grain, from, to, asof, title).
@@ -63,7 +64,8 @@ export interface ViewState {
   showEmpty: boolean
   color: MapColor | null
   t: string | null
-  /** the second period of the Map's compare mode ("2016-07"); null = compare off. shared like `t` */
+  /** the second period of the Map's compare mode ("2016-07"), or a year range ("2003-2012": the mean of its periods at the
+   * month of `t`, map/compare.ts); null = compare off. shared like `t` */
   t2: string | null
   /** with `t2`: draw `t2 - t` per cell instead of the slice at `t2` (the Map's `anom=1`) */
   anom: boolean
@@ -76,6 +78,8 @@ export interface ViewState {
   proj: 'globe' | null
   /** the layer under the Map (`erddap:dhw_5km:CRW_SST`), or null for none */
   layer: string | null
+  /** the layer's palette (a ramp id, `thermal`, `spectral_r`), or null for the layer's default */
+  pal: string | null
   /** the Matrix's page (1-based) and the folded series it shows open */
   page: number
   unfold: string[]
@@ -86,11 +90,15 @@ export interface ViewState {
 export const DEFAULT_STATE: ViewState = {
   view: 'matrix', q: '', vocab: 'onms', depth: 'swim', cell: null,
   place: null, coll: null, method: null, ind: null,
-  axes: 'indicators', showEmpty: false, color: null, t: null, t2: null, anom: false, swipe: null, cls: null, grain: null, proj: null, layer: null, page: 1, unfold: [], spec: DEFAULT_SPEC,
+  axes: 'indicators', showEmpty: false, color: null, t: null, t2: null, anom: false, swipe: null, cls: null, grain: null, proj: null, layer: null, pal: null, page: 1, unfold: [], spec: DEFAULT_SPEC,
 }
 
 /** a period in the hash: "2024", "2024-07", "2024-07-15" */
 const PERIOD = /^\d{4}(-\d{2}(-\d{2})?)?$/
+/** t2 may also be a year range, "2003-2012" (the first year not after the last) */
+const T2 = (v: string) => PERIOD.test(v) || (/^\d{4}-\d{4}$/.test(v) && v.slice(0, 4) <= v.slice(5))
+/** a palette: a ramp id, `_r` for it reversed (map/gridLayer.ts `palOf` checks the map package has it) */
+const PAL = /^[a-z]+(_r)?$/
 
 /** a swipe fraction from the hash: a number in [0, 1], three decimals; anything else (or the middle) is null */
 const swipeOf = (v: string | undefined): number | null => {
@@ -139,13 +147,14 @@ export function parseHash(hash: string): ViewState {
     showEmpty: kv.get('empty') === '1',
     color: MAP_COLORS.includes(color as MapColor) ? (color as MapColor) : null,
     t: PERIOD.test(t) ? t : null,
-    t2: PERIOD.test(t2) ? t2 : null,
-    anom: PERIOD.test(t2) && kv.get('anom') === '1',
+    t2: T2(t2) ? t2 : null,
+    anom: T2(t2) && kv.get('anom') === '1',
     swipe: swipeOf(kv.get('swipe')),
     cls: kv.get('cls') || null,
     grain: MAP_GRAINS.includes(kv.get('grain') as Grain) ? (kv.get('grain') as Grain) : null,
     proj: kv.get('proj') === 'globe' ? 'globe' : null,
     layer: layer ? formatLayerKey(layer) : null,
+    pal: layer && PAL.test(kv.get('pal') ?? '') ? kv.get('pal')! : null,
     page: view === 'matrix' && /^\d+$/.test(kv.get('page') ?? '') ? Math.max(1, Number(kv.get('page'))) : 1,
     unfold: view === 'matrix' ? [...new Set((kv.get('unfold') ?? '').split(',').map(x => x.trim()).filter(Boolean))] : [],
     // outside the Report only the selection is read; the Report's other keys are its own
@@ -198,6 +207,7 @@ export function serializeHash(s: ViewState): string {
     if (s.grain) parts.push('grain=' + s.grain)
     if (s.proj) parts.push('proj=' + s.proj)
     if (s.layer) parts.push('layer=' + enc(s.layer))
+    if (s.layer && s.pal) parts.push('pal=' + s.pal)
     shared()
     if (s.t2 && s.anom) parts.push('anom=1')
     else if (s.t2 && s.swipe != null && Math.round(s.swipe * 1000) !== 500) parts.push('swipe=' + Math.round(Math.min(1, Math.max(0, s.swipe)) * 1000) / 1000)

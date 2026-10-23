@@ -5,6 +5,8 @@
 // the first pass is places as rows (#axes=p), the second the default, indicators as rows with places in columns: the same cell round
 // trip, and Tab + Enter on a remove button; then the Place view's breadcrumb returns to the cell it came from. at the end, the order:
 // Alt+arrow and the Move buttons move a header, a drag onto another header of its group does, grouping off lifts the limit, and the Order control.
+// last, build week 2: `l` turns the Map's compare mode on and off (t2), does nothing while typing, goes to the layer select without a layer, and
+// Help ▾ → Keyboard shortcuts lists it.
 //   node viewer/scripts/keys.mjs [--url https://oceanmetrics.io/indicators/] [--data <catalog base URL>]
 import puppeteer from 'puppeteer-core'
 
@@ -454,6 +456,37 @@ if (t) {
 }
 // every view carries the order: the Matrix, Map and Report tabs keep ps=ns
 check(await page.evaluate(() => [...document.querySelectorAll('nav.views a')].every(a => /ps=ns/.test(a.getAttribute('href') ?? ''))), 'order: the Matrix, Map and Report tabs carry ps=ns')
+
+// ---- build week 2: `l` (erddap-places' lens key) turns the Map's compare mode on and off; Help ▾ → Keyboard shortcuts lists it ----
+await page.goto('about:blank')
+await page.goto(`${URL_BASE}${Q}#view=map&ind=erddap:dhw_5km:CRW_SST:mean&grain=month&t=2024-07&layer=grid:jplMURSST41mday:sst`, { waitUntil: 'networkidle0' })
+await page.waitForSelector('.map[data-state]', { timeout: 60000 })
+await page.evaluate(() => document.activeElement?.blur())
+await page.keyboard.press('l')
+check(await page.waitForFunction(() => /[#&]t2=/.test(location.hash), { timeout: 5000 }).then(() => true, () => false), `l: compare on, t2 in the hash (${await page.evaluate(() => location.hash)})`)
+await page.evaluate(() => document.activeElement?.blur())
+await page.keyboard.press('l')
+check(await page.waitForFunction(() => !/[#&]t2=/.test(location.hash), { timeout: 5000 }).then(() => true, () => false), 'l again: compare off, t2 gone')
+// typing in a field is not a shortcut
+await page.evaluate(() => { const i = document.createElement('input'); i.id = 'k-probe'; document.body.append(i); i.focus() })
+await page.keyboard.press('l')
+await new Promise(r => setTimeout(r, 300))
+check(!(await page.evaluate(() => /[#&]t2=/.test(location.hash))), 'l while typing in a field does nothing')
+await page.evaluate(() => document.getElementById('k-probe')?.remove())
+// with no layer under the map, l goes to the layer select and says why
+await page.goto('about:blank')
+await page.goto(`${URL_BASE}${Q}#view=map&ind=erddap:dhw_5km:CRW_SST:mean`, { waitUntil: 'networkidle0' })
+await page.waitForSelector('.map[data-state]', { timeout: 60000 })
+await page.keyboard.press('l')
+check(await page.evaluate(() => document.activeElement?.tagName === 'SELECT' && /Layer under the map/.test(document.activeElement?.closest('.group')?.textContent ?? '')), 'l without a layer: focus on the "Layer under the map" select')
+// the Keyboard list
+await page.evaluate(() => document.querySelector('header .mbon-menu button')?.click())
+const kb = await page.waitForFunction(() => [...document.querySelectorAll('.mbon-menu .panel button')].find(b => /Keyboard/.test(b.textContent ?? '')), { timeout: 5000 }).then(() => true, () => false)
+check(kb, 'Help ▾ has "Keyboard shortcuts"')
+if (kb) {
+  await page.evaluate(() => [...document.querySelectorAll('.mbon-menu .panel button')].find(b => /Keyboard/.test(b.textContent ?? ''))?.click())
+  check(await page.waitForFunction(() => /compare two periods/.test(document.getElementById('keys')?.textContent ?? ''), { timeout: 5000 }).then(() => true, () => false), 'the Keyboard list names l (compare two periods)')
+}
 
 await browser.close()
 console.log(fails.length ? `${fails.length} keyboard check(s) failed` : 'keyboard checks passed')

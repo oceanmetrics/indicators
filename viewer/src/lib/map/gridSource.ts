@@ -13,12 +13,15 @@ import type { Lobe, SliceSource } from '@oceanmetrics/engine'
 import { asyncBufferFromUrl, parquetMetadataAsync, parquetReadObjects } from 'hyparquet'
 import { compressors } from 'hyparquet-compressors'
 import type { Geometry } from 'geojson'
-import { axisSteps, budgetLobes, placesParquetUrl } from './gridLayer.ts'
-import type { SlicePlace } from './gridLayer.ts'
+import { axisSteps, budgetLobes, patientFetch, placesParquetUrl } from './gridLayer.ts'
+import type { PlaceCells, SlicePlace } from './gridLayer.ts'
 import { groupsFor, rowsToPlaces } from './placeGeometry.ts'
-import { anomalyRows } from './gridAnomaly.ts'
+import { anomalyRows, meanRows } from './gridAnomaly.ts'
 import type { SliceCell } from '@oceanmetrics/map'
 import type { GeoPlace, MetaLike } from './placeGeometry.ts'
+
+// every ERDDAP request of the slice asks again when the mirror drops it (gridLayer.ts `patientFetch`, as the places page)
+const erddapFetch = patientFetch()
 
 // ---- the engine: one DuckDB-WASM a page, in its worker ----
 
@@ -69,8 +72,14 @@ export interface GridSource {
   /** cells per step the slice holds, and how many lobes ask ERDDAP for them */
   cells: number
   lobes: number
+  /** the mask's cells per place, in the order the places were sliced */
+  perPlace: PlaceCells[]
+  /** the dataset's live time extent (null when the server did not say) */
+  extent: { start: string; end: string } | null
   /** `now - then` per cell of `now`, in the engine's SQL (the compare mode's anomaly) */
   anomaly(then: readonly SliceCell[], now: readonly SliceCell[]): Promise<SliceCell[]>
+  /** the mean per cell of several slices, in the engine's SQL (a year range's Then) */
+  mean(slices: readonly (readonly SliceCell[])[]): Promise<SliceCell[]>
 }
 
 /**
@@ -86,11 +95,25 @@ export async function prepareGridSource(collection: unknown, variableName: strin
   const missing = places.filter(p => !geo.some(g => g.place_id === p.id)).map(p => p.id)
   const byPlace = geo.map(g => ({ place: g.place_id, lobes: placeLobes({ place_id: g.place_id, geometry: g.geometry }) }))
   const { kept, left } = budgetLobes<Lobe>(byPlace, axisSteps(collection as Parameters<typeof axisSteps>[0]))
-  const [axes, extent] = await Promise.all([lobeAxes(ds, kept), fetchTimeExtent(ds.baseUrl, ds.datasetId).catch(() => null)])
-  const { cells } = lobeMasks(ds, kept, axes)
+  const [axes, extent] = await Promise.all([lobeAxes(ds, kept, { fetch: erddapFetch }), fetchTimeExtent(ds.baseUrl, ds.datasetId, undefined, { fetchFn: erddapFetch }).catch(() => null)])
+  // the mask lobe by lobe (the same cells as all at once), so each place's share is counted: the legend's cells per place
+  const cells: ReturnType<typeof lobeMasks>['cells'] = []
+  const perPlace: PlaceCells[] = []
+  let k = 0
+  for (const { place, lobes } of byPlace) {
+    if (left.includes(place)) continue
+    const pc: PlaceCells = { id: place, cells: 0, boundary: 0 }
+    for (let i = 0; i < lobes.length; i++, k++) {
+      const m = lobeMasks(ds, [kept[k]], [axes[k]]).cells
+      for (const c of m) { cells.push(c); if (c.weight < 1) pc.boundary++ }
+      pc.cells += m.length
+    }
+    perPlace.push(pc)
+  }
   return {
-    source: sliceSource({ dataset: ds, variable, axes, mask: cells, engine: theEngine(), extent }),
-    left: [...left, ...missing], cells: cells.length, lobes: kept.length,
+    source: sliceSource({ dataset: ds, variable, axes, mask: cells, engine: theEngine(), extent, fetch: erddapFetch }),
+    left: [...left, ...missing], cells: cells.length, lobes: kept.length, perPlace, extent,
     anomaly: (then, now) => anomalyRows(theEngine(), then, now),
+    mean: slices => meanRows(theEngine(), slices),
   }
 }

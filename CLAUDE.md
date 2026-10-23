@@ -72,7 +72,7 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   own `places` and `indicators` rules, in the hash as `pi`, `px` (place ids, `coll:<slug>`, `set:<id>`; default `coll:places`) and `ii`, `ix`
   (`*` = leads, `all`, `cat:`, `series:`, ids). The old keys (`colls`, `xp`, `xi`, `ai`, `leads`, a Map's `coll`) are read as the same selection on
   parse. Other hash keys: `q`, `vocab`, `depth`, `cell`, the Matrix's `page` (60 places a page) and `unfold` (the OBIS series opened), `axes=p`, `empty=1`, `t` (shared by every view since 2026-10-22; the Map reads it, the Matrix from
-  build week 3), `t2` (the compare mode's second period, shared like `t`), the Map's `anom=1` and `layer=<kind>:<id>[:<variable>]` (the layer slot, `map/layerSlot.ts`; `grid:dhw_5km:CRW_SST`), and the order `ps pg po is ig io` (README "Matrix view"). The place picker lists every polygon
+  build week 3), `t2` (the compare mode's second period, shared like `t`), the Map's `anom=1`, `pal` and `layer=<kind>:<id>[:<variable>]` (the layer slot, `map/layerSlot.ts`; `grid:dhw_5km:CRW_SST`), and the order `ps pg po is ig io` (README "Matrix view"). The place picker lists every polygon
   collection of the gazetteer; the gazetteer's places are read lazily (`gazetteerPlaces.ts`), never for the default selection.
 - **The cards and the Matrix summary come from `@oceanmetrics/catalog`** (`/cards`; 0.3.0, shared with the places page): `cardsFor` (through `place.ts`
   `placeCard`) gives the Place view's card words, citation with the place clause and Reproduce block; `valuesUrl`, `duckdbSnippet`, `configLines`, `configHash`
@@ -102,7 +102,13 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   Never key on an id prefix such as `base-`: no CARTO layer has one. **Compare** (`map/compare.ts`, hash `t2` shared like `t`, the Map's `anom=1`): a second grid slot of the same layer at `t2`
   (`companion()` in `gridKind.ts`, ids `slot:grid@t2`) above the first, each slot cut to its side of the swipe (t2 left, t right) by a pair of custom layers that set and clear the
   WebGL scissor (`swipeLayers.ts`; one map, never a second canvas or a `setFilter` per frame); both slots on one scale (the union of their ranges), one slice per
-  period (`sliceCache.ts`), `t2 - t` in the engine's SQL (`gridAnomaly.ts`); `t` and `t2` are periods of the layer's grain, so erddap-places' `md` has no counterpart.
+  period (`sliceCache.ts`), `t2 - t` in the engine's SQL (`gridAnomaly.ts`); `t` and `t2` are periods of the layer's grain, so erddap-places' `md` has no counterpart. `t2` may also be a year range
+  (`2003-2012`): the mean per cell of its periods at the month of `t`, at most `MAX_MEAN_PERIODS` (12) slices, three at once, averaged in the engine's SQL
+  (`meanRows`/`meanSql`). Build week 2's other parity rows: the cell readout (`GridSlot.cellAt`, map 0.3.0; words in `gridLayer.ts` `cellReadout`, a box
+  beside the pointer and a "Cell:" legend line), the cells sliced in the legend (`cellCountLine`, `cellRows`; the mask counted per place in `gridSource.ts`),
+  every ERDDAP request through `patientFetch` and a Retry on a failed slice (`GridSlot.retry()`, `problemText`), the palette (`pal=`, `rampChoices`,
+  `GridSlot.setRamp`; the anomaly keeps `balance`), and `l` for compare on and off (`viewer/src/lib/keys.ts`, Help ▾ → Keyboard shortcuts; update `SHORTCUTS`
+  and `keys.mjs` when a key changes). A hover shot is taken with `Page.captureScreenshot` (puppeteer's screenshot fires a mouseout that clears the readout).
   Every map shares one `setupMapLibre` (`map/setup.ts`); a `$effect` that makes a slot keys on strings
   (`layerKey`, the places' key), never on `view`, which is a new object on every hash change, or a new `t` remakes the slot instead of `update(t)`.
 - **The pickers** (`viewer/src/lib/pick/`): one place picker and one indicator picker for every view, the rules in plain
