@@ -23,7 +23,7 @@ describe('Help → Try these', () => {
     expect(v[2].anom).toBe(true)
     expect(v[4].place).toBe('NMS:FKNMS')
   })
-  it('says one sentence each', () => {
-    for (const t of TRY_THESE) expect(t.sentence).toMatch(/^[A-Z][^]*\.$/)
+  it('has a label each', () => {
+    for (const t of TRY_THESE) expect(t.label.length).toBeGreaterThan(5)
   })
 })

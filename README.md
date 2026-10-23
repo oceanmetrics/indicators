@@ -560,7 +560,7 @@ People" (PPG-26-197).
 
 ## Size budget
 
-`node scripts/size-budget.mjs` after `npm run build`, in gzip: entry JS ≤ 110 kB, all JS except the map chunk ≤ 210 kB (200 until 2026-10-23, 205 until the bar),
+`node scripts/size-budget.mjs` after `npm run build`, in gzip: entry JS ≤ 110 kB, all JS except the map chunk ≤ 212 kB (200 until 2026-10-23, 205 until the bar, 210 until Try these),
 the map chunk (MapLibre, pmtiles and the map components) ≤ 330 kB, CSS except the map's ≤ 15 kB, the map's CSS ≤ 15 kB.
 At the first deploy (2026-10-20) the entry was 86.5 kB and the CSS 6.7 kB. The map chunk has its own budget because
 MapLibre is about 230 kB gzip and is loaded only when the Map view is opened. With the two pickers (2026-10-20) the entry is 107.0 kB and the CSS 14.98 kB (107.6 and 15.0 with the place sets: their code is the Map's or lives in the lazy panels, and their rules reuse `om-*` classes): the picker panels and their rules load on the first open, and rules that several components repeated live once in `viewer/src/app.css` as `om-*` classes (gzip is per file, so each copy cost bytes). Nothing was raised for the pickers. With the globe and full screen (2026-10-20) the entry is 108.1 kB (the hash key, three icons and the overlay tokens, which live in the inlined theme files) and the CSS 14.99 kB: the `--map-sea` and `--overlay-*` tokens and the Menu rule are in `brand/themes/*.css` (inlined in the JS), not in the entry CSS. Nothing was raised. With the shared selection and the Select section (2026-10-20) the entry was 109.7 kB and the CSS 14.9 kB before the merge with the globe and the report layouts (the toggling rules of `report/tree.ts` load with the first tick or removal, the gazetteer's index loader and the picker panels on first use; the Tree's look-alike CSS moved rather than grew).  After the three merges of 2026-10-20 (globe, report layouts, shared selection) the entry was 111.3 kB, over budget; the
@@ -616,6 +616,12 @@ With the shared bar (2026-10-23: `<om-nav>` from `@oceanmetrics/nav` 0.1.0, the 
 101.0 kB of 110, all JS but the map 206.1 kB (was 203.4) and **its budget is raised from 205 to 210 kB**. The reason: the bar's `define` chunk is 4.9 kB gzip and loads
 only for the Ocean Metrics instance (`main.ts`: `if (brand !== 'mbon') import('@oceanmetrics/nav/define')`), minus 2.2 kB for the header copy and the mark it replaces.
 The alternative, a static import into the entry, would make the MBON instance pay for a bar it never shows. The CSS is unchanged in budget.
+
+With Help -> Try these and the Map tab's "layers · then vs now" (2026-10-23, Ben could not find the layer under the map or Then vs Now
+without asking) all JS but the map went from 209.6 to 210.2 kB on the Pages build (209.1 to 209.7 locally), over its 210 kB, and **its budget
+is raised to 212 kB**. Trimmed first: the examples carry no sentences in the viewer (their sentences are on oceanmetrics.io `/docs/` "Maps")
+and share one hash base, which brought it to 209.5 locally (about 210.0 on Pages), still at the line. The examples are entry code because the
+Help menu is on every view; a lazy chunk would count in the same line and gzip worse. The empty-state layer box is the map chunk's (326.3 of 330).
 
 ## Analytics
 

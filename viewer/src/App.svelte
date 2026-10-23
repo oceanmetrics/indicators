@@ -252,7 +252,7 @@
   {#if catalog}<a href={catalog.base + 'indicators.json'} target="_blank" rel="noopener">Manifest (indicators.json)</a>{/if}
   <hr />
   <span class="mbon-label">Try these</span>
-  {#each TRY_THESE as t (t.id)}<a href={tryHref(t)} title={t.sentence} onclick={() => close()}>{t.label}</a>{/each}
+  {#each TRY_THESE as t (t.id)}<a href={tryHref(t)} onclick={() => close()}>{t.label}</a>{/each}
 {/snippet}
 {#snippet feedback()}<span class="fb"><Button variant="quiet" size="sm" href={issueHref} target="_blank">Feedback</Button></span>{/snippet}
 

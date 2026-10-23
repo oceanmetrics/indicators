@@ -5,32 +5,26 @@
 
 export interface TryThis {
   id: string
-  /** the menu row */
+  /** the menu row (the one-sentence description of each is on /docs/ "Maps": the entry chunk is at its budget) */
   label: string
-  /** one sentence: what the view shows */
-  sentence: string
   /** the view's hash, without `#` */
   hash: string
 }
 
 const SST = 'view=map&ind=erddap:dhw_5km:CRW_SST:mean'
 const MUR = 'layer=grid:jplMURSST41mday:sst'
+const ONE = `${SST}&pi=coll:places&grain=month&t=2024-07&${MUR}&place=NMS:CINMS`
 
 export const TRY_THESE: readonly TryThis[] = [
   { id: 'layer', label: 'SST under the sanctuaries',
-    sentence: 'Monthly sea surface temperature (MUR SST) under the sanctuaries, with the period scrubber to move through time.',
-    hash: `${SST}&pi=coll:places&grain=month&t=2024-07&${MUR}&place=NMS:CINMS` },
+    hash: ONE },
   { id: 'compare', label: 'Then vs Now: July 2016 against July 2024',
-    sentence: 'The same layer at two periods side by side, with a swipe between Then and Now.',
-    hash: `${SST}&pi=coll:places&grain=month&t=2024-07&${MUR}&place=NMS:CINMS&t2=2016-07` },
+    hash: `${ONE}&t2=2016-07` },
   { id: 'anomaly', label: 'The difference per cell',
-    sentence: 'Then vs Now as one map: July 2024 minus July 2016 in every cell, on a diverging scale.',
-    hash: `${SST}&pi=coll:places&grain=month&t=2024-07&${MUR}&place=NMS:CINMS&t2=2016-07&anom=1` },
+    hash: `${ONE}&t2=2016-07&anom=1` },
   { id: 'range', label: 'Against a ten-year mean',
-    sentence: 'Channel Islands in July 2024 against the mean of July 2003 to 2012 as Then.',
     hash: `${SST}&pi=NMS:CINMS&place=NMS:CINMS&grain=month&t=2024-07&${MUR}&t2=2003-2012` },
   { id: 'place', label: 'One place: Florida Keys',
-    sentence: 'Every indicator of one sanctuary, with its status and trend relative to its own record.',
     hash: 'view=place&place=NMS:FKNMS' },
 ]
 
