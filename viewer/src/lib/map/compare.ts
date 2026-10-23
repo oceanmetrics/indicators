@@ -119,15 +119,18 @@ const signed = (v: number) => (v > 0 ? `+${num(v)}` : v < 0 ? `−${num(-v)}` : 
  * the legend line of the compare mode, naming both periods. the swipe: "Compare: <title> · left of the handle <t2> ·
  * right <t> · one colour scale over both periods · <min> to <max> <units> · <via>". the anomaly: "Difference: <title>,
  * <t2> minus <t>, per cell · <−m> to <+m> <units> · blue lower in <t2>, red higher · <via>". "loading the slice at <p>…"
- * until a period is in, "· <problem>" when it failed
+ * until a period is in, "· <problem>" when it failed. `secondLabel` names a year range's Then in full, once; `secondShort`
+ * ("Then") stands for it after that
  */
-export function compareLegendLine(o: { title: string; via: string; first: CompareLegend; second: CompareLegend; anom: boolean; secondLabel?: string | null }, period: (t: string) => string): string {
+export function compareLegendLine(o: { title: string; via: string; first: CompareLegend; second: CompareLegend; anom: boolean; secondLabel?: string | null; secondShort?: string | null }, period: (t: string) => string): string {
   const p1 = o.first.t ? period(o.first.t) : 'the latest time'
   const p2 = o.secondLabel ?? (o.second.t ? period(o.second.t) : 'the latest time')
+  // a long Then (a year range's "Then: mean of 2003-01..2012-01 (10 periods)") is said once; after that its short name
+  const p2s = o.secondShort ?? p2
   const units = o.second.units ?? o.first.units ?? null
   const u = units ? ` ${units}` : ''
   const states: string[] = []
-  for (const [l, p] of [[o.second, p2], [o.first, p1]] as const) {
+  for (const [l, p] of [[o.second, p2s], [o.first, p1]] as const) {
     if (l.problem) states.push(`${p}: ${l.problem}`)
     else if (!l.ramp) states.push(`loading the slice at ${p}…`)
   }
@@ -135,7 +138,7 @@ export function compareLegendLine(o: { title: string; via: string; first: Compar
   if (o.anom) {
     const r = o.second.ramp
     const range = r ? ` · ${signed(r.min)} to ${signed(r.max)}${u}` : ''
-    return `Difference: ${o.title}, ${p2} minus ${p1}, per cell${range} · blue lower in ${p2}, red higher${state} · ${o.via}`
+    return `Difference: ${o.title}, ${p2} minus ${p1}, per cell${range} · blue lower in ${p2s}, red higher${state} · ${o.via}`
   }
   const r = o.first.ramp ?? o.second.ramp
   const range = r ? ` · ${num(r.min)} to ${num(r.max)}${u}` : ''

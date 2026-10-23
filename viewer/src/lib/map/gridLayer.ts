@@ -152,6 +152,27 @@ export function stepDate(t: string | null | undefined): string | null {
   return /^\d{4}$/.test(y) ? `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}` : null
 }
 
+/**
+ * the step a slice asks for, inside the dataset's record (erddap-places: "t the window's last day clamped to the dataset's last
+ * step"): a day past the record's last step asks for that step, a day before its first for the first; a day inside it, and null
+ * (the latest), stay as they are. `clamped` says which end it was moved to. the extent is the server's (`/info`), so a layer
+ * whose record ends before the indicator's (IMERG's final run lags by months) still draws its last month instead of failing
+ */
+export function clampStep(day: string | null, extent: { start: string; end: string } | null): { day: string | null; clamped: 'end' | 'start' | null } {
+  if (!day || !extent) return { day, clamped: null }
+  const d = day.slice(0, 10), lo = extent.start.slice(0, 10), hi = extent.end.slice(0, 10)
+  if (hi && d > hi) return { day: hi, clamped: 'end' }
+  if (lo && d < lo) return { day: lo, clamped: 'start' }
+  return { day, clamped: null }
+}
+
+/** what the legend adds when the period asked for is outside the dataset's record: "2026-08 is past the record of this layer: its last step, 2026-06-01, is drawn" */
+export function clampLine(asked: string, drawn: string, clamped: 'end' | 'start'): string {
+  return clamped === 'end'
+    ? `${asked} is past the record of this layer: its last step, ${drawn}, is drawn`
+    : `${asked} is before the record of this layer: its first step, ${drawn}, is drawn`
+}
+
 // ---- the legend and the credit ----
 
 /** how the slice is drawn: in the browser, from the dataset's own server */
@@ -262,6 +283,9 @@ export function rampChoices(defaultId: string, ramps: Readonly<Record<string, { 
   }
   return out
 }
+
+/** the palette select is shown with a layer, and not under the difference, which keeps its own diverging ramp (`balance`) */
+export const paletteShown = (layer: string | null | undefined, anom: boolean) => !!layer && !anom
 
 // ---- the cell readout (hover or tap) ----
 

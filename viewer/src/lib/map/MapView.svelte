@@ -42,7 +42,7 @@
   import type { LayerSlot } from './layerSlot.ts'
   import { gridKind } from './gridKind.ts'
   import type { GridLayerSlot } from './gridKind.ts'
-  import { cellCountLine, cellReadout, cellRows, layerChoices, leftOutLine, palOf, rampChoices, readoutPlace, slicedIds, slicePlaces, slicePlacesKey, slotLegendLine, stepDate } from './gridLayer.ts'
+  import { cellCountLine, cellReadout, cellRows, clampLine, layerChoices, leftOutLine, palOf, paletteShown, rampChoices, readoutPlace, slicedIds, slicePlaces, slicePlacesKey, slotLegendLine, stepDate } from './gridLayer.ts'
   import { defaultRampFor, RAMPS } from '@oceanmetrics/map'
   import type { CellProps, GridSlot } from '@oceanmetrics/map'
   import { compareToggle, shortcutFor } from '../keys.ts'
@@ -292,8 +292,13 @@
     const left = g?.leftOut ? leftOutLine(g.leftOut(), g.without(), placeName) : ''
     void slot2Tick
     const l2 = slot2?.legend() ?? null
-    const line = l2 ? compareLegendLine({ title: l.title, via: l.via, first: { ...l, t: slotT }, second: { ...l2, t: slot2T }, anom: anomOn, secondLabel: rangeLong ? `Then: ${rangeLong}` : null }, t => periodLabel(t, model.grain)) : slotLegendLine(l, t => periodLabel(t, model.grain))
-    return line + (left ? ` · ${left}` : '')
+    // a year range's long Then is said once, then "Then" (compare.ts compareLegendLine)
+    const line = l2 ? compareLegendLine({ title: l.title, via: l.via, first: { ...l, t: slotT }, second: { ...l2, t: slot2T }, anom: anomOn, secondLabel: rangeLong ? `Then: ${rangeLong}` : null, secondShort: rangeLong ? 'Then' : null }, t => periodLabel(t, model.grain)) : slotLegendLine(l, t => periodLabel(t, model.grain))
+    // a period outside the layer's record draws its last (or first) step, and says so (gridLayer.ts clampStep)
+    const c1 = g?.stepOf?.(slotT) ?? null
+    const c2 = l2 && !isYearRange(slot2T) ? (slot2 as GridLayerSlot | null)?.stepOf?.(slot2T) ?? null : null
+    const moved = [c1 ? clampLine(rightLabel, c1.day, c1.clamped) : '', c2 ? clampLine(leftLabel, c2.day, c2.clamped) : ''].filter(Boolean).join(' · ')
+    return line + (moved ? ` · ${moved}` : '') + (left ? ` · ${left}` : '')
   })
 
   // ---- the palette (the hash's `pal`): the slot and the compare slot repaint, the anomaly keeps its diverging ramp ----
@@ -478,7 +483,8 @@
       <Select label="Layer under the map" value={view.layer ?? ''} options={layerOptions} onchange={(v: string) => onpatch({ layer: v || null })} />
       {#if keyNote}<span class="hint" role="status">{keyNote}</span>{/if}
     </div>
-    {#if view.layer}
+    <!-- the difference keeps its own diverging ramp: no palette to choose then -->
+    {#if paletteShown(view.layer, anomOn)}
       <div class="group layer">
         <Select label="Palette" value={pal ?? ''} options={palOptions} onchange={(v: string) => onpatch({ pal: v || null })} />
       </div>
@@ -569,7 +575,8 @@
   .group.slide { min-width: min(20rem, 100%); flex: 1; max-width: 32rem; }
   .group.layer { width: min(18rem, 100%); }
   .group.compare { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-2) var(--space-5); min-width: 0; flex: 1 1 100%; }
-  .group.compare .with { width: min(10rem, 100%); }
+  /* wide enough for a year range's "mean of 2003–2012" with the select's arrow */
+  .group.compare .with { width: min(13rem, 100%); }
   .row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
   .one { font: var(--fw-semibold) var(--text-sm) / 1 var(--font-mono); color: var(--text-strong); }
   .notice { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: var(--space-2) var(--space-3); background: var(--bg-tint); border-radius: var(--radius-sm); font: var(--type-small); color: var(--text-strong); }

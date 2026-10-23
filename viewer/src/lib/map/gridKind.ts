@@ -12,7 +12,7 @@ import { anomalyDomain, isYearRange, parseYearRange, rangeMonth, unionRange, yea
 import type { MeanInfo } from './compare.ts'
 import { sharedSlices } from './sliceCache.ts'
 import type { LayerSlot, SlotFactory } from './layerSlot.ts'
-import { collectionUrl, gridCredit, gridTitle, gridVia, hostOf, problemText, producersOf, unitLabel } from './gridLayer.ts'
+import { clampStep, collectionUrl, gridCredit, gridTitle, gridVia, hostOf, problemText, producersOf, unitLabel } from './gridLayer.ts'
 import type { PlaceCells, SlicePlaces } from './gridLayer.ts'
 import type { GridSource } from './gridSource.ts'
 
@@ -55,6 +55,8 @@ export interface GridLayerSlot extends GridSlot {
   meanInfo(): MeanInfo | null
   /** the ramp the slot draws with when the hash names none (`defaultRampFor`) */
   defaultRamp: string
+  /** the step drawn for a period outside the dataset's record (its last or first step, `clampStep`); null inside it, and until its slice */
+  stepOf(t: string | null): { day: string; clamped: 'end' | 'start' } | null
   /** a second slot of this layer for the compare mode: the slice at its own `t` (`t2`) under the same scale as this one, or
    * with `anom` the difference `t2 - t` per cell (this slot's `t`, read at each slice) on a diverging ramp */
   companion(o: { anom: boolean; onchange?: () => void }): GridLayerSlot
@@ -104,8 +106,19 @@ export function gridKind(places: () => SlicePlaces): SlotFactory {
     const source = async () => { try { return await prepare() } catch { await new Promise(r => setTimeout(r, RETRY_MS)); return prepare() } }
     let left: string[] = []
     let perPlace: PlaceCells[] | null = null
+    // a period outside the dataset's record asks for its last (or first) step: the day drawn, by the period asked
+    const moved = new Map<string, { day: string; clamped: 'end' | 'start' }>()
     // one slice per period for both slots: the anomaly reads the slice at t the first slot drew
-    const slices = sharedSlices({ async slice(t, signal) { const g = await source(); left = g.left; perPlace = g.perPlace; return g.source.slice(t, signal) } })
+    const slices = sharedSlices({
+      async slice(t, signal) {
+        const g = await source()
+        left = g.left
+        perPlace = g.perPlace
+        const c = clampStep(t, g.extent)
+        if (t && c.clamped && c.day) moved.set(t, { day: c.day, clamped: c.clamped })
+        return g.source.slice(c.day, signal)
+      },
+    })
     // a failure in the host's words; an abort passes as it is
     const plain = <T>(p: Promise<T>, signal?: AbortSignal) => p.catch((e: unknown) => { throw signal?.aborted ? e : new Error(problemText(e, host)) })
     // the mean of a year range at a month, the last two kept (the anomaly asks for the one the swipe drew)
@@ -205,6 +218,7 @@ export function gridKind(places: () => SlicePlaces): SlotFactory {
         perPlace: () => perPlace,
         meanInfo: () => mean,
         defaultRamp: base.ramp,
+        stepOf: t => (t ? moved.get(t) ?? null : null),
         companion: c => make({ instance: COMPARE_INSTANCE, anomOf: c.anom ? () => out.legend()?.t ?? null : undefined, firstT: () => out.legend()?.t ?? null, onchange: c.onchange }),
       }
       return out

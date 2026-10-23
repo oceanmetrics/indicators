@@ -293,3 +293,15 @@ export function mapToMatrixHref(from: Carry, ind: string | null, place: string |
 export function placeToMapHref(from: Carry, placeId: string, ind: string | null): string {
   return mapHref(from, ind, null, placeId)
 }
+
+// ---- history: which changes Back undoes ----
+
+/**
+ * how a new state goes into the browser's history: a new entry (`push`) when the reader changes view or turns the Map's compare
+ * mode on or off (erddap-places pushed a history entry on a lens switch, so Back returned to the lens before: the compare mode is
+ * that lens here), else the entry is rewritten in place (`replace`: a new period, a swipe, a colour; Back does not walk through
+ * every step of a scrub). Back and Forward then fire `hashchange`, which the App reads as any pasted link
+ */
+export function historyStep(prev: Pick<ViewState, 'view' | 't2'>, next: Pick<ViewState, 'view' | 't2'>): 'push' | 'replace' {
+  return prev.view !== next.view || !!prev.t2 !== !!next.t2 ? 'push' : 'replace'
+}

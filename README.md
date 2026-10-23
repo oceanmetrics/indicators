@@ -365,6 +365,19 @@ values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` 
 - **The keyboard** (row 58): `l`, erddap-places' lens key, turns the compare mode on (at the default second period) and off, the place
   kept; with no layer under the map it goes to the "Layer under the map" select and says so (`viewer/src/lib/keys.ts`). Help ▾ →
   *Keyboard shortcuts* lists it with the keys of the Period scrubber, the compare handle, the Matrix headers and Esc.
+- **The second pass of build week 2** (2026-10-23, erddap-places parity rows 18, 21, 24, 33, 72, 87 and four cosmetic findings; shots
+  `map_wk2b_*`): a place selected from a link is **framed by the viewport** (`bounds.ts` `fitPadding`: a margin of 6 % of the frame's
+  shorter side, 12 to 64 px, plus the Flat / Globe / Full screen row on top and the scale at the bottom; the fixed 80 px a side left a
+  place a third of a 390 px frame) and **the short way round the globe** (`placeBox`: the longitudes of every vertex as points on a
+  circle, the box the circle less the widest gap, so Papahanaumokuakea is one box over 180 whether the tiles give it as two features or,
+  at zoom 1 on a phone, as one whose ring runs from 177 to -162). **A period outside the layer's record draws its last (or first) step**
+  (`gridLayer.ts` `clampStep`, in the shared slices of `gridKind.ts`; `GridLayerSlot.stepOf`), and the legend says so: "2026-08 is
+  past the record of this layer: its last step, 2025-09-01, is drawn" (`clampLine`; IMERG's final run ends months before the
+  indicators). **Turning compare on or off is a history entry** (`hash.ts` `historyStep`; every other change rewrites the entry), so
+  Back returns to the view before it and Forward again, the Map following in place (`keys.mjs`: "Back after compare off", "Forward").
+  The cosmetic fixes: the "Compare with" select is 13 rem, so "mean of 2003–2012" reads whole; the difference legend names a year
+  range's Then in full once and then "Then" (`compareLegendLine` `secondShort`); the Palette select is hidden under the difference
+  (`paletteShown`), which keeps `balance`.
 - **Every group of the selection is a layered part** of the map, as a place set is (see below): `viewer/src/lib/map/selection.ts` turns the rules into groups; a group chosen in part
   (places picked by id, or some taken away) is drawn restricted to its chosen places (a vector filter; for a Marine Regions group an SLD filter on the
   MRGIDs, up to 120 of them: past that the whole group is drawn). Excluded places are not drawn and not in the legend or the table.
@@ -525,6 +538,10 @@ With build week 2's parity rows (2026-10-23: the cell readout, the counts, the R
 Keyboard list) the map JS is 323.9 kB of 330 (+3.9), the engine 139.8 of 160 (+0.3: the patient fetch, the mean), all JS but the map
 203.2 of 205 (+1.2: the legend's rows and Retry, `keys.ts` and the Keyboard notice), the entry 103.4 of 110 (+0.7: the Keyboard list),
 the CSS but the map 14.8 of 15 (+0.2, the legend's cell table) and the map's CSS 12.5 of 15. Nothing was raised.
+
+The second pass of build week 2 (2026-10-23: the fit by viewport, `placeBox`, the step clamp, the history entry, the cosmetic fixes) adds
+0.5 kB to the map JS (324.4 of 330), 0.1 to the entry (103.5 of 110) and to all JS but the map (203.3 of 205); the engine and the CSS are
+unchanged. Nothing was raised.
 
 ## Brand and icons
 

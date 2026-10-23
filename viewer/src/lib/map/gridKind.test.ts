@@ -174,3 +174,34 @@ describe('the year range Then (row 32), the counts, the palette and the retry', 
     expect(r.map(x => (x.status === 'fulfilled' ? x.value : (x.reason as Error).message))).toEqual([10, 20, 'three', 40, 50])
   })
 })
+
+describe('a period outside the dataset\'s record (rows 18, 33: t clamped to the dataset\'s last step)', () => {
+  it('a period past the record asks for its last step, says which, and draws it; one inside is asked as it is', async () => {
+    const m = strictMap()
+    asked.length = 0
+    VALUES['2026-09-16'] = [20, 24]
+    const first = await make()
+    first.mount(m as never, null, '2026-11-01')
+    await settle()
+    expect(asked).toEqual(['2026-09-16'])
+    expect(first.stepOf('2026-11-01')).toEqual({ day: '2026-09-16', clamped: 'end' })
+    expect(first.legend()!.ramp).toMatchObject({ min: 20, max: 24 })
+    expect(first.legend()!.problem ?? null).toBeNull()
+    first.update('2024-07-01')
+    await settle()
+    expect(asked).toEqual(['2026-09-16', '2024-07-01'])
+    expect(first.stepOf('2024-07-01')).toBeNull()
+    first.unmount(m as never)
+  })
+  it('a period before the record asks for its first step', async () => {
+    const m = strictMap()
+    asked.length = 0
+    VALUES['2002-06-16'] = [10, 12]
+    const first = await make()
+    first.mount(m as never, null, '1999-01-01')
+    await settle()
+    expect(asked).toEqual(['2002-06-16'])
+    expect(first.stepOf('1999-01-01')).toEqual({ day: '2002-06-16', clamped: 'start' })
+    first.unmount(m as never)
+  })
+})

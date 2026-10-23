@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { carryOver, DEFAULT_STATE, groupHref, mapHref, mapToMatrixHref, matrixHref, matrixToMapHref, placeToMapHref, parseHash, placeHref, reportHref, serializeHash } from './hash.ts'
+import { carryOver, DEFAULT_STATE, groupHref, historyStep, mapHref, mapToMatrixHref, matrixHref, matrixToMapHref, placeToMapHref, parseHash, placeHref, reportHref, serializeHash } from './hash.ts'
 import { DEFAULT_SPEC } from '../../../src/report/spec.ts'
 import type { ReportSpec } from '../../../src/report/spec.ts'
 import type { ViewState } from './hash.ts'
@@ -487,5 +487,40 @@ describe('week 2: t2 as a year range, and the layer\'s palette (pal=)', () => {
     expect(parseHash('#view=map&pal=viridis').pal).toBeNull()
     expect(parseHash('#view=map&layer=grid:a:b&pal=Viridis').pal).toBeNull()
     expect(serializeHash(st({ view: 'map', pal: 'viridis' }))).toBe('view=map')
+  })
+})
+
+describe('erddap-places links, through its redirect (parity rows 73, 74, 105, 107)', () => {
+  it('a Statistics link redirected opens the Place view on the place, its group and the indicator (redirect.test.ts output)', () => {
+    const v = parseHash('#view=place&place=MRGID:8439&coll=mr_eez&ind=erddap:dhw_5km:CRW_SST:mean')
+    expect([v.view, v.place, v.coll, v.ind]).toEqual(['place', 'MRGID:8439', 'mr_eez', 'erddap:dhw_5km:CRW_SST:mean'])
+    expect(serializeHash(v)).toBe('view=place&place=MRGID:8439&coll=mr_eez&ind=erddap:dhw_5km:CRW_SST:mean')
+  })
+  it('a place id with a space (written %20 by the redirect) and several colons is read whole and written back the same', () => {
+    const v = parseHash('#view=place&place=BOEM:OCS-P%200561&ind=erddap:dhw_5km:CRW_SST:mean')
+    expect(v.place).toBe('BOEM:OCS-P 0561')
+    expect(serializeHash(v)).toBe('view=place&place=BOEM:OCS-P%200561&ind=erddap:dhw_5km:CRW_SST:mean')
+    const w = parseHash('#view=place&place=ONMS:florida-keys-national-marine-sanctuary:northern-section')
+    expect(w.place).toBe('ONMS:florida-keys-national-marine-sanctuary:northern-section')
+    expect(serializeHash(w)).toBe('view=place&place=ONMS:florida-keys-national-marine-sanctuary:northern-section')
+  })
+  it('a redirect that names no place opens the matrix (the bare /indicators/ address is the default state)', () => {
+    expect(parseHash('')).toEqual(DEFAULT_STATE)
+    expect(parseHash('#view=place').view).toBe('matrix')
+  })
+})
+
+describe('which changes Back undoes (parity rows 72, 87)', () => {
+  const map = { view: 'map' as const, t2: null }
+  it('turning compare on or off is a new history entry, so Back returns to the view before (erddap-places\' lens switch)', () => {
+    expect(historyStep(map, { view: 'map', t2: '2016-07' })).toBe('push')
+    expect(historyStep({ view: 'map', t2: '2016-07' }, map)).toBe('push')
+  })
+  it('a change of view is a new entry too', () => {
+    expect(historyStep(map, { view: 'matrix', t2: null })).toBe('push')
+  })
+  it('a new period, a new Then, a swipe or a colour rewrites the entry in place (Back does not walk a scrub)', () => {
+    expect(historyStep({ view: 'map', t2: '2016-07' }, { view: 'map', t2: '2003-2012' })).toBe('replace')
+    expect(historyStep(map, map)).toBe('replace')
   })
 })

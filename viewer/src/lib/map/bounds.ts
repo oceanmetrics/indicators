@@ -75,3 +75,55 @@ export function worldCopies(zoom: number, framePx: number, crossing = false): bo
 export function crossingMinZoom(framePx: number): number {
   return Math.max(0, Math.log2(Math.max(1, framePx) / 512))
 }
+
+// ---- the padding of a fit ----
+
+/** the padding MapLibre's fitBounds takes, in CSS pixels */
+export interface Padding { top: number; bottom: number; left: number; right: number }
+
+/** the frame's own controls: the Flat / Globe / Full screen row at the top, the scale (and the swipe's captions) at the bottom */
+export const FRAME_TOP_PX = 44
+export const FRAME_BOTTOM_PX = 28
+
+/**
+ * the padding that frames a place in a frame of this size (erddap-places' `fitPadding()`, which kept the Controls pane and the Time
+ * strip off the place; here the controls are outside the map, and only the frame's own buttons and scale sit over it): a margin of
+ * 6 % of the frame's shorter side, 12 to 64 px, plus the button row on top and the scale at the bottom. so a 390 px phone frames
+ * a place across almost all of its width, where the old fixed 80 px a side left it a third of the frame
+ */
+export function fitPadding(width: number, height: number): Padding {
+  const side = Math.round(Math.min(64, Math.max(12, Math.min(Math.max(0, width), Math.max(0, height)) * 0.06)))
+  return { top: side + FRAME_TOP_PX, bottom: side + FRAME_BOTTOM_PX, left: side, right: side }
+}
+
+/**
+ * the box of one place from its features, the short way round the globe: the longitudes of every vertex are points on a circle,
+ * and the box is the circle less the widest gap between them (the gap across the antimeridian first, so a tie keeps the plain
+ * box). so Papahanaumokuakea is one box over 180 (east past 180) whether the tiles hand it back as a feature each side of 180
+ * (zoomed in) or as one feature whose ring runs from 177 to -162 (zoom 1 on a phone, where a box per feature read as the world).
+ * latitude is the plain min and max; null when no vertex
+ */
+export function placeBox(geoms: { coordinates?: unknown }[]): Box4 | null {
+  const lons: number[] = []
+  let s = Infinity, n = -Infinity
+  const visit = (c: Coords): void => {
+    if (typeof c === 'number') return
+    if (c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number') {
+      lons.push((((c[0] + 180) % 360) + 360) % 360)
+      s = Math.min(s, c[1]); n = Math.max(n, c[1])
+      return
+    }
+    for (const x of c) visit(x)
+  }
+  for (const g of geoms) visit((g.coordinates ?? []) as Coords)
+  if (!lons.length) return null
+  lons.sort((a, b) => a - b)
+  let gap = lons[0] + 360 - lons[lons.length - 1], start = lons[0]
+  for (let i = 1; i < lons.length; i++) {
+    const g = lons[i] - lons[i - 1]
+    if (g > gap) { gap = g; start = lons[i] }
+  }
+  const r = (v: number) => Math.round(v * 1e9) / 1e9
+  const w = start - 180
+  return [r(w), s, r(w + 360 - gap), n]
+}

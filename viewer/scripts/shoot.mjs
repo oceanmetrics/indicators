@@ -2,7 +2,7 @@
 // the place and indicator pickers open matrix_*_places_picker and matrix_*_indicators_picker, the Select section select_*, a group
 // nothing is computed for uncomputed_*, the drawer), the Place view (place_<place>_<brand>_<theme>[_390].png), the
 // Map view (map_<indicator>_<color>_<theme>[_390].png; the layer under it map_layer_*, the compare mode map_compare_*, build week 2's cell
-// readout, palette, Retry and year-range Then map_wk2_*), the Report view (report_*: the Scorecard, the Cards report, the
+// readout, palette, Retry and year-range Then map_wk2_*; the second pass map_wk2b_*: the fit by viewport, PMNM, a period past the record), the Report view (report_*: the Scorecard, the Cards report, the
 // open builder over budget, the print preview, Small multiples, the Quad plot, the Map sheet and the Dossier), the order of the rows
 // and columns (order_*: the Order control open, a flat north-to-south order in both orientations, a custom order, a drag in progress with
 // its drop bar and a refused drop, the move buttons on focus) and the embed route (embed_*).
@@ -46,6 +46,12 @@ const WIDE = { width: 1280, height: 1500, deviceScaleFactor: 2 }
 // (`--t 2024-01` for a layer whose July is empty there, such as IMERG's precipitation: `--compare-layer grid:IMERG_monthly_global_precip:precipitation`)
 const LAYER_ONE = 'view=map&ind=erddap:dhw_5km:CRW_SST:mean&pi=NMS:CINMS&place=NMS:CINMS&grain=month&t=' + arg('--t', '2024-07') + '&layer=' + arg('--compare-layer', 'grid:jplMURSST41mday:sst')
 const RANGE = LAYER_ONE + '&t2=2003-2012'
+// build week 2, second pass (map_wk2b_*): a place framed by the viewport (row 24: at 390 it fills the frame's width), the year-range
+// Then with the "Compare with" select whole, and the difference without the Palette select and with its Then said once; Papahanaumokuakea
+// over the antimeridian with its slice (row 21); a period past the layer's record drawing its last step (rows 18, 33: IMERG ends 2025-09)
+const IMERG = 'grid:IMERG_monthly_global_precip:precipitation'
+const PMNM = 'view=map&ind=erddap:dhw_5km:CRW_SST:mean&pi=NMS:PMNM&place=NMS:PMNM&grain=month&t=2024-01&layer=' + IMERG
+const CLAMP = 'view=map&ind=erddap:dhw_5km:CRW_SST:mean&pi=NMS:CINMS&place=NMS:CINMS&grain=month&t=2026-08&layer=' + IMERG
 const FKNMS = 'view=place&place=NMS:FKNMS'
 const FKNMS_SST = 'cell=NMS:FKNMS|erddap:dhw_5km:CRW_SST:mean'
 // the way forward from an empty cell: Wells (a NERRS reserve) has no sea surface temperature computed (not computed yet), and the
@@ -150,6 +156,8 @@ const failSlabs = async page => {
   })
 }
 // on a phone the legend is under the map: bring it (and its Retry) into the shot
+// a phone's own height (844): the map is under the controls, so the shot scrolls it to the top of the screen
+const showMap = async page => { await page.evaluate(() => document.querySelector('.frame')?.scrollIntoView({ block: 'start' })); await new Promise(r => setTimeout(r, 600)) }
 const showLegend = async page => { await page.evaluate(() => document.querySelector('.legend')?.scrollIntoView({ block: 'center' })); await new Promise(r => setTimeout(r, 300)) }
 // then the server answers again and Retry is pressed: the slice draws
 const retryNow = async page => {
@@ -328,6 +336,16 @@ const SHOTS = [
   ['map_wk2_range_cinms_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, RANGE],
   ['map_wk2_range_cinms_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, RANGE],
   ['map_wk2_range_cinms_anom_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, RANGE + '&anom=1'],
+  ['map_wk2b_fit_cinms_oceanmetrics_light_390', 'oceanmetrics', 'light', PHONE, LAYER_ONE, showMap],
+  ['map_wk2b_fit_cinms_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PHONE, LAYER_ONE, showMap],
+  ['map_wk2b_fit_cinms_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, LAYER_ONE],
+  ['map_wk2b_range_cinms_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, RANGE],
+  ['map_wk2b_range_cinms_anom_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, RANGE + '&anom=1'],
+  ['map_wk2b_range_cinms_anom_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, RANGE + '&anom=1'],
+  ['map_wk2b_pmnm_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, PMNM],
+  ['map_wk2b_pmnm_oceanmetrics_dark_390', 'oceanmetrics', 'dark', PHONE, PMNM, showMap],
+  ['map_wk2b_pmnm_globe_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, PMNM + '&proj=globe'],
+  ['map_wk2b_clamp_cinms_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, CLAMP],
   ['map_sdg1451_value_oceanmetrics_light', 'oceanmetrics', 'light', MAP, MPA],
   ['map_sdg1451_value_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, MPA],
   // OBIS, the CoastWatch OBIS replacement: species of fish per EEZ, by year and by decade

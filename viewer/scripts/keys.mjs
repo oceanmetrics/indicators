@@ -5,8 +5,8 @@
 // the first pass is places as rows (#axes=p), the second the default, indicators as rows with places in columns: the same cell round
 // trip, and Tab + Enter on a remove button; then the Place view's breadcrumb returns to the cell it came from. at the end, the order:
 // Alt+arrow and the Move buttons move a header, a drag onto another header of its group does, grouping off lifts the limit, and the Order control.
-// last, build week 2: `l` turns the Map's compare mode on and off (t2), does nothing while typing, goes to the layer select without a layer, and
-// Help ▾ → Keyboard shortcuts lists it.
+// last, build week 2: `l` turns the Map's compare mode on and off (t2), Back and Forward walk it (each turn is a history entry), `l` does
+// nothing while typing, goes to the layer select without a layer, and Help ▾ → Keyboard shortcuts lists it.
 //   node viewer/scripts/keys.mjs [--url https://oceanmetrics.io/indicators/] [--data <catalog base URL>]
 import puppeteer from 'puppeteer-core'
 
@@ -467,6 +467,17 @@ check(await page.waitForFunction(() => /[#&]t2=/.test(location.hash), { timeout:
 await page.evaluate(() => document.activeElement?.blur())
 await page.keyboard.press('l')
 check(await page.waitForFunction(() => !/[#&]t2=/.test(location.hash), { timeout: 5000 }).then(() => true, () => false), 'l again: compare off, t2 gone')
+// Back and Forward walk the compare mode (a new history entry each time it turns on or off: hash.ts historyStep), and the Map
+// follows in place: the Compare toggle with them (erddap-places rows 72, 87)
+const compareShown = () => page.evaluate(() => !!document.querySelector('.group.compare .with'))
+const histTo = async (dir, on) => {
+  await page.evaluate(d => (d === 'back' ? history.back() : history.forward()), dir)
+  return page.waitForFunction(o => /[#&]t2=/.test(location.hash) === o, { timeout: 5000 }, on).then(() => true, () => false)
+}
+check(await histTo('back', true) && await compareShown(), 'Back after compare off: compare on again, the "Compare with" select shown')
+check(await histTo('back', false) && !(await compareShown()), 'Back again: compare off, as the view opened')
+check(await histTo('forward', true) && await compareShown(), 'Forward: compare on')
+check(await histTo('back', false), 'Back: compare off')
 // typing in a field is not a shortcut
 await page.evaluate(() => { const i = document.createElement('input'); i.id = 'k-probe'; document.body.append(i); i.focus() })
 await page.keyboard.press('l')

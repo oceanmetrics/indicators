@@ -108,7 +108,10 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   beside the pointer and a "Cell:" legend line), the cells sliced in the legend (`cellCountLine`, `cellRows`; the mask counted per place in `gridSource.ts`),
   every ERDDAP request through `patientFetch` and a Retry on a failed slice (`GridSlot.retry()`, `problemText`), the palette (`pal=`, `rampChoices`,
   `GridSlot.setRamp`; the anomaly keeps `balance`), and `l` for compare on and off (`viewer/src/lib/keys.ts`, Help ▾ → Keyboard shortcuts; update `SHORTCUTS`
-  and `keys.mjs` when a key changes). A hover shot is taken with `Page.captureScreenshot` (puppeteer's screenshot fires a mouseout that clears the readout).
+  and `keys.mjs` when a key changes). The second pass (`map_wk2b_*`): a selected place is framed with `bounds.ts` `fitPadding` (by the frame's size) over
+  `placeBox` (the shortest arc over all its vertices: never a box per feature, which read PMNM as the world at zoom 1); a period outside the layer's
+  record slices its last or first step (`clampStep` inside the shared slices; `stepOf`, `clampLine` in the legend); turning compare on or off pushes a
+  history entry (`hash.ts` `historyStep`, App's hash effect), everything else replaces it. A hover shot is taken with `Page.captureScreenshot` (puppeteer's screenshot fires a mouseout that clears the readout).
   Every map shares one `setupMapLibre` (`map/setup.ts`); a `$effect` that makes a slot keys on strings
   (`layerKey`, the places' key), never on `view`, which is a new object on every hash change, or a new `t` remakes the slot instead of `update(t)`.
 - **The pickers** (`viewer/src/lib/pick/`): one place picker and one indicator picker for every view, the rules in plain

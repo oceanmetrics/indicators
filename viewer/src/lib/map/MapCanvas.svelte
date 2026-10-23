@@ -23,8 +23,8 @@
   import { setupMap } from './setup.ts'
   import { tilesAt } from './basemapTiles.ts'
   import { styleCredit } from './credit.ts'
-  import { crossesAntimeridian, crossingMinZoom, geometryBounds, unionBoxes, worldCopies } from './bounds.ts'
-  import type { Box4 } from './bounds.ts'
+  import { crossesAntimeridian, crossingMinZoom, fitPadding, geometryBounds, placeBox, unionBoxes, worldCopies } from './bounds.ts'
+  import type { Box4, Padding } from './bounds.ts'
   import { DOT_IMAGE, classedIds, fillColorExpr, fillOpacityExpr, focusFilter, haloWidthExpr, lineColorExpr, lineWidthExpr, memberDotsLayer, onlyFilter } from './paint.ts'
   import { featureOf, partsKey, placeOf } from './parts.ts'
   import type { MapPart } from './parts.ts'
@@ -188,7 +188,7 @@
 
   // a camera for a box: on the globe a world-scale box shows the whole sphere in the frame (centred on the box), as the sphere is
   // what the reader came for; anything else is MapLibre's own fit. the box may run east past 180 (the short way round the world)
-  function fitTo(m: MlMap, b: Box4, opts: { padding: number; duration: 0; maxZoom: number }) {
+  function fitTo(m: MlMap, b: Box4, opts: { padding: number | Padding; duration: 0; maxZoom: number }) {
     if (untrack(() => proj) === 'globe' && isWorldScale(b) && box) {
       m.jumpTo({ center: boxCentre(b), zoom: globeZoom(box.clientWidth, box.clientHeight) })
       return
@@ -228,10 +228,12 @@
     for (const [i, part] of parts.entries()) {
       if (part.kind !== 'vector' || !part.layer.source_layer || !m.getSource(sid(i))) continue
       const feats = m.querySourceFeatures(sid(i), { sourceLayer: part.layer.source_layer, filter: ['==', ['get', 'place_id'], featureOf(part, id)] })
-      const b = geometryBounds(feats.map(f => f.geometry as { coordinates?: unknown }))
+      // a place over the antimeridian (Papahanaumokuakea) is a feature each side of 180: one box the short way round (bounds.ts placeBox)
+      const b = placeBox(feats.map(f => f.geometry as { coordinates?: unknown }))
       if (!b) continue
       framed = id
-      m.fitBounds(b, { padding: 80, duration: 0, maxZoom: 9 })
+      // the padding follows the frame (bounds.ts fitPadding): a phone frames the place across most of its width
+      fitTo(m, b, { padding: box ? fitPadding(box.clientWidth, box.clientHeight) : 40, duration: 0, maxZoom: 9 })
       return true
     }
     return false

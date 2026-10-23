@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte'
+  import { onMount, tick, untrack } from 'svelte'
   import { Button, Header, Notice } from '@marinebon/ui'
   import { loadCatalog, loadLayers, resolveDataBase, collTitle } from './lib/data.ts'
   import type { Catalog, Indicator, Layers } from './lib/data.ts'
-  import { carryOver, DEFAULT_STATE, groupHref, mapToMatrixHref, matrixHref, matrixToMapHref, parseHash, placeToMapHref, serializeHash } from './lib/hash.ts'
+  import { carryOver, DEFAULT_STATE, groupHref, historyStep, mapToMatrixHref, matrixHref, matrixToMapHref, parseHash, placeToMapHref, serializeHash } from './lib/hash.ts'
   import type { ViewState } from './lib/hash.ts'
   import { indicatorsCustom, placesCustom, usesRank } from '../../src/report/order.ts'
   import type { OrderSpec, Shown } from '../../src/report/order.ts'
@@ -143,14 +143,20 @@
   })
 
   // ---- the URL hash is the state ----
+  // the state the history entry holds now: compare on or off and a new view push an entry (hash.ts historyStep), the rest rewrites it
+  let written: ViewState = untrack(() => view)
   $effect(() => {
     const h = serializeHash(view)
     if (h !== location.hash.replace(/^#/, '')) {
-      history.replaceState(null, '', location.pathname + location.search + (h ? '#' + h : ''))
+      const url = location.pathname + location.search + (h ? '#' + h : '')
+      if (historyStep(written, view) === 'push') history.pushState(null, '', url)
+      else history.replaceState(null, '', url)
     }
+    written = view
   })
   function onHashChange() {
     const next = parseHash(location.hash)
+    written = next
     if (serializeHash(next) === serializeHash(view)) return
     const was = view
     if (was.view === 'matrix' && next.view === 'place') { cameFrom = was; placeT0 = performance.now(); placeMs = null }

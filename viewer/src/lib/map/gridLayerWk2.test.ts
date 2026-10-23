@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { PatientFetchError } from '@oceanmetrics/engine'
 import { RAMPS } from '@oceanmetrics/map'
-import { cellCountLine, cellReadout, cellRows, latLonText, palOf, problemText, rampChoices, readoutPlace } from './gridLayer.ts'
+import { cellCountLine, cellReadout, cellRows, clampLine, clampStep, latLonText, palOf, paletteShown, problemText, rampChoices, readoutPlace } from './gridLayer.ts'
 
 describe('the cells sliced, in the legend (row 19)', () => {
   const pp = [{ id: 'NMS:CINMS', cells: 2345, boundary: 210 }, { id: 'NMS:MBNMS', cells: 61234, boundary: 1890 }, { id: 'NMS:TBNMS', cells: 0, boundary: 0 }]
@@ -89,5 +89,31 @@ describe('a failure in the legend\'s words', () => {
     expect(problemText(new Error('HTTP 404 for https://erddap.example.org/erddap/griddap/x.parquet?sst'), 'h')).toBe('erddap.example.org did not answer (HTTP 404)')
     expect(problemText(new Error('erddap.oceanmetrics.io did not answer (no response within 30 s, 2 tries)'), 'h')).toBe('erddap.oceanmetrics.io did not answer (no response within 30 s, 2 tries)')
     expect(problemText(new Error('x'.repeat(200)), 'h')).toHaveLength(158)
+  })
+})
+
+describe('the step a slice asks for, inside the record (rows 18, 33)', () => {
+  const ext = { start: '2000-06-01T00:00:00Z', end: '2026-06-01T00:00:00Z' }
+  it('a day past the last step asks for the last step, one before the first for the first; the rest as they are', () => {
+    expect(clampStep('2026-08-01', ext)).toEqual({ day: '2026-06-01', clamped: 'end' })
+    expect(clampStep('1998-01-01', ext)).toEqual({ day: '2000-06-01', clamped: 'start' })
+    expect(clampStep('2024-07-01', ext)).toEqual({ day: '2024-07-01', clamped: null })
+    expect(clampStep('2026-06-01', ext)).toEqual({ day: '2026-06-01', clamped: null })
+  })
+  it('null (the latest) and an unknown extent leave the day alone', () => {
+    expect(clampStep(null, ext)).toEqual({ day: null, clamped: null })
+    expect(clampStep('2030-01-01', null)).toEqual({ day: '2030-01-01', clamped: null })
+  })
+  it('the legend says the period asked and the step drawn', () => {
+    expect(clampLine('2026-08', '2026-06-01', 'end')).toBe('2026-08 is past the record of this layer: its last step, 2026-06-01, is drawn')
+    expect(clampLine('1998-01', '2000-06-01', 'start')).toBe('1998-01 is before the record of this layer: its first step, 2000-06-01, is drawn')
+  })
+})
+
+describe('the palette select (cosmetic, 2026-10-23)', () => {
+  it('is shown with a layer, and hidden under the difference, which keeps its diverging ramp', () => {
+    expect(paletteShown('grid:jplMURSST41mday:sst', false)).toBe(true)
+    expect(paletteShown('grid:jplMURSST41mday:sst', true)).toBe(false)
+    expect(paletteShown(null, false)).toBe(false)
   })
 })

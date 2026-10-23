@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { crossesAntimeridian, crossingMinZoom, geometryBounds, unionBoxes, worldCopies } from './bounds.ts'
+import { crossesAntimeridian, crossingMinZoom, fitPadding, geometryBounds, placeBox, unionBoxes, worldCopies } from './bounds.ts'
 
 describe('the bounds of a place', () => {
   it('a polygon, a multipolygon and several geometries together', () => {
@@ -71,5 +71,39 @@ describe('world copies', () => {
     expect(crossesAntimeridian([-200, 0, -170, 10])).toBe(true)
     expect(crossesAntimeridian([-180, -62, 180, 87])).toBe(false)
     expect(crossesAntimeridian([-125, 32, -117, 40])).toBe(false)
+  })
+})
+
+describe('the padding of a fit (row 24: a place framed by the viewport)', () => {
+  it('a 390 px phone frame (358 x 472) leaves the place almost all of its width, clear of the button row and the scale', () => {
+    expect(fitPadding(358, 472)).toEqual({ top: 65, bottom: 49, left: 21, right: 21 })
+  })
+  it('a wide frame (950 x 930) keeps a larger margin', () => {
+    expect(fitPadding(950, 930)).toEqual({ top: 100, bottom: 84, left: 56, right: 56 })
+  })
+  it('the margin is 12 px at least and 64 px at most; a zero frame is finite', () => {
+    expect(fitPadding(100, 100)).toEqual({ top: 56, bottom: 40, left: 12, right: 12 })
+    expect(fitPadding(3000, 2000)).toEqual({ top: 108, bottom: 92, left: 64, right: 64 })
+    expect(fitPadding(0, 0)).toEqual({ top: 56, bottom: 40, left: 12, right: 12 })
+  })
+  it('regression: the old fixed 80 px a side left a place a third of a 358 px frame; now it has 316 px of it', () => {
+    const p = fitPadding(358, 472)
+    expect(358 - p.left - p.right).toBe(316)
+  })
+})
+
+describe('the box of a selected place (row 21: antimeridian-safe)', () => {
+  it('Papahanaumokuakea as two features either side of 180 is one box over it, east past 180, not the world', () => {
+    const west = { coordinates: [[[177, 20], [180, 20], [180, 30], [177, 30], [177, 20]]] }
+    const east = { coordinates: [[[-180, 22], [-162, 22], [-162, 31], [-180, 31], [-180, 22]]] }
+    expect(placeBox([west, east])).toEqual([177, 20, 198, 31])
+  })
+  it('regression: one feature whose ring runs over 180 (a zoom-1 tile on a 390 px phone) is the same box, not the world', () => {
+    const one = { coordinates: [[[177, 20], [180, 20], [-162, 22], [-162, 31], [180, 30], [177, 30], [177, 20]]] }
+    expect(placeBox([one])).toEqual([177, 20, 198, 31])
+  })
+  it('a place on one side is its plain box; no geometry gives nothing', () => {
+    expect(placeBox([{ coordinates: [[[-120.6, 33.3], [-118.9, 33.3], [-118.9, 34.2], [-120.6, 33.3]]] }])).toEqual([-120.6, 33.3, -118.9, 34.2])
+    expect(placeBox([{ coordinates: [] }])).toBeNull()
   })
 })

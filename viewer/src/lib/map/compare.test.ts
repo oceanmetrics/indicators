@@ -93,4 +93,14 @@ describe('the legend names both periods', () => {
     expect(compareLegendLine({ ...base, anom: true, first: { t: '2024-07-01', ramp: { min: 11.2, max: 31.2 } }, second: { t: '2016-07-01', ramp: { min: -2.46, max: 2.46 }, units: '°C' } }, period))
       .toBe(`Difference: Sea surface temperature from MUR, 2016-07 minus 2024-07, per cell · −2.46 to +2.46 °C · blue lower in 2016-07, red higher · ${base.via}`)
   })
+  it('regression: a year range\'s long Then is said once in the difference, then by its short name (it was repeated whole)', () => {
+    const long = 'Then: mean of 2003-01..2012-01 (10 periods)'
+    const line = compareLegendLine({ ...base, anom: true, secondLabel: long, secondShort: 'Then', first: { t: '2024-01-01', ramp: { min: 0, max: 300 } }, second: { t: '2003-2012', ramp: { min: -33, max: 33 }, units: 'mm' } }, period)
+    expect(line).toBe(`Difference: Sea surface temperature from MUR, ${long} minus 2024-01, per cell · −33.0 to +33.0 mm · blue lower in Then, red higher · ${base.via}`)
+    expect(line.split('mean of').length - 1).toBe(1)
+  })
+  it('a year range still loading is named by its short name in the state, after its long name in the swipe line', () => {
+    expect(compareLegendLine({ ...base, anom: false, secondLabel: 'Then: mean of 2003-07..2012-07', secondShort: 'Then', first: { t: '2024-07-01', ramp: { min: 11, max: 30 } }, second: { t: '2003-2012', ramp: null } }, period))
+      .toBe(`Compare: Sea surface temperature from MUR · left of the handle Then: mean of 2003-07..2012-07 · right 2024-07 · one colour scale over both periods · 11.0 to 30.0 · loading the slice at Then… · ${base.via}`)
+  })
 })
