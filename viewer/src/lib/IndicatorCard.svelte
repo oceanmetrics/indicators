@@ -18,6 +18,7 @@
   import { downloadBlob } from './download.ts'
   import type { Depth } from './hash.ts'
   import { valuesCollOf } from './matrix.ts'
+  import { breakParts } from './wrap.ts'
   import type { Place } from './matrix.ts'
   import { cardModel, defaultMethod, fileName, METHOD_IDS, placeCard, placeCsv } from './place.ts'
   import type { CardOptions } from './place.ts'
@@ -201,13 +202,13 @@
       </div>
 
       <details class="four">
-        <summary><span class="mbon-label">Dataset · place · method · delivery</span></summary>
+        <summary><span class="mbon-label four-label"><span>Dataset</span><i aria-hidden="true">{' · '}</i><span>place</span><i aria-hidden="true">{' · '}</i><span>method</span><i aria-hidden="true">{' · '}</i><span>delivery</span></span></summary>
         <Elements {catalog} {ind} {place} {collTitle} valuesColl={cov?.coll ?? null} row={model.stat} {depth} method={model.method} grain={model.grain ?? ind.status_grain} />
       </details>
       {/if}
 
       <div class="cite">
-        <p class="citation"><span class="mbon-label">Cite</span> {citation}</p>
+        <p class="citation"><span class="mbon-label">Cite</span> {#each breakParts(citation) as part, i (i)}{part}<wbr />{/each}</p>
         {#if !still}<CopyButton text={citation} label="Copy citation" />{/if}
       </div>
       {#if card && !still}
@@ -265,6 +266,10 @@
   .four > :global(.els) { margin-top: var(--space-2); }
   .cite { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
   .citation { margin: 0; flex: 1 1 18rem; font: var(--type-small); font-size: 0.8125rem; line-height: 1.5; color: var(--text-body); overflow-wrap: anywhere; }
+  /* the heading's words are the break points, and its letter-spacing is tightened on a phone so it stays on one line */
+  .four-label span { white-space: nowrap; }
+  .four-label i { font-style: normal; white-space: pre-wrap; }
+  @media (max-width: 400px) { .four-label { letter-spacing: 0.06em; } .four > summary { gap: var(--space-1); } }
   .repro > :not(summary) { margin-top: var(--space-2); }
   .repro .small { margin-bottom: 0; font: var(--type-small); font-size: 0.8125rem; color: var(--text-body); overflow-wrap: anywhere; }
   .repro pre { margin-bottom: 0; white-space: pre-wrap; overflow-wrap: anywhere; }

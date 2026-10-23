@@ -129,10 +129,14 @@ export function lineChart(spec: LineSpec): LineGeometry {
   const ys = vals.map(p => p.v)
   if (ov) ys.push(ov.lo, ov.hi)
   if (spec.yDomain) ys.push(...spec.yDomain)
+  // a series of no negative value (counts, species, records, percents ...) never gets an axis below 0: the padding and
+  // the nice-ticks step would otherwise open it to -100 under a series of 0..300. a negative value keeps its padding
+  const nonNeg = vals.length > 0 && vals.every(p => p.v >= 0)
   const lo = ys.length ? Math.min(...ys) : 0
   const hi = ys.length ? Math.max(...ys) : 1
   const padY = (hi - lo) * 0.04
-  const yt = niceTicks(lo - padY, hi + padY, spec.compact ? 2 : 3)
+  // an all-zero series is opened upward only (0..1), never to -1
+  const yt = nonNeg ? niceTicks(Math.max(0, lo - padY), hi > 0 ? hi + padY : 1, spec.compact ? 2 : 3) : niceTicks(lo - padY, hi + padY, spec.compact ? 2 : 3)
   const labels = yt.ticks.map(v => fmt(v, yt.decimals))
   const left = spec.left ?? Math.ceil(Math.max(...labels.map(l => l.length)) * CHAR_W) + 14
   const plot: Plot = { x0: left, y0: topPad, x1: Math.max(left + 40, width - rightPad), y1: Math.max(topPad + (spec.compact ? 30 : 40), height - bottomPad) }
@@ -167,7 +171,8 @@ export function lineChart(spec: LineSpec): LineGeometry {
     points,
     d: mode === 'line' ? d : '',
     center: ov ? r1(sy(ov.center)) : null,
-    band: ov ? { y0: r1(sy(ov.hi)), y1: r1(sy(ov.lo)) } : null,
+    // a band edge below the floor of a non-negative axis stops at the plot
+    band: ov ? { y0: r1(Math.max(plot.y0, sy(ov.hi))), y1: r1(Math.min(plot.y1, sy(ov.lo))) } : null,
     window: win,
     xTicks: yearTicks(d0, d1, Math.floor((plot.x1 - plot.x0) / 54)).map(t => ({ x: r1(sx(t.x)), label: t.label })),
     unitAt: { x: 0, y: 11 },

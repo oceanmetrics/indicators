@@ -114,6 +114,36 @@ describe('lineChart', () => {
   })
 })
 
+describe('lineChart: the y axis floor', () => {
+  // the Senegalese EEZ's OBIS species richness: 0 to about 300 species a year, padding of 4% and a step of 100 gave -100
+  const eez = yearly([0, 1, 2, 5, 12, 30, 80, 120, 300, 110, 108], 2015)
+  const labels = (g: ReturnType<typeof lineChart>) => g.yTicks.map(t => Number(t.label.replace('\u2212', '-')))
+  it('eez obis species axis does not go below zero', () => {
+    const g = lineChart({ width: 640, height: 240, series: eez, grain: 'year', mode: 'points' })
+    expect(Math.min(...labels(g))).toBe(0)
+    expect(labels(g)).toEqual([0, 100, 200, 300, 400])
+    expect(g.points.every(p => p.y >= g.plot.y0 - 0.1 && p.y <= g.plot.y1 + 0.1)).toBe(true)
+  })
+  it('a non-negative series whose minimum is above zero does not go below zero either', () => {
+    const g = lineChart({ width: 640, height: 240, series: yearly([2, 3, 1, 4, 250]), grain: 'year' })
+    expect(Math.min(...labels(g))).toBeGreaterThanOrEqual(0)
+  })
+  it('a band that reaches below zero does not pull a non-negative axis down, and is held inside the plot', () => {
+    const g = lineChart({ width: 640, height: 240, series: yearly([0, 1, 2, 1, 6]), grain: 'year', overlay: { center: 2, lo: -3, hi: 7, kind: 'sd', recentFrom: null, recentTo: null } })
+    expect(Math.min(...labels(g))).toBe(0)
+    expect(g.band!.y1).toBeLessThanOrEqual(g.plot.y1)
+  })
+  it('an all-zero series opens upward only', () => {
+    const g = lineChart({ width: 640, height: 240, series: yearly([0, 0, 0]), grain: 'year' })
+    expect(Math.min(...labels(g))).toBe(0)
+    expect(Math.max(...labels(g))).toBeGreaterThan(0)
+  })
+  it('a series with a negative value keeps its padding below it', () => {
+    const g = lineChart({ width: 640, height: 240, series: yearly([-5, 0, 10, 100, 300]), grain: 'year' })
+    expect(Math.min(...labels(g))).toBeLessThan(-5)
+  })
+})
+
 describe('lineChart: shared y axis and compact panels (Small multiples)', () => {
   const low = yearly([1, 2, 1, 2, 1])
   const high = yearly([100, 120, 110, 130, 100])
