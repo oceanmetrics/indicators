@@ -38,7 +38,7 @@
   import type { LayerSlot } from './layerSlot.ts'
   import { gridKind } from './gridKind.ts'
   import type { GridLayerSlot } from './gridKind.ts'
-  import { layerChoices, leftOutLine, slicePlaces, slicePlacesKey, slotLegendLine, stepDate } from './gridLayer.ts'
+  import { layerChoices, leftOutLine, slicedIds, slicePlaces, slicePlacesKey, slotLegendLine, stepDate } from './gridLayer.ts'
   import { defaultWindow } from './timeWindow.ts'
   import TimeScrubber from './TimeScrubber.svelte'
   import { loadGazetteer } from './gazetteer.ts'
@@ -229,12 +229,8 @@
   const layerOptions = $derived(layerChoices(m.indicators, ind, view.layer))
   const slotLegend = $derived.by(() => { void slotTick; return slot?.legend() ?? null })
   // the places the slice covers: their fills give way to it (MapCanvas), the ones it leaves out keep theirs
-  const sliced = $derived.by(() => {
-    void slotTick
-    if (!slot) return null
-    const out = new Set((slot as GridLayerSlot).leftOut?.() ?? [])
-    return sliceSel.places.map(p => p.id).filter(id => !out.has(id))
-  })
+  const sliced = $derived.by(() => { void slotTick; return slicedIds(sliceSel.places, (slot as GridLayerSlot | null)?.leftOut?.() ?? [], slotLegend, !!slot) })
+
   const placeName = (id: string) => places?.find(p => p.id === id)?.name ?? idx?.places.find(p => p.id === id)?.name ?? titles(id)
   const slotLine = $derived.by(() => {
     void slotTick

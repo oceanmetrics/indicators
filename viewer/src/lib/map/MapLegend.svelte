@@ -64,5 +64,5 @@
   .ramp { display: grid; gap: 2px; }
   .bar { display: block; height: 0.7rem; border-radius: 2px; border: 1px solid var(--border-strong); }
   .ends { display: flex; justify-content: space-between; font: var(--text-xs) / 1.2 var(--font-mono); color: var(--text-body); }
-  .note { margin: 0; font: var(--type-small); color: var(--text-body); }
+  .note { margin: 0; font: var(--type-small); color: var(--text-body); overflow-wrap: anywhere; }
 </style>

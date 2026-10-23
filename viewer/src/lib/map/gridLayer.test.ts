@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   axisSteps, boxCells, budgetLobes, collectionUrl, gridCredit, gridTitle, gridVia, layerChoices, leftOutLine, producersOf, slicePlaces, slicePlacesKey,
-  slotLegendLine, stepDate, uniqueCells, unitLabel,
+  slicedIds, slotLegendLine, stepDate, uniqueCells, unitLabel,
 } from './gridLayer.ts'
 import type { MapPart } from './parts.ts'
 
@@ -111,5 +111,17 @@ describe('one row per cell', () => {
     const a = { lat: 34.005, lon: -120.005, value: 16.2, weight: 1 }
     const b = { lat: 34.005, lon: -119.995, value: 16.3, weight: 1 }
     expect(uniqueCells([a, b, { ...a }, { ...b, weight: 0.4 }])).toEqual([a, b])
+  })
+})
+
+describe('the places whose fill gives way to the slice', () => {
+  const ps = [{ coll: 'places', id: 'NMS:A' }, { coll: 'places', id: 'NMS:PMNM' }]
+  it('are the sliced places less the ones left out', () => {
+    expect(slicedIds(ps, ['NMS:PMNM'], { problem: null, ramp: null }, true)).toEqual(['NMS:A'])
+  })
+  it('none without a slot; none when the slice failed whole, so every fill comes back (regression: a 404 left the map empty)', () => {
+    expect(slicedIds(ps, [], null, false)).toBeNull()
+    expect(slicedIds(ps, [], { problem: 'no data: 404', ramp: null }, true)).toBeNull()
+    expect(slicedIds(ps, [], { problem: 'no cells in this period', ramp: { min: 0, max: 1, colors: [] } }, true)).toEqual(['NMS:A', 'NMS:PMNM'])
   })
 })

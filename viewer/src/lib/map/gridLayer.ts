@@ -88,6 +88,16 @@ export function slicePlaces(parts: readonly Pick<MapPart, 'group' | 'kind' | 'de
   return { places, without }
 }
 
+/**
+ * the places whose fill gives way to the slice: the ones sliced, less the ones it left out; null (every place keeps its
+ * fill) without a slot, or when the slice failed whole (a problem and no ramp: the server did not answer)
+ */
+export function slicedIds(places: readonly SlicePlace[], leftOut: readonly string[], legend: Pick<LegendSpec, 'problem' | 'ramp'> | null, hasSlot: boolean): string[] | null {
+  if (!hasSlot || (legend?.problem && !legend.ramp)) return null
+  const out = new Set(leftOut)
+  return places.map(p => p.id).filter(id => !out.has(id))
+}
+
 /** a key that changes when the sliced places do (the slot is made again) */
 export const slicePlacesKey = (s: SlicePlaces) => s.places.map(p => `${p.coll}/${p.id}`).join(',')
 
