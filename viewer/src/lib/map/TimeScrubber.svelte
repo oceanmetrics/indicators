@@ -18,12 +18,15 @@
     /** the window double-click resets to */
     defaultWin: number
     format: (i: number) => string
+    /** the window's two ends as words (default `format`): without a "(latest)" the line fits */
+    formatEdge?: (i: number) => string
     disabled?: boolean
     /** t chosen (on release, a key, a button) */
     onchange: (i: number) => void
     onwindow: (w: number) => void
   }
-  let { label, n, value, win, defaultWin, format, disabled = false, onchange, onwindow }: Props = $props()
+  let { label, n, value, win, defaultWin, format, formatEdge, disabled = false, onchange, onwindow }: Props = $props()
+  const edge = (i: number) => (formatEdge ?? format)(i)
 
   // while a drag runs, what it shows; null otherwise
   let live = $state<{ t: number; w: number } | null>(null)
@@ -97,7 +100,7 @@
     <button type="button" class="pm" aria-label="earlier {label}" disabled={disabled || value <= 0} onclick={() => onchange(value - 1)}>−</button>
     <div class="trackwrap">
       <div class="track" bind:this={track} id={id} role="slider" tabindex={disabled ? -1 : 0} aria-labelledby="{id}-l" aria-valuemin={0} aria-valuemax={n - 1}
-        aria-valuenow={t} aria-valuetext="{format(t)}, window from {format(windowStart(t, w))}" aria-disabled={disabled}
+        aria-valuenow={t} aria-valuetext="{format(t)}, window from {edge(windowStart(t, w))}" aria-disabled={disabled}
         title="drag across to set the window · drag the window to pan · wheel to zoom · double-click to reset"
         onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={() => { drag = null; live = null }}
         ondblclick={() => { if (!disabled && win !== defaultWin) onwindow(defaultWin) }} onkeydown={key}>
@@ -107,7 +110,7 @@
       </div>
       <div class="ticks" aria-hidden="true">
         <span class="tl first">{format(0)}</span>
-        <span class="tl win">window {format(windowStart(t, w))} to {format(t)}</span>
+        <span class="tl win">window {edge(windowStart(t, w))} to {edge(t)}</span>
         <span class="tl last">{format(n - 1)}</span>
       </div>
     </div>
@@ -126,14 +129,9 @@
   .rail { position: absolute; left: 0; right: 0; top: calc(50% - 2px); height: 4px; border-radius: 2px; background: var(--border-strong); }
   .band { position: absolute; top: calc(50% - 5px); height: 10px; min-width: 2px; border-radius: 3px; background: color-mix(in srgb, var(--brand) 35%, transparent); border: 1px solid var(--brand); box-sizing: border-box; cursor: grab; }
   .handle { position: absolute; top: calc(50% - 8px); width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: var(--bg-surface); border: 2px solid var(--brand); box-sizing: border-box; cursor: grab; }
-  .ticks { display: flex; justify-content: space-between; gap: var(--space-2); margin: 0.1rem 0 0; font: var(--text-xs) / 1.2 var(--font-mono); color: var(--text-body); }
+  .ticks { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 var(--space-2); margin: 0.1rem 0 0; font: var(--text-xs) / 1.2 var(--font-mono); color: var(--text-body); }
   .tl { white-space: nowrap; }
-  .tl.win { overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--text-body); }
-  /* narrow: the window's words go on their own line under the two ends */
-  @media (max-width: 600px) {
-    .ticks { flex-wrap: wrap; row-gap: 0; }
-    .tl.win { order: 3; flex-basis: 100%; text-align: center; }
-  }
+  .tl.win { order: 3; flex-basis: 100%; text-align: center; overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--text-body); }
   .pm {
     flex: none; width: 1.6rem; height: 1.6rem; display: grid; place-items: center; padding: 0; border-radius: var(--radius-sm);
     border: 1px solid var(--border-strong); background: var(--control-bg); color: var(--text-heading); font: var(--fw-semibold) var(--text-sm) / 1 var(--font-mono); cursor: pointer;

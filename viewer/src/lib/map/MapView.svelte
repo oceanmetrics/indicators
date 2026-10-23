@@ -195,30 +195,35 @@
   let winSet = $state<{ key: string; w: number } | null>(null)
   const winKey = $derived(`${ind?.id ?? ''}|${model?.grain ?? ''}`)
   const win = $derived(winSet?.key === winKey ? winSet.w : winDefault)
+  const periodPlain = (i: number) => (model && periods[i] ? periodLabel(periods[i], model.grain) : '')
   const periodWord = (i: number) => (model && periods[i] ? periodLabel(periods[i], model.grain) + (i === periods.length - 1 ? ' (latest)' : '') : '')
 
   // ---- the layer under the map (the hash's `layer`), at the step of `t` (null: the dataset's latest) ----
   // the places the slice covers: the polygon places of the parts drawn (gridLayer.ts slicePlaces); the slot is made again when they change
   const sliceSel = $derived(slicePlaces(parts))
   const sliceKey = $derived(slicePlacesKey(sliceSel))
+  // a boolean, so the slot is not made again each time the parts are rebuilt (a new t, a new colour mode): only update(t) runs then
+  const haveParts = $derived(!!built)
   const slotT = $derived(stepDate(view.t))
   let slot = $state.raw<LayerSlot | null>(null)
   let slotError = $state('')
   // the slot says when its legend changes (a new period, the slice in, an error); the legend line reads it again
   let slotTick = $state(0)
+  // a string, so a new hash (a new t) does not make the slot again: `view` is a new object each time, only update(t) runs then
+  const layerKey = $derived(view.layer)
   $effect(() => {
-    const spec = parseLayerKey(view.layer)
+    const spec = parseLayerKey(layerKey)
     void sliceKey
     slot = null
     slotError = ''
-    if (!spec || !built) return
+    if (!spec || !haveParts) return
     let live = true
     try {
       slotFor(spec, { onchange: () => { if (live) slotTick++ } }).then(
         sl => { if (live) slot = sl },
-        e => { if (live) slotError = `The layer ${view.layer} did not load (${e instanceof Error ? e.message : String(e)}).` },
+        e => { if (live) slotError = `The layer ${layerKey} did not load (${e instanceof Error ? e.message : String(e)}).` },
       )
-    } catch (e) { slotError = `The layer ${view.layer} cannot be drawn here (${e instanceof Error ? e.message : String(e)}).` }
+    } catch (e) { slotError = `The layer ${layerKey} cannot be drawn here (${e instanceof Error ? e.message : String(e)}).` }
     return () => { live = false }
   })
   const layerOptions = $derived(layerChoices(m.indicators, ind, view.layer))
@@ -338,7 +343,7 @@
     {/if}
     <div class="group slide">
       {#if periods.length > 1}
-        <TimeScrubber label="Period" n={periods.length} value={idxNow} {win} defaultWin={winDefault} format={periodWord}
+        <TimeScrubber label="Period" n={periods.length} value={idxNow} {win} defaultWin={winDefault} format={periodWord} formatEdge={periodPlain}
           disabled={!canSlide} onchange={onslide} onwindow={w => (winSet = { key: winKey, w })} />
       {:else}
         <span class="mbon-label">Period</span>

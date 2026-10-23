@@ -11,11 +11,12 @@
   // the others that are not the slot's, and a theme flip carries them into the next style (`carryLayers`). this component
   // only draws: the classes, colours and credits come in as props, and a click goes out as a place id.
   import { onMount, untrack } from 'svelte'
-  import { addProtocol, importScriptInWorkers, Map as MlMap, NavigationControl, ScaleControl, setWorkerUrl } from 'maplibre-gl'
+  import { Map as MlMap, NavigationControl, ScaleControl } from 'maplibre-gl'
   import type { GeoJSONSource, MapMouseEvent, RasterTileSource, StyleSpecification } from 'maplibre-gl'
   import 'maplibre-gl/dist/maplibre-gl.css'
-  import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
-  import { basemapLayerIds, baseStyle, composeStyle, seaSurfaceId, setupMapLibre } from '@oceanmetrics/map'
+  import { BASEMAP_URL, basemapLayerIds, baseStyle, composeStyle, DEFAULT_TILES, seaSurfaceId } from '@oceanmetrics/map'
+  import { setupMap } from './setup.ts'
+  import { tilesAt } from './basemapTiles.ts'
   import { styleCredit } from './credit.ts'
   import { crossesAntimeridian, crossingMinZoom, geometryBounds, unionBoxes, worldCopies } from './bounds.ts'
   import type { Box4 } from './bounds.ts'
@@ -75,9 +76,11 @@
   let shown: string | null = null
 
   // ---- the basemap: the composed style in force, and what of it is the basemap's ----
-  // the GEBCO tiers are built in build week 2 (2026-11-06 to 11-12); until they answer the map boots and stays on CARTO's own
-  // style (`dem: false`): MapLibre schedules no frame while a source fails, so a composed style with missing tiers stalls `load`
+  // the GEBCO and OSM tiers are in the bucket, but storage.oceanmetrics.io/basemap/ (the package's DEFAULT_TILES) answers 404
+  // until the storage host lets them through: the map boots and stays on CARTO's own style (`dem: false`), since MapLibre
+  // schedules no frame while a source fails. VITE_BASEMAP_DEM=1 turns the tiers on, read from the bucket's path-style url
   const DEM = import.meta.env.VITE_BASEMAP_DEM === '1'
+  const TILES = tilesAt(DEFAULT_TILES, BASEMAP_URL)
   let basemap = new Set<string>()
   let baseSources = new Set<string>()
   let sea: string | null = null
@@ -91,7 +94,7 @@
       const sea = getComputedStyle(document.documentElement).getPropertyValue('--map-sea').trim() || 'transparent'
       base = { version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': sea } }] }
     }
-    return { ...composeStyle(base, { theme, dem }), projection: projectionSpec(untrack(() => proj)) }
+    return { ...composeStyle(base, { theme, dem, tiles: TILES }), projection: projectionSpec(untrack(() => proj)) }
   }
   function setBasemap(style: StyleSpecification) {
     basemap = basemapLayerIds(style)
@@ -241,9 +244,8 @@
     let ro: ResizeObserver | null = null
     let made: MlMap | null = null
     void (async () => {
-      // the setup, once a page: MapLibre's worker module and the pmtiles:// protocol (the three functions, not the namespace,
-      // which would keep every export of maplibre-gl in the bundle)
-      await setupMapLibre({ maplibre: { addProtocol, importScriptInWorkers, setWorkerUrl }, workerUrl, protocols: ['pmtiles'] })
+      // the setup, once a page: MapLibre's worker module and the pmtiles:// protocol (setup.ts)
+      await setupMap()
       const d = untrack(() => dark)
       const style = await styleFor(d, false)
       if (dead) return

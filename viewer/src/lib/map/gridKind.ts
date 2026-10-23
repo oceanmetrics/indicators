@@ -61,15 +61,17 @@ export function gridKind(places: () => SlicePlaces): SlotFactory {
     let first: number | null = null
     const slot = gridSlot({ ...spec, variable: name }, {
       async slice(t, signal) {
+        const s0 = performance.now()
         prepared ??= import('./gridSource.ts').then(m => m.prepareGridSource(coll, name, sel.places))
         prepared.catch(() => { prepared = null })
         const g = await prepared
         left = g.left
         const rows = uniqueCells(await g.source.slice(t, signal))
-        if (first === null && !signal?.aborted) {
-          first = Math.round(performance.now() - t0)
-          console.info(`[om] grid slice ${spec.id}:${name} at ${t ?? 'latest'}: ${rows.length} cells, ${g.lobes} lobes, first slice in ${first} ms`)
-        }
+        if (signal?.aborted) return rows
+        const ms = Math.round(performance.now() - s0)
+        const isFirst = first === null
+        if (isFirst) first = Math.round(performance.now() - t0)
+        console.info(`[om] grid slice ${spec.id}:${name} at ${t ?? 'latest'}: ${rows.length} cells, ${g.lobes} lobes, ${isFirst ? `first slice in ${first} ms from mount` : `step in ${ms} ms`}`)
         return rows
       },
     }, { title, credit: gridCredit(title, producersOf(coll), host), units: unitLabel(v.unit), ramp: defaultRampFor(name, { units: v.unit }), via: gridVia(host), opacity: 0.9, onchange: opts.onchange })

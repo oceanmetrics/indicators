@@ -68,12 +68,8 @@ export default defineConfig({
   publicDir: resolve(REPO, 'brand/favicons/oceanmetrics'),
   base: process.env.VITE_BASE || './',
   plugins: [svelte(), serveDir('/catalog/', CATALOG), serveDir('/goos-eov/', GOOS), assets()],
-  // vitest otherwise resolves svelte's `ssr` export condition and `mount()` refuses to run. dedupe: @oceanmetrics/map is
-  // linked with file: until 0.2.1 is on npm, so its own imports of pmtiles and maplibre-gl would resolve from the platform
-  // checkout's node_modules (a second copy) without it; a published install has one copy (peer dependencies).
-  // TODO: switch package.json to "@oceanmetrics/map": "^0.2.1" once it is on npm (the orchestrator publishes it), then drop
-  // this dedupe and the `paths` entry of tsconfig.json
-  resolve: { conditions: ['browser'], dedupe: ['pmtiles', 'maplibre-gl'] },
+  // vitest otherwise resolves svelte's `ssr` export condition and `mount()` refuses to run
+  resolve: { conditions: ['browser'] },
   // MapLibre 6 import()s a worker module only when its url ends in .mjs (`importScriptInWorkers`), so worker chunks are .mjs
   worker: { format: 'es', rollupOptions: { output: { entryFileNames: 'assets/[name]-[hash].mjs', chunkFileNames: 'assets/[name]-[hash].mjs' } } },
   // DuckDB-WASM ships its own worker and wasm, which the dep optimizer breaks (obis-hex, atlas, CalCOFI explore)
