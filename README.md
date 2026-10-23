@@ -540,8 +540,8 @@ Keyboard list) the map JS is 323.9 kB of 330 (+3.9), the engine 139.8 of 160 (+0
 the CSS but the map 14.8 of 15 (+0.2, the legend's cell table) and the map's CSS 12.5 of 15. Nothing was raised.
 
 The second pass of build week 2 (2026-10-23: the fit by viewport, `placeBox`, the step clamp, the history entry, the cosmetic fixes) adds
-0.5 kB to the map JS (324.4 of 330), 0.1 to the entry (103.5 of 110) and to all JS but the map (203.3 of 205); the engine and the CSS are
-unchanged. Nothing was raised.
+0.4 kB to the map JS (324.3 of 330), 0.1 to the entry (103.5 of 110) and to all JS but the map (203.3 of 205); the CSS is unchanged, and the
+engine is 140.3 of 160 with engine 0.1.2's `patientFetch` (`c125f2f`), not this pass. Nothing was raised.
 
 ## Brand and icons
 
