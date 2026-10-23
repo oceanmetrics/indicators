@@ -5,8 +5,9 @@
 // - include and exclude hold `*`, `all`, `cat:<term>`, `series:<id>` (its lead), `series:<id>:*`, `coll:<slug>`, `set:<id>` or an id.
 // - nothing selected is `["none"]` (NONE): an empty include would read back as `*` from a URL.
 // the pickers (src/lib/pick/) build the trees they show; this file turns a tick into new rules, for every view.
-import { expandIndicators, expandPlaces, matchIndicators, matchPlaces, seriesLeads } from '../../../../src/report/spec.ts'
-import type { IndicatorLike, PlaceLike, PlaceSetLike, ReportSpec } from '../../../../src/report/spec.ts'
+import { expandIndicators, expandPlaces, matchIndicators, matchPlaces, seriesLeads } from '@oceanmetrics/catalog/report'
+import type { ReportSpec } from '../../../../src/report/spec.ts'
+import type { IndicatorLike, PlaceLike, PlaceSetLike } from '@oceanmetrics/catalog/report'
 
 export type Check = 'checked' | 'mixed' | 'unchecked'
 /** the include rule of an empty selection: an id that matches nothing, so it survives the round trip through a URL */
@@ -130,7 +131,7 @@ export function toggleSeries<T extends TreeIndicator>(sel: IndSel, all: T[], ser
 export function seriesOfCategory<T extends IndicatorLike>(all: T[], vocab: string, known: string[], term: string): string[] {
   const k = new Set(known)
   return [...seriesLeads(all)].filter(([, lead]) => {
-    const tag = lead.category[vocab]
+    const tag = lead.category?.[vocab]
     return term === CAT_OTHER ? !tag || !k.has(tag) : tag === term
   }).map(([s]) => s)
 }
@@ -169,7 +170,7 @@ export function collapseToLeads<T extends TreeIndicator>(sel: IndSel, all: T[]):
 export interface TreePlace extends PlaceLike { name: string }
 
 const placeEngine = <T extends TreePlace>(items: T[], sets: readonly PlaceSetLike[]): Engine<T> => ({
-  items, match: (r, all) => matchPlaces(r, all, sets), expand: (s, all) => expandPlaces({ ...s, context: false }, all, sets),
+  items, match: (r, all) => matchPlaces(r, all, sets), expand: (s, all) => expandPlaces(s, all, sets),
 })
 const placeNorm = <T extends TreePlace>(sel: Sel, all: T[], sets: readonly PlaceSetLike[]) => normalize(sel, all, (r, items) => matchPlaces(r, items, sets))
 

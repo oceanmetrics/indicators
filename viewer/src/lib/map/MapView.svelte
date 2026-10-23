@@ -21,7 +21,7 @@
   import { Icon } from '../../../../src/icons/index.ts'
   import { periodLabel, STATUS_WORDS, TREND_WORDS } from '@oceanmetrics/status'
   import type { MethodId } from '@oceanmetrics/status'
-  import { expandIndicators } from '../../../../src/report/spec.ts'
+  import { expandIndicators } from '@oceanmetrics/catalog/report'
   import type { Catalog, Layers } from '../data.ts'
   import { groupHref, mapToMatrixHref, placeHref } from '../hash.ts'
   import type { MapColor, ViewState } from '../hash.ts'

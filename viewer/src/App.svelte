@@ -7,7 +7,7 @@
   import type { ViewState } from './lib/hash.ts'
   import { indicatorsCustom, placesCustom, usesRank } from '../../src/report/order.ts'
   import type { OrderSpec, Shown } from '../../src/report/order.ts'
-  import { expandIndicators, expandPlaces } from '../../src/report/spec.ts'
+  import { expandIndicators, expandPlaces } from '@oceanmetrics/catalog/report'
   import { cellModel, foldColumns, groupColumns, indexCoverage, pageRows, pickRow, ROW_CAP, selectionRollups, selectionRows, statusRank, withValues } from './lib/matrix.ts'
   import { producerCredits } from './lib/delivery.ts'
   import { APP_NAME, TAGLINE, pageTitle } from './lib/brand/brand.ts'

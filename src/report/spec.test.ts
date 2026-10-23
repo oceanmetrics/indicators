@@ -1,18 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import {
-  DEFAULT_SPEC, budget, budgetLine, coverageCounts, exceptionRank, expandIndicators, expandPlaces, matchIndicators, matchPlaces,
-  seriesLeads, specFromParams, specId, specParams,
-} from './spec.ts'
+import { expandPlaces } from '@oceanmetrics/catalog/report'
+import { DEFAULT_SPEC, budget, budgetLine, coverageCounts, exceptionRank, specFromParams, specId, specParams } from './spec.ts'
 import type { ReportSpec } from './spec.ts'
 
-const IND = [
-  { id: 'erddap:sst:mean', series: 'sst', lead: true, category: { onms: 'water-quality', names: 'physical-chemical', eov: 'sea-surface-temperature' } },
-  { id: 'erddap:oisst:mean', series: 'sst', lead: false, category: { onms: 'water-quality', names: 'physical-chemical', eov: 'sea-surface-temperature' } },
-  { id: 'erddap:npp:mean', series: 'npp', lead: true, category: { onms: 'living-resources', names: 'biological', eov: 'phytoplankton' } },
-  { id: 'obis:species', series: 'obis-all', lead: true, category: { onms: 'living-resources', names: 'biological' } },
-  { id: 'obis:records', series: 'obis-all', lead: false, category: { onms: 'living-resources', names: 'biological' } },
-  { id: 'sdg:x', series: 'sdg', lead: false, category: { onms: 'response' } },
-]
 const ids = (xs: { id: string }[]) => xs.map(x => x.id)
 const PLACES = [
   { id: 'NMS:CINMS', coll: 'places' }, { id: 'NMS:FKNMS', coll: 'places' }, { id: 'NMS:TBNMS', coll: 'places' },
@@ -75,65 +65,24 @@ describe('the report spec in a URL', () => {
   })
 })
 
-describe('expanding the rules', () => {
-  it('a series lead is the marked one, else its first member', () => {
-    expect([...seriesLeads(IND)].map(([s, i]) => `${s}=${i.id}`)).toEqual(['sst=erddap:sst:mean', 'npp=erddap:npp:mean', 'obis-all=obis:species', 'sdg=sdg:x'])
-  })
-  it('* is every series lead; cat: is the leads tagged with the term in any vocabulary', () => {
-    expect(ids(matchIndicators('*', IND))).toEqual(['erddap:sst:mean', 'erddap:npp:mean', 'obis:species', 'sdg:x'])
-    expect(ids(matchIndicators('cat:living-resources', IND))).toEqual(['erddap:npp:mean', 'obis:species'])
-    expect(ids(matchIndicators('cat:sea-surface-temperature', IND))).toEqual(['erddap:sst:mean'])
-  })
-  it('all is every indicator, leads or not; an exclude still takes from it', () => {
-    expect(ids(matchIndicators('all', IND))).toEqual(ids(IND))
-    expect(ids(expandIndicators({ include: ['all'], exclude: ['series:obis-all:*', 'sdg:x'] }, IND))).toEqual(['erddap:sst:mean', 'erddap:oisst:mean', 'erddap:npp:mean'])
-  })
-  it('series: is its lead, series:…:* every member, an id itself, an unknown rule nothing', () => {
-    expect(ids(matchIndicators('series:sst', IND))).toEqual(['erddap:sst:mean'])
-    expect(ids(matchIndicators('series:sst:*', IND))).toEqual(['erddap:sst:mean', 'erddap:oisst:mean'])
-    expect(ids(matchIndicators('erddap:oisst:mean', IND))).toEqual(['erddap:oisst:mean'])
-    expect(matchIndicators('cat:nope', IND)).toEqual([])
-  })
-  it('include then exclude, in manifest order; an exclude may be a rule', () => {
-    expect(ids(expandIndicators({ include: ['cat:living-resources', 'erddap:oisst:mean'], exclude: ['obis:species'] }, IND)))
-      .toEqual(['erddap:oisst:mean', 'erddap:npp:mean'])
-    expect(ids(expandIndicators({ include: ['*'], exclude: ['series:obis-all:*'] }, IND))).toEqual(['erddap:sst:mean', 'erddap:npp:mean', 'sdg:x'])
-  })
-  it('places: *, coll:, an id; then the excludes', () => {
-    expect(ids(expandPlaces({ include: ['coll:places'], exclude: ['NMS:TBNMS'], context: false }, PLACES))).toEqual(['NMS:CINMS', 'NMS:FKNMS'])
-    expect(ids(expandPlaces({ include: ['NMS:CINMS', 'MRGID:8371'], exclude: [], context: false }, PLACES))).toEqual(['NMS:CINMS', 'MRGID:8371'])
-    expect(expandPlaces({ include: ['*'], exclude: ['coll:mr_eez'], context: false }, PLACES)).toHaveLength(3)
-  })
-  it('coll:<slug> matches a place by its group (home collection) or by a values collection that holds it', () => {
-    // NMS:A is grouped under its gazetteer collection and read from `places`; Pitcairn is grouped under mr_eez but also has rows in `places`
-    const pl = [
-      { id: 'NERRS:WEL', coll: 'noaa_nerrs', valuesColls: ['noaa_nerrs'] },
-      { id: 'MRGID:8439', coll: 'mr_eez', valuesColls: ['mr_eez', 'places'] },
-      { id: 'NMS:A', coll: 'noaa_sanctuaries', valuesColls: ['places'] },
-      { id: 'NMS:B', coll: 'noaa_sanctuaries' },
-    ]
-    expect(ids(matchPlaces('coll:noaa_sanctuaries', pl))).toEqual(['NMS:A', 'NMS:B'])   // by group
-    expect(ids(matchPlaces('coll:places', pl))).toEqual(['MRGID:8439', 'NMS:A'])        // an old link (pi=coll:places): by values collection
-    expect(ids(matchPlaces('coll:mr_eez', pl))).toEqual(['MRGID:8439'])
-    expect(ids(matchPlaces('coll:nope', pl))).toEqual([])
-    expect(ids(matchPlaces('NMS:B', pl))).toEqual(['NMS:B'])
-  })
-  it('coll:<slug> is strict when a place has the slug as its group: a place only read from that values collection is not in it', () => {
-    // Pitcairn's EEZ has rows in the `places` values collection but belongs to the EEZs: the default selection (coll:places) is the sanctuaries
+// the rules themselves (matchPlaces, expandPlaces, matchIndicators, expandIndicators, seriesLeads) moved to
+// @oceanmetrics/catalog/report with their tests (catalog 0.5.0); what stays is the spec's use of them
+describe('the spec over the rules', () => {
+  it('the spec reads the places rules of @oceanmetrics/catalog/report: coll:places is strict for the default', () => {
     const pl = [
       { id: 'NMS:A', coll: 'places', valuesColls: ['places'] },
       { id: 'MRGID:8439', coll: 'mr_eez', valuesColls: ['mr_eez', 'places'] },
     ]
-    expect(ids(matchPlaces('coll:places', pl))).toEqual(['NMS:A'])
     expect(ids(expandPlaces(DEFAULT_SPEC.places, pl))).toEqual(['NMS:A'])
   })
-  it('set:<id> is the places of the groups of the place set; an unknown set selects nothing', () => {
-    const sets = [{ id: 'political', groups: ['mr_eez', 'fao_high_seas'] }]
-    const pl = [{ id: 'MRGID:1', coll: 'mr_eez' }, { id: 'FAO:HS1', coll: 'fao_high_seas' }, { id: 'NMS:A', coll: 'places' }]
-    expect(ids(matchPlaces('set:political', pl, sets))).toEqual(['MRGID:1', 'FAO:HS1'])
-    expect(ids(expandPlaces({ include: ['set:political'], exclude: ['MRGID:1'], context: false }, pl, sets))).toEqual(['FAO:HS1'])
-    expect(matchPlaces('set:political', pl)).toEqual([])
-    expect(matchPlaces('set:nope', pl, sets)).toEqual([])
+  it('the spec keeps ctx between the places and the indicators keys', () => {
+    expect(specParams({ ...DEFAULT_SPEC, places: { include: ['*'], exclude: ['x:1'], context: true }, indicators: { include: ['all'], exclude: ['y:2'] } }))
+      .toEqual([['pi', '*'], ['px', 'x:1'], ['ctx', '1'], ['ii', 'all'], ['ix', 'y:2']])
+  })
+  it('the default spec never shares its arrays with a spec read from a URL', () => {
+    const s = specFromParams(new Map())
+    s.places.include.push('x:1')
+    expect(DEFAULT_SPEC.places.include).toEqual(['coll:places'])
   })
   it('the default places are the sanctuaries (coll:places), written as nothing', () => {
     expect(DEFAULT_SPEC.places.include).toEqual(['coll:places'])

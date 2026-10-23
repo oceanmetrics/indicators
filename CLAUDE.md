@@ -46,6 +46,7 @@ published gazetteer over HTTP.
 producer outputs (published) ──► om_indicators/adapters/*.py ──► contract.write_values() ──► catalog/values/indicator=<id>/coll=<slug>/data.parquet
 config/indicators.yml + vocab + producer STAC ──► om_indicators/manifest.py ──► catalog/indicators.json
 values + indicators.json ──► src/coverage/build.ts (imports @oceanmetrics/status) ──► catalog/coverage.parquet
+coverage.parquet + the published one ──► src/coverage/changes.ts (@oceanmetrics/catalog/changes) ──► catalog/changes/, catalog/feeds/
 indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/status, src/icons/)
 ```
 
@@ -54,7 +55,7 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   repo, not Python. The coverage builder (Node) and the viewer import the package. Its tests, including the R
   cross-check of `iea-sd` against the real ecoidx `PlotTimeSeries()`, are in `platform`; a change to a method is made
   there, not here.
-- **`src/report/` is the report spec** (rules, expansion, layout caps and the panel budget, report id), shared by the viewer's Report view and the Node figure job; the tri-state trees, presets and layouts are in `viewer/src/lib/report/`, and the embed route is `viewer/embed/` + `viewer/src/embed.ts`.
+- **`src/report/` is the report spec** (layout caps and the panel budget, the URL keys, report id), shared by the viewer's Report view and the Node figure job; the selection rules and their expansion (`matchPlaces`, `expandPlaces`, `matchIndicators`, `expandIndicators`, `seriesLeads`, the `pi px ii ix` keys) are `@oceanmetrics/catalog/report` since catalog 0.5.0 (shared with the alerts Worker): import them from there, never copy them back; the tri-state trees, presets and layouts are in `viewer/src/lib/report/`, and the embed route is `viewer/embed/` + `viewer/src/embed.ts`.
 - **`iea-sd` is ported from ecoidx `PlotTimeSeries()`, not `plot_ts()`.** `plot_ts()` compares the recent mean
   itself with 1 SD rather than its departure from the long-term mean (`R/plot.R:167-168`), and its +/− captions are
   reversed. The recent window is the last `recent` rows of the series (NA rows count), the SD is the sample SD, a

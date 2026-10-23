@@ -12,6 +12,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "coverage:build": "node --experimental-strip-types src/coverage/cli.ts",
+    "changes:build": "node --experimental-strip-types src/coverage/changes.ts",
     "icons:paths": "node brand/build-icon-paths.mjs",
     "icons:build": "node brand/build-icons.mjs",
     "icons:sheet": "node brand/icon-sheet.mjs"
@@ -32,7 +33,7 @@
     "@duckdb/duckdb-wasm": "1.32.0",
     "@marinebon/ui": "github:marinebon/ui#v0.4.0",
     "@mdi/js": "7.4.47",
-    "@oceanmetrics/catalog": "^0.3.0",
+    "@oceanmetrics/catalog": "file:../platform/packages/catalog",
     "@oceanmetrics/engine": "^0.1.2",
     "@oceanmetrics/map": "^0.3.1",
     "@oceanmetrics/status": "^0.1.1",

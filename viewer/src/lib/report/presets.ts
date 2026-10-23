@@ -1,8 +1,10 @@
 // named report specs for the builder's "Start from" menu. they live here until instances land (instance.json holds
 // them then, plan §6). a preset is the shared selection (places and indicators, as for every view) plus a layout and a title.
 // it is offered only when it expands to at least one place and one indicator, so the OBIS one appears once OBIS indicators are published.
-import { DEFAULT_SPEC, expandIndicators, expandPlaces } from '../../../../src/report/spec.ts'
-import type { IndicatorLike, PlaceLike, PlaceSetLike, ReportSpec } from '../../../../src/report/spec.ts'
+import { DEFAULT_SPEC } from '../../../../src/report/spec.ts'
+import { expandIndicators, expandPlaces } from '@oceanmetrics/catalog/report'
+import type { ReportSpec } from '../../../../src/report/spec.ts'
+import type { IndicatorLike, PlaceLike, PlaceSetLike } from '@oceanmetrics/catalog/report'
 
 export interface Preset {
   id: string

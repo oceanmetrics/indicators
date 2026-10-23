@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { expandIndicators, expandPlaces } from '../../../../src/report/spec.ts'
+import { expandIndicators, expandPlaces } from '@oceanmetrics/catalog/report'
 import {
   NONE, collapseToLeads, selectedIds, seriesOfCategory, toggleCategory, toggleCollection,
   toggleIndicator, togglePlace, toggleSeries, toggleSet,

@@ -1,5 +1,7 @@
 // the report spec (plan §6): chosen places × chosen indicators in a chosen layout. plain functions, no DOM, so the
-// viewer and the Node figure export (SanctuaryWatch, Phase 4) read a spec the same way.
+// viewer and the Node figure export (SanctuaryWatch, Phase 4) read a spec the same way. the selection rules themselves
+// (matchPlaces, expandPlaces, matchIndicators, expandIndicators, seriesLeads, the pi px ii ix keys) live in
+// @oceanmetrics/catalog/report since catalog 0.5.0, shared with the alerts Worker; import them from there.
 // - selections are rules, never expanded lists. places: `*`, `coll:<slug>`, `set:<id>` (a place set: its groups), or a
 //   place_id. indicators: `*` (each series' lead), `all` (every indicator), `cat:<term>`, `series:<id>` (its lead),
 //   `series:<id>:*` (every member), or an id. each untick goes in `exclude`. a live report picks up what is published
@@ -17,6 +19,8 @@
 //   (one indicator as a choropleth with a time slider) and Dossier (paged for print: figure, caption, method, citation and
 //   Reproduce for every place and indicator). every report also carries a locator map (except the Map sheet, which is one).
 import type { Grain, MethodId, Status, Trend } from '@oceanmetrics/status'
+import { DEFAULT_RULES, rulesFromParams, rulesParams } from '@oceanmetrics/catalog/report'
+import type { PlaceLike } from '@oceanmetrics/catalog/report'
 import { DEFAULT_ORDER, isDefaultOrder, orderFromParams, orderParams } from './order.ts'
 import type { OrderSpec } from './order.ts'
 
@@ -44,8 +48,8 @@ export interface ReportSpec {
 }
 
 export const DEFAULT_SPEC: ReportSpec = {
-  places: { include: ['coll:places'], exclude: [], context: false },
-  indicators: { include: ['*'], exclude: [] },
+  places: { ...structuredClone(DEFAULT_RULES.places), context: false },
+  indicators: structuredClone(DEFAULT_RULES.indicators),
   order: DEFAULT_ORDER,
   layout: 'cards',
   split: null,
@@ -59,22 +63,20 @@ export const DEFAULT_SPEC: ReportSpec = {
 
 // ---- the URL form ----
 
-const list = (v: string | undefined) => (v ?? '').split(',').map(s => s.trim()).filter(Boolean)
 const int = (v: string | undefined) => (v != null && /^-?\d+$/.test(v) ? Number(v) : null)
-const same = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i])
 
 /** a spec from the decoded key/value pairs of a URL (unknown or malformed values fall back to the default) */
 export function specFromParams(kv: Map<string, string>, depth: Depth = DEFAULT_SPEC.depth): ReportSpec {
   const d = DEFAULT_SPEC
-  const pi = list(kv.get('pi')), ii = list(kv.get('ii'))
+  const rules = rulesFromParams(kv)
   const layout = kv.get('layout') as Layout
   const status = kv.get('status') as MethodId
   const grain = kv.get('grain') as Grain
   const recent = int(kv.get('recent'))
   const base = /^(\d{4})-(\d{4})$/.exec(kv.get('base') ?? '')
   return {
-    places: { include: pi.length ? pi : d.places.include, exclude: list(kv.get('px')), context: kv.get('ctx') === '1' },
-    indicators: { include: ii.length ? ii : d.indicators.include, exclude: list(kv.get('ix')) },
+    places: { ...rules.places, context: kv.get('ctx') === '1' },
+    indicators: rules.indicators,
     order: orderFromParams(kv),
     layout: LAYOUT_IDS.includes(layout) ? layout : d.layout,
     split: kv.get('split') === 'place' || kv.get('split') === 'category' ? (kv.get('split') as 'place' | 'category') : null,
@@ -94,12 +96,11 @@ export function specFromParams(kv: Map<string, string>, depth: Depth = DEFAULT_S
 /** the spec's keys and values for a URL, in a fixed order, defaults left out (depth is the view's shared key) */
 export function specParams(s: ReportSpec): [string, string][] {
   const d = DEFAULT_SPEC
-  const out: [string, string][] = []
-  if (!same(s.places.include, d.places.include)) out.push(['pi', s.places.include.join(',')])
-  if (s.places.exclude.length) out.push(['px', s.places.exclude.join(',')])
+  const rules = rulesParams({ places: s.places, indicators: s.indicators })
+  const axis = (keys: string[]) => rules.filter(([k]) => keys.includes(k))
+  const out: [string, string][] = [...axis(['pi', 'px'])]
   if (s.places.context) out.push(['ctx', '1'])
-  if (!same(s.indicators.include, d.indicators.include)) out.push(['ii', s.indicators.include.join(',')])
-  if (s.indicators.exclude.length) out.push(['ix', s.indicators.exclude.join(',')])
+  out.push(...axis(['ii', 'ix']))
   out.push(...orderParams(s.order ?? d.order))
   if (s.layout !== d.layout) out.push(['layout', s.layout])
   if (s.style.status !== d.style.status) out.push(['status', s.style.status])
@@ -139,86 +140,7 @@ export function specId(s: ReportSpec, manifestVersion: string): string {
   return (h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0')).slice(0, 12)
 }
 
-// ---- expanding the rules ----
-
-export interface IndicatorLike {
-  id: string
-  series: string
-  lead: boolean
-  category: Partial<Record<string, string>>
-}
-export interface PlaceLike {
-  id: string
-  /** the place's group: its home gazetteer collection */
-  coll: string
-  /** the values collections that hold rows of it (a place can be in two) */
-  valuesColls?: string[]
-}
-
-/** each series' lead (its first member when none is marked), keyed by series */
-export function seriesLeads<T extends IndicatorLike>(indicators: T[]): Map<string, T> {
-  const out = new Map<string, T>()
-  for (const i of indicators) if (i.lead && !out.has(i.series)) out.set(i.series, i)
-  for (const i of indicators) if (!out.has(i.series)) out.set(i.series, i)
-  return out
-}
-
-/** the indicators one rule selects (in manifest order) */
-export function matchIndicators<T extends IndicatorLike>(rule: string, indicators: T[]): T[] {
-  const leads = new Set(seriesLeads(indicators).values())
-  if (rule === 'all') return indicators
-  if (rule === '*') return indicators.filter(i => leads.has(i))
-  if (rule.startsWith('cat:')) {
-    const term = rule.slice(4)
-    return indicators.filter(i => leads.has(i) && Object.values(i.category).includes(term))
-  }
-  if (rule.startsWith('series:')) {
-    const all = rule.endsWith(':*')
-    const id = all ? rule.slice(7, -2) : rule.slice(7)
-    return indicators.filter(i => i.series === id && (all || leads.has(i)))
-  }
-  return indicators.filter(i => i.id === rule)
-}
-
-/** include rules, then exclude rules (which may also be rules: `series:x:*` drops a whole series), manifest order */
-export function expandIndicators<T extends IndicatorLike>(sel: ReportSpec['indicators'], indicators: T[]): T[] {
-  const inc = new Set(sel.include.flatMap(r => matchIndicators(r, indicators)))
-  const exc = new Set(sel.exclude.flatMap(r => matchIndicators(r, indicators)))
-  return indicators.filter(i => inc.has(i) && !exc.has(i))
-}
-
-/** a place set, as the rules need it: `set:<id>` stands for its groups */
-export interface PlaceSetLike {
-  id: string
-  groups: readonly string[]
-}
-
-/**
- * the places one rule selects: `*`, `coll:<slug>`, `set:<id>` (the groups of the place set, from `sets`; an unknown set
- * selects nothing) or a place_id. `coll:<slug>` matches a place whose group (home gazetteer collection) is the slug; when no
- * place has that group, it matches the places any of whose values collections is the slug, so a link written when places
- * were grouped by their values file still selects the same places.
- */
-export function matchPlaces<P extends PlaceLike>(rule: string, places: P[], sets: readonly PlaceSetLike[] = []): P[] {
-  if (rule === '*') return places
-  if (rule.startsWith('set:')) {
-    const set = sets.find(s => `set:${s.id}` === rule)
-    return set ? places.filter(p => set.groups.includes(p.coll)) : []
-  }
-  if (rule.startsWith('coll:')) {
-    const slug = rule.slice(5)
-    if (places.some(p => p.coll === slug)) return places.filter(p => p.coll === slug)
-    return places.filter(p => (p.valuesColls ?? []).includes(slug))
-  }
-  return places.filter(p => p.id === rule)
-}
-
-/** include rules, then exclude rules, in the order of `places` (the caller sorts) */
-export function expandPlaces<P extends PlaceLike>(sel: ReportSpec['places'], places: P[], sets: readonly PlaceSetLike[] = []): P[] {
-  const inc = new Set(sel.include.flatMap(r => matchPlaces(r, places, sets)))
-  const exc = new Set(sel.exclude.flatMap(r => matchPlaces(r, places, sets)))
-  return places.filter(p => inc.has(p) && !exc.has(p))
-}
+// ---- coverage counts ----
 
 /**
  * coverage counts for the tree ("7 of 9 places"): for each indicator, how many of the chosen places have a value at

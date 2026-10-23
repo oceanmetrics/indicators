@@ -3,7 +3,8 @@ import type { CoverageRow } from '../../../../src/coverage/build.ts'
 import type { Indicator, Term } from '../data.ts'
 import { indexCoverage } from '../matrix.ts'
 import { multiIndicatorLabel } from './indicators.ts'
-import { DEFAULT_SPEC, expandIndicators } from '../../../../src/report/spec.ts'
+import { DEFAULT_SPEC } from '../../../../src/report/spec.ts'
+import { expandIndicators } from '@oceanmetrics/catalog/report'
 import { buildIndicatorPickTree, placesWithValue, placesWithValueAnywhere, toggleSelectedIndicators } from './indicatorsTree.ts'
 
 // a small synthetic manifest: two categories, three series (sst has a lead and a second member), one indicator in no known category

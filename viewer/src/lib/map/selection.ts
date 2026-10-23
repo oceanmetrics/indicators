@@ -1,8 +1,8 @@
 // what the Map draws of the shared selection, in plain functions: the place groups (each drawn as a part of its own, layered as a
 // place set is), the places of a group that are chosen (a vector filter, an SLD filter) and the words that name the selection.
 // the selection is the report spec's rules (src/report/spec.ts); nothing here reads a map.
-import { matchPlaces } from '../../../../src/report/spec.ts'
-import type { PlaceSetLike } from '../../../../src/report/spec.ts'
+import { matchPlaces } from '@oceanmetrics/catalog/report'
+import type { PlaceSetLike } from '@oceanmetrics/catalog/report'
 import type { PlaceSel } from '../selection.ts'
 import { orderGroups } from '../matrix.ts'
 import type { Place } from '../matrix.ts'

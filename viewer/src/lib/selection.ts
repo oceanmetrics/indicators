@@ -5,8 +5,10 @@
 // - indicators: `*` (each series' lead; the default), `all`, `cat:<term>`, `series:<id>`, `series:<id>:*`, ids
 // the keys of the earlier views (Matrix: colls xp ai xi leads; Map: coll) are read as the same selection, so old links open
 // on the same places and indicators.
-import { DEFAULT_SPEC, expandIndicators, expandPlaces } from '../../../src/report/spec.ts'
-import type { IndicatorLike, PlaceLike, PlaceSetLike, ReportSpec } from '../../../src/report/spec.ts'
+import { DEFAULT_SPEC } from '../../../src/report/spec.ts'
+import { expandIndicators, expandPlaces } from '@oceanmetrics/catalog/report'
+import type { ReportSpec } from '../../../src/report/spec.ts'
+import type { IndicatorLike, PlaceLike, PlaceSetLike } from '@oceanmetrics/catalog/report'
 import type { OrderSpec } from '../../../src/report/order.ts'
 
 export type PlaceSel = ReportSpec['places']
