@@ -302,34 +302,6 @@ export function readoutPlace(x: number, y: number, width: number, height: number
   return { left: Math.round(x), top: Math.round(y), flipX: x > width * 0.6, flipY: y > height * 0.7 }
 }
 
-// ---- a server that drops requests (the places page's `patientFetch`, web/src/lib/map/gridLayer.ts) ----
-
-/**
- * a fetch that asks again when the server drops the request (a 404 or a 5xx, or no answer): the ERDDAP mirror answers the same
- * url 404 and 200 by turns (two backends, one without the dataset; seen 2026-10-23), so each request is asked up to `tries`
- * times, `ms` x the try between them. the last answer is returned as it was; another 4xx at once; an abort stops at once
- */
-export function patientFetch(fetchFn: typeof fetch = (...a) => fetch(...a), tries = 6, ms = 300): typeof fetch {
-  return (async (input: RequestInfo | URL, init?: RequestInit) => {
-    let last: Response | null = null
-    let err: unknown = null
-    for (let i = 0; i < tries; i++) {
-      if (init?.signal?.aborted) throw init.signal.reason ?? new DOMException('aborted', 'AbortError')
-      try {
-        last = await fetchFn(input, init)
-        err = null
-        if (last.ok || (last.status !== 404 && last.status < 500)) return last
-      } catch (e) {
-        if (init?.signal?.aborted) throw e
-        err = e
-      }
-      if (i < tries - 1 && ms > 0) await new Promise(r => setTimeout(r, ms * (i + 1)))
-    }
-    if (err) throw err
-    return last!
-  }) as typeof fetch
-}
-
 /**
  * a slice's failure as the legend says it after "no data: ": the host and the status, never the server's HTML page or the
  * whole request url ("erddap.oceanmetrics.io answered HTTP 404 Not Found")

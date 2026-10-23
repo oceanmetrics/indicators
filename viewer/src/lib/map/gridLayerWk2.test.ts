@@ -1,8 +1,9 @@
-// the week 2 rules of the grid layer: the cells sliced in the legend, the palette, the cell readout, the patient fetch and
+// the week 2 rules of the grid layer: the cells sliced in the legend, the palette, the cell readout and
 // the words of a failure (erddap-places parity rows 17, 19, 20, 30, 37, 82)
 import { describe, expect, it } from 'vitest'
+import { PatientFetchError } from '@oceanmetrics/engine'
 import { RAMPS } from '@oceanmetrics/map'
-import { cellCountLine, cellReadout, cellRows, latLonText, palOf, patientFetch, problemText, rampChoices, readoutPlace } from './gridLayer.ts'
+import { cellCountLine, cellReadout, cellRows, latLonText, palOf, problemText, rampChoices, readoutPlace } from './gridLayer.ts'
 
 describe('the cells sliced, in the legend (row 19)', () => {
   const pp = [{ id: 'NMS:CINMS', cells: 2345, boundary: 210 }, { id: 'NMS:MBNMS', cells: 61234, boundary: 1890 }, { id: 'NMS:TBNMS', cells: 0, boundary: 0 }]
@@ -70,38 +71,6 @@ describe('the cell readout (rows 17, 37)', () => {
   })
 })
 
-describe('a server that drops requests (row 20: the places page\'s patientFetch)', () => {
-  const answers = (...codes: number[]) => {
-    const asked: number[] = []
-    const f = (async () => { const c = codes[Math.min(asked.length, codes.length - 1)]; asked.push(c); return new Response('x', { status: c }) }) as typeof fetch
-    return { f, asked }
-  }
-  it('asks again after a 404 or a 5xx until it gets an answer', async () => {
-    const a = answers(404, 503, 200)
-    expect((await patientFetch(a.f, 6, 0)('https://e/x')).status).toBe(200)
-    expect(a.asked).toEqual([404, 503, 200])
-  })
-  it('another 4xx is the server\'s answer: returned at once', async () => {
-    const a = answers(400, 200)
-    expect((await patientFetch(a.f, 6, 0)('https://e/x')).status).toBe(400)
-    expect(a.asked).toEqual([400])
-  })
-  it('the last answer after every try; a network error after every try is thrown', async () => {
-    const b = answers(404)
-    expect((await patientFetch(b.f, 3, 0)('https://e/x')).status).toBe(404)
-    expect(b.asked).toEqual([404, 404, 404])
-    const f = (async () => { throw new TypeError('Failed to fetch') }) as typeof fetch
-    await expect(patientFetch(f, 2, 0)('https://e/x')).rejects.toThrow('Failed to fetch')
-  })
-  it('an aborted request stops at once', async () => {
-    const ctl = new AbortController()
-    ctl.abort()
-    const a = answers(404)
-    await expect(patientFetch(a.f, 6, 0)('https://e/x', { signal: ctl.signal })).rejects.toThrow()
-    expect(a.asked).toEqual([])
-  })
-})
-
 describe('a failure in the legend\'s words', () => {
   it('the engine\'s ERDDAP error: the host and the status, not the server\'s page', () => {
     expect(problemText(new Error('404 Not Found from ERDDAP: <html>Error {\n code=404;\n message="Not Found: Currently unknown datasetID"}</html>'), 'erddap.oceanmetrics.io'))
@@ -111,6 +80,10 @@ describe('a failure in the legend\'s words', () => {
     expect(problemText(new Error('https://erddap.oceanmetrics.io/erddap/griddap/jplMURSST41mday.json?longitude%5B(-120.123):1:(-119.456)%5D: 404 Not Found'), 'h'))
       .toBe('erddap.oceanmetrics.io did not answer (HTTP 404)')
     expect(problemText(new Error('https://e.org/erddap/info/x/index.json?y=500: no answer'), 'h')).toBe('e.org did not answer')
+  })
+  it('a request the engine gave up on (PatientFetchError): the host, the last status and the tries, as it says them', () => {
+    const e = new PatientFetchError('erddap.oceanmetrics.io', 'HTTP 503 Service Unavailable', 6, 'https://erddap.oceanmetrics.io/erddap/griddap/jplMURSST41mday.parquet?x', 503)
+    expect(problemText(e, 'erddap.oceanmetrics.io')).toBe('erddap.oceanmetrics.io did not answer (HTTP 503 Service Unavailable, 6 tries)')
   })
   it('a url in the message: its host; an unreachable host keeps its own words; a long message is cut', () => {
     expect(problemText(new Error('HTTP 404 for https://erddap.example.org/erddap/griddap/x.parquet?sst'), 'h')).toBe('erddap.example.org did not answer (HTTP 404)')

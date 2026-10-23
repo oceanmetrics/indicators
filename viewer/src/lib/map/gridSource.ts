@@ -8,20 +8,21 @@ import ehWasm from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url'
 import ehWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url'
 import mvpWasm from '@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url'
 import mvpWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url'
-import { Engine, connectBrowser, fetchTimeExtent, lobeAxes, lobeMasks, placeLobes, sliceSource, toDataset, wkbToGeoJSON } from '@oceanmetrics/engine'
+import { Engine, connectBrowser, fetchTimeExtent, lobeAxes, lobeMasks, patientFetch, placeLobes, sliceSource, toDataset, wkbToGeoJSON } from '@oceanmetrics/engine'
 import type { Lobe, SliceSource } from '@oceanmetrics/engine'
 import { asyncBufferFromUrl, parquetMetadataAsync, parquetReadObjects } from 'hyparquet'
 import { compressors } from 'hyparquet-compressors'
 import type { Geometry } from 'geojson'
-import { axisSteps, budgetLobes, patientFetch, placesParquetUrl } from './gridLayer.ts'
+import { axisSteps, budgetLobes, placesParquetUrl } from './gridLayer.ts'
 import type { PlaceCells, SlicePlace } from './gridLayer.ts'
 import { groupsFor, rowsToPlaces } from './placeGeometry.ts'
 import { anomalyRows, meanRows } from './gridAnomaly.ts'
 import type { SliceCell } from '@oceanmetrics/map'
 import type { GeoPlace, MetaLike } from './placeGeometry.ts'
 
-// every ERDDAP request of the slice asks again when the mirror drops it (gridLayer.ts `patientFetch`, as the places page)
-const erddapFetch = patientFetch()
+// every ERDDAP request of the slice asks again when the mirror drops it (@oceanmetrics/engine `patientFetch`:
+// a network error, a 404 "unknown datasetID", a 429 or a 5xx is asked again, six tries). the engine's requests pass a url string
+const erddapFetch = ((input, init) => patientFetch(String(input), init)) as typeof fetch
 
 // ---- the engine: one DuckDB-WASM a page, in its worker ----
 
