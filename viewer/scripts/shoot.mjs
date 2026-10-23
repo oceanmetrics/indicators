@@ -43,7 +43,8 @@ const LAYER = SST + '&grain=month&t=2024-07&layer=' + arg('--layer', 'grid:dhw_5
 const COMPARE = SST + '&grain=month&t=2024-07&t2=2016-07&layer=' + arg('--compare-layer', 'grid:jplMURSST41mday:sst')
 const WIDE = { width: 1280, height: 1500, deviceScaleFactor: 2 }
 // build week 2: the layer over one place (the retry shots), and the year-range Then over it
-const LAYER_ONE = 'view=map&ind=erddap:dhw_5km:CRW_SST:mean&pi=NMS:CINMS&place=NMS:CINMS&grain=month&t=2024-07&layer=' + arg('--compare-layer', 'grid:jplMURSST41mday:sst')
+// (`--t 2024-01` for a layer whose July is empty there, such as IMERG's precipitation: `--compare-layer grid:IMERG_monthly_global_precip:precipitation`)
+const LAYER_ONE = 'view=map&ind=erddap:dhw_5km:CRW_SST:mean&pi=NMS:CINMS&place=NMS:CINMS&grain=month&t=' + arg('--t', '2024-07') + '&layer=' + arg('--compare-layer', 'grid:jplMURSST41mday:sst')
 const RANGE = LAYER_ONE + '&t2=2003-2012'
 const FKNMS = 'view=place&place=NMS:FKNMS'
 const FKNMS_SST = 'cell=NMS:FKNMS|erddap:dhw_5km:CRW_SST:mean'
@@ -144,10 +145,12 @@ const failSlabs = async page => {
   await page.setRequestInterception(true)
   page.on('request', r => {
     if (r.isInterceptResolutionHandled()) return
-    if (failing.on && /\/griddap\/[^?]+\.parquet/.test(r.url())) r.respond({ status: 404, contentType: 'text/html', body: '<html>Error {code=404; message="Not Found: Your query produced no matching results."}</html>' })
+    if (failing.on && /\/griddap\/[^?]+\.parquet/.test(r.url())) r.respond({ status: 404, contentType: 'text/html', headers: { 'Access-Control-Allow-Origin': '*' }, body: '<html>Error {code=404; message="Not Found: Your query produced no matching results."}</html>' })
     else r.continue()
   })
 }
+// on a phone the legend is under the map: bring it (and its Retry) into the shot
+const showLegend = async page => { await page.evaluate(() => document.querySelector('.legend')?.scrollIntoView({ block: 'center' })); await new Promise(r => setTimeout(r, 300)) }
 // then the server answers again and Retry is pressed: the slice draws
 const retryNow = async page => {
   failing.on = false
@@ -305,18 +308,19 @@ const SHOTS = [
   ['map_wk2_hover_cinms_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, COMPARE + '&place=NMS:CINMS', hoverCell(0.65, 0.36)],
   ['map_wk2_hover_cinms_anom_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, COMPARE + '&place=NMS:CINMS&anom=1', hoverCell(0.45, 0.36)],
   ['map_wk2_hover_layer_cinms_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, COMPARE.replace(/&t2=[^&]+/, '') + '&place=NMS:CINMS', hoverCell(0.45, 0.36)],
-  ['map_wk2_hover_cinms_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, COMPARE + '&place=NMS:CINMS', hoverCell(0.35, 0.4, true)],
-  ['map_wk2_hover_cinms_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, COMPARE + '&place=NMS:CINMS', hoverCell(0.6, 0.4, true)],
-  // the palette: Spectral reversed (erddap-places' red = warm) on the swipe, the legend's ramp with it
-  ['map_wk2_palette_cinms_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, COMPARE + '&place=NMS:CINMS&pal=spectral_r'],
-  ['map_wk2_palette_cinms_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, COMPARE + '&place=NMS:CINMS&pal=viridis'],
-  ['map_wk2_palette_cinms_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, COMPARE + '&place=NMS:CINMS&pal=spectral_r'],
-  ['map_wk2_palette_cinms_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, COMPARE + '&place=NMS:CINMS&pal=viridis'],
+  ['map_wk2_hover_cinms_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, LAYER_ONE + '&t2=2016-07', hoverCell(0.35, 0.4, true)],
+  ['map_wk2_hover_cinms_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, LAYER_ONE + '&t2=2016-07', hoverCell(0.6, 0.4, true)],
+  // the palette: Spectral reversed (erddap-places' red = warm) on the swipe, the legend's ramp with it (one place sliced, and at 390
+  // the tap, so the mirror is asked for two slabs a shot)
+  ['map_wk2_palette_cinms_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, LAYER_ONE + '&t2=2016-07&pal=spectral_r'],
+  ['map_wk2_palette_cinms_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, LAYER_ONE + '&t2=2016-07&pal=viridis'],
+  ['map_wk2_palette_cinms_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, LAYER_ONE + '&t2=2016-07&pal=spectral_r'],
+  ['map_wk2_palette_cinms_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, LAYER_ONE + '&t2=2016-07&pal=viridis'],
   // a failed slice (every slab answers 404 here) and its Retry; then the server answers and Retry draws it
   ['map_wk2_retry_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, LAYER_ONE, null, failSlabs],
   ['map_wk2_retry_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, LAYER_ONE, null, failSlabs],
-  ['map_wk2_retry_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, LAYER_ONE, null, failSlabs],
-  ['map_wk2_retry_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, LAYER_ONE, null, failSlabs],
+  ['map_wk2_retry_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, LAYER_ONE, showLegend, failSlabs],
+  ['map_wk2_retry_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, LAYER_ONE, showLegend, failSlabs],
   ['map_wk2_retried_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, LAYER_ONE, retryNow, failSlabs],
   // the year-range Then: t2=2003-2012, the mean of July 2003..2012 (one place sliced, so ten slices stay light on the mirror)
   ['map_wk2_range_cinms_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, RANGE],
@@ -471,7 +475,8 @@ mkdirSync(OUT, { recursive: true })
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] })
 try {
   for (const [name, brand, theme, vp, hash, act, pre] of SHOTS) {
-    if (ONLY && !name.includes(ONLY)) continue
+    // `--only <part>` takes every shot whose name holds it; `--only <name>$` that one shot
+    if (ONLY && !(ONLY.endsWith('$') ? name === ONLY.slice(0, -1) : name.includes(ONLY))) continue
     const page = await browser.newPage()
     await page.setViewport(vp)
     if (pre) await pre(page)
@@ -496,6 +501,16 @@ try {
       const t0 = Date.now()
       await page.waitForFunction(() => { const t = document.querySelector('.legend')?.textContent ?? ''; return /Layer:|Compare:|Difference:/.test(t) && !/loading the slice/.test(t) }, { timeout: 300000 })
       console.log('   layer legend settled in', Date.now() - t0, 'ms:', await page.evaluate(() => [...document.querySelectorAll('.legend .note')].map(n => n.textContent).join(' | ')))
+      // the mirror drops a dataset for minutes at a time: a shot that is not about a failure presses Retry (the legend's own
+      // button) until the slice is in, a few times, and says so when it never is
+      for (let k = 0; !pre && k < 6 && await page.evaluate(() => /no data:/.test(document.querySelector('.legend')?.textContent ?? '')); k++) {
+        await new Promise(r => setTimeout(r, 30000))
+        await page.evaluate(() => [...document.querySelectorAll('.legend button')].find(b => b.textContent?.trim() === 'Retry')?.click())
+        await new Promise(r => setTimeout(r, 1000))
+        await page.waitForFunction(() => { const t = document.querySelector('.legend')?.textContent ?? ''; return !/loading the slice/.test(t) }, { timeout: 300000 })
+        console.log('   retried:', await page.evaluate(() => /no data:/.test(document.querySelector('.legend')?.textContent ?? '') ? 'still no data' : 'the slice is in'))
+      }
+      if (!pre && await page.evaluate(() => /no data:/.test(document.querySelector('.legend')?.textContent ?? ''))) console.log('   STILL NO DATA: shoot', name, 'again:', await page.evaluate(() => (document.querySelector('.legend')?.textContent ?? '').match(/no data: [^·]*/g)?.join(' | ')))
       await new Promise(r => setTimeout(r, 500))
       await page.waitForSelector('.map[data-state=done]', { timeout: 90000 })
     }

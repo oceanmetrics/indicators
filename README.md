@@ -343,6 +343,8 @@ values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` 
   "Then: mean of 2003-07..2012-07 (10 periods)", "(12 periods: capped at 12 of 18)", "17 outside the record", "1 failed: 2007-07"; the
   swipe caption says "mean of 2003-07..2012-07". The "Compare with" select offers erddap-places' baselines (1985-2005, 2003-2012) that
   overlap the record and the ten years before `t`; a link may name any range. With `anom=1` the difference is that mean minus `t`.
+  The shots `map_wk2_range_*` and `map_wk2_retry*` read IMERG's monthly precipitation in January (`shoot.mjs --only map_wk2_range
+  --compare-layer grid:IMERG_monthly_global_precip:precipitation --t 2024-01`): the mirror dropped MUR monthly for most of 2026-10-23.
 - **The cell readout** (rows 17, 37): hovering a cell (a tap on a phone) shows a small box beside the pointer and a "Cell:" line in the
   legend with the cell's value, unit and period, the centre and, for a boundary cell, the share inside the place; in the compare mode
   both periods and the difference `t2 - t` (the anomaly's sign). Each slot answers from its own last slice (`GridSlot.cellAt`,
