@@ -1,0 +1,38 @@
+{
+ "version": 1,
+ "updated": "2026-10-21T13:00:00Z",
+ "entries": [
+  {
+   "indicator": "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:no3:mean",
+   "place_id": "MRGID:5670",
+   "coll": "mr_eez",
+   "dataset": "cmems_mod_glo_bgc_my_0.25deg_P1M-m",
+   "variable": "no3",
+   "path": "cmems_mod_glo_bgc_my_0.25deg_P1M-m/no3/MRGID-5670/data.parquet",
+   "provenance": "cmems_mod_glo_bgc_my_0.25deg_P1M-m/no3/MRGID-5670/provenance.json",
+   "rows": 15,
+   "sha256": "sha256:d1d6119215908aae380f8a4517231e5dcd78e9d0db1cfc83528413b86b1e20c6",
+   "time_range": [
+    "2020-01-01",
+    "2021-02-01"
+   ],
+   "created": "2026-10-20T12:00:00Z"
+  },
+  {
+   "indicator": "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:no3:mean",
+   "place_id": "MRGID:8325",
+   "coll": "mr_eez",
+   "dataset": "cmems_mod_glo_bgc_my_0.25deg_P1M-m",
+   "variable": "no3",
+   "path": "cmems_mod_glo_bgc_my_0.25deg_P1M-m/no3/MRGID-8325/data.parquet",
+   "provenance": "cmems_mod_glo_bgc_my_0.25deg_P1M-m/no3/MRGID-8325/provenance.json",
+   "rows": 15,
+   "sha256": "sha256:33754812ed0c985c19d845cbd24ed8cb38b7dd9956097ae28ec01e356ca8d06e",
+   "time_range": [
+    "2020-01-01",
+    "2021-02-01"
+   ],
+   "created": "2026-10-21T12:00:00Z"
+  }
+ ]
+}

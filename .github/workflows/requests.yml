@@ -1,12 +1,22 @@
 # indicator requests (plan §4, Phase 6): an issue from the form .github/ISSUE_TEMPLATE/indicator-request.yml is
 # triaged on a GitHub runner (om_indicators/requests.py: label auto / already / needs-review, and a comment saying
-# why), and an `auto` job runs on the self-hosted macmini runner: erddap-places computes the one place, publishes it,
-# the catalog is rebuilt and published, the issue gets the link and is closed.
+# why), and an `auto` job runs on the self-hosted macmini runner: the one engine (`om-extract run`, oceanmetrics/extract,
+# the chunked ERDDAP path and its STAC item writer, in place of erddap-places' precompute since 2026-10-23) computes the
+# one place into erddap-places' stats/ layout, the files are published (see OM_STATS_PUBLISH below), the catalog is
+# rebuilt and published, the issue gets the link and is closed.
+#
+# OM_STATS_PUBLISH (a repository variable) decides whether the engine's stats files are uploaded to
+# s3://oceanmetrics.io-public/gazetteer/stats/: unset or anything but `publish` is a dry run. the files are produced,
+# listed and attached to the run as an artifact, nothing is uploaded, the catalog is not rebuilt, and the issue gets a
+# comment saying so and stays open for a maintainer to re-run (the `run` label) once publishing is on. the default waits
+# on the parity criterion, ledger 2026-10-23: the engine's sums differ from erddap-places' published ones in the last
+# bits, which "bit for bit" does not allow, so the engine writes nothing under gazetteer/stats/ until Ben restates it.
 #
 # a Copernicus Marine request (cmems: indicators) is never `auto`: it uses a maintainer's personal Copernicus Marine
 # login. triage marks it `needs-review` with approvable=true when the place producer can do it, and a maintainer's `run`
 # label then starts the same run job with the Copernicus Marine place producer (om_indicators/producers/cmems_place.py,
-# `uv run --group cmems`) in place of erddap-places; the catalog rebuild and the closing comment are the same. which
+# `uv run --group cmems`, a thin call into om-extract's Copernicus Marine reader, the engine `om-extract run --reader
+# copernicus` runs) in place of the ERDDAP engine run; the catalog rebuild and the closing comment are the same. which
 # producer runs is decided in the job from the checked indicator id (check-job prints REQ_FAMILY), never from the issue.
 #
 # the issue is untrusted input: its body reaches the triage only as a file written from an environment variable, never
@@ -118,26 +128,62 @@ jobs:
         env:
           REQUESTS_PER_DAY: ${{ vars.REQUESTS_PER_DAY }}
       # the packages from npm: @oceanmetrics/catalog carries the values contract's schemas (om_extract finds them in
-      # node_modules), which the Copernicus Marine producer needs before the rebuild step
+      # node_modules), which both producers (`om-extract run` and the Copernicus Marine one) need before the rebuild step
       - name: install the npm packages
         if: steps.cap.outputs.over != '1'
         run: |
           export PATH="/opt/homebrew/bin:$PATH"
           npm ci --no-audit --no-fund
-      - uses: actions/checkout@v4
+      - name: compute the place (om-extract, the chunked engine and its stats item)
         if: steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems'
-        with:
-          repository: oceanmetrics/erddap-places
-          path: erddap-places
-      - name: compute the place (erddap-places precompute)
+        env:
+          OM_CHUNKS: ${{ vars.OM_CHUNKS }}
+        run: |
+          export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+          # the place from the gazetteer (a reference collection from the runner's private copy, PLACES_INTERNAL), the
+          # whole record through the chunk store (kept between runs outside the checkout, so a re-run fetches only the
+          # chunks it lacks), and erddap-places' stats/ layout with its STAC item under out/gazetteer/stats
+          rm -rf out
+          uv run om-extract run \
+            --collection "https://storage.oceanmetrics.io/gazetteer/erddap/$REQ_DATASET/collection.json" \
+            --place "$REQ_PLACE" --coll "$REQ_COLL" --var "$REQ_VARIABLE" \
+            --chunks "${OM_CHUNKS:-$HOME/.cache/oceanmetrics/chunks}" \
+            --stats-dir out/gazetteer/stats --out out/run
+      - name: list the stats files, and upload them only when OM_STATS_PUBLISH is publish
+        id: stats
         if: steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems'
+        env:
+          OM_STATS_PUBLISH: ${{ vars.OM_STATS_PUBLISH }}
         run: |
           export PATH="/opt/homebrew/bin:$PATH"
-          (cd erddap-places/app && npm ci --no-audit --no-fund)
-          cd erddap-places/precompute && npm ci --no-audit --no-fund
-          # PRECOMPUTE_PUBLISH: erddap-places uploads the parquet, provenance and item of each unit it finishes
-          PRECOMPUTE_PUBLISH=s3://oceanmetrics.io-public/gazetteer \
-            npx tsx src/precompute.ts --gazetteer "$REQ_COLL" --place "$REQ_PLACE" --dataset "$REQ_DATASET" --variable "$REQ_VARIABLE"
+          # dry-run by default: waits on the parity criterion, ledger 2026-10-23 (the engine writes nothing under
+          # gazetteer/stats/ until Ben restates "bit for bit"); `publish` uploads
+          mode=dry-run
+          [ "${OM_STATS_PUBLISH:-}" = publish ] && mode=publish
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          cd out/gazetteer
+          # the upload order: the parquet, its provenance, then the item (it records the others' size and checksum)
+          { find stats -name '*.parquet' | sort; find stats -name '*.provenance.json' | sort; find stats/items -name '*.json' | sort; } > ../stats_files.txt
+          echo "$(wc -l < ../stats_files.txt | tr -d ' ') stats file(s), mode $mode:"
+          cat ../stats_files.txt
+          # the artifact is a tarball: actions/upload-artifact refuses the ':' of a place id in a file name
+          tar -czf ../stats.tgz stats
+          if [ "$mode" = publish ]; then
+            while read -r f; do
+              case "$f" in *.parquet) type=application/vnd.apache.parquet ;; *) type=application/json ;; esac
+              aws s3 cp "$f" "s3://oceanmetrics.io-public/gazetteer/$f" --content-type "$type" --only-show-errors
+            done < ../stats_files.txt
+          else
+            echo "dry run: nothing uploaded to s3://oceanmetrics.io-public/gazetteer/stats/ (OM_STATS_PUBLISH is not publish)"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems'
+        with:
+          name: stats
+          path: |
+            out/stats.tgz
+            out/stats_files.txt
+          retention-days: 30
       - name: compute the place (Copernicus Marine place producer, with the maintainer's own login)
         if: steps.cap.outputs.over != '1' && env.REQ_FAMILY == 'cmems'
         run: |
@@ -146,11 +192,12 @@ jobs:
           # --publish uploads the place's folder and the merged index.json under indicators/producers/cmems/
           uv run --group cmems python -m om_indicators.producers.cmems_place \
             --place "$REQ_PLACE" --coll "$REQ_COLL" --indicator "$REQ_INDICATOR" --publish
+      # a dry run published no stats file, so the requested item would point at nothing: no rebuild, no closing comment
       - name: rebuild and publish the catalog
-        if: steps.cap.outputs.over != '1'
+        if: steps.cap.outputs.over != '1' && (env.REQ_FAMILY == 'cmems' || steps.stats.outputs.mode == 'publish')
         run: |
           export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
-          # an erddap-places item goes on the requested-items list, which the build reads and the publish keeps; a Copernicus
+          # a stats item (the engine's, in erddap-places' layout) goes on the requested-items list, which the build reads and the publish keeps; a Copernicus
           # Marine place is in the producer's published index.json, which the cmems-places step of the build reads
           if [ "$REQ_FAMILY" != cmems ]; then
             uv run python -m om_indicators.requests add-item job.json --out requested_items.json
@@ -160,7 +207,7 @@ jobs:
           scripts/build_catalog.sh
           scripts/publish_catalog.sh
       - name: answer the issue
-        if: steps.cap.outputs.over != '1'
+        if: steps.cap.outputs.over != '1' && (env.REQ_FAMILY == 'cmems' || steps.stats.outputs.mode == 'publish')
         run: |
           link="https://oceanmetrics.io/indicators/#view=place&place=${REQ_PLACE}&coll=${REQ_COLL}&ind=${REQ_INDICATOR}"
           # a run that started by itself is `auto-done`, which the daily cap counts; one a maintainer started with the `run`
@@ -170,6 +217,13 @@ jobs:
           gh issue comment "$NUM" --body "Done: the values are published. Place view: $link"
           gh issue edit "$NUM" --add-label "$done"
           gh issue close "$NUM" --reason completed
+      - name: answer the issue (a dry run, computed but not published)
+        if: steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems' && steps.stats.outputs.mode != 'publish'
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          n=$(wc -l < out/stats_files.txt | tr -d ' ')
+          gh issue comment "$NUM" --body "Computed, not published yet: the new extraction engine wrote $n stats file(s) for this place, attached to the run as the \`stats\` artifact ($RUN_URL). Publishing them waits on a maintainer's check of the engine against the published statistics; the issue stays open and a maintainer re-runs it with the \`run\` label once publishing is on."
       - name: say so when it failed
         if: failure()
         env:

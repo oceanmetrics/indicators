@@ -1,6 +1,9 @@
 """Copernicus Marine place producer: one gazetteer place x one `cmems:<dataset>:<var>:mean` indicator -> month and year rows.
 
-this is a PRODUCER (it computes), not an adapter (adapters only read what is published). it exists because
+this is a PRODUCER (it computes), not an adapter (adapters only read what is published); the computation itself is
+om-extract's Copernicus Marine reader (om_extract/readers/copernicus.py: the windows, the Toolbox subset, the cell-centre
+mean, the month and year rows, the provenance), and this module is the request around it: the indicator check, the
+polygon, the output folder, index.json and the upload. it exists because
 noaa-onms/eco-indicators runs by hand over the sanctuaries only; a maintainer accepts a request for any other place
 (issue label `run`, .github/workflows/requests.yml) and this runs on the Mac mini with the maintainer's own Copernicus
 Marine login. the output folder is published under s3://oceanmetrics.io-public/indicators/producers/cmems/ and the
@@ -11,14 +14,14 @@ adapter om_indicators/adapters/cmems_places.py reads it into the catalog.
             machine's private full-resolution copy (`PLACES_INTERNAL`/<coll>/places.parquet, as erddap-places reads it),
             else the publisher's single-feature service in layers.json (`raster.feature_url`). a derived collection
             (fao_high_seas) or a reference one with tiles only needs a maintainer: `NeedsMaintainer`.
-  subset    the Copernicus Marine Toolbox, the polygon's bbox buffered by one grid cell, the surface layer only (depth
+  subset    (om-extract) the Copernicus Marine Toolbox, the polygon's bbox buffered by one grid cell, the surface layer only (depth
             0 to 0.51 m, the first level of the BGC multiyear dataset is 0.506 m; noaa-onms/eco-indicators asks 0 to
             0.5), the whole record or --from/--to. a bbox across the antimeridian is split into one window per side
             (`windows()`), as the gazetteer stores such places split at +/-180.
-  mean      `cell_means()`: per time step the mean of the cells whose CENTRES fall inside the polygon (boundary
+  mean      (om-extract) `cell_means()`: per time step the mean of the cells whose CENTRES fall inside the polygon (boundary
             included), NaN skipped; the spatial SD (n - 1) goes to sd. this is R `terra::extract(r, p, fun = mean,
             na.rm = TRUE)`, the method of eco-indicators, so sanctuary and EEZ values share one method.
-  rows      `place_rows()`: the rules of eco_indicators (month = the monthly mean, n = 1, sd; year = the mean of 12
+  rows      (om-extract) `place_rows()`: the rules of eco_indicators (month = the monthly mean, n = 1, sd; year = the mean of 12
             months, only for complete years, n = 12), through contract.write_values().
   output    <out>/<dataset>/<var>/<place with ':' as '-'>/{data.parquet, provenance.json}, and <out>/index.json (the list
             of everything published, merged with the published one by `merge_index()`).
@@ -34,7 +37,6 @@ prints or copies it. the scientific stack (copernicusmarine, xarray, shapely, nu
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import hashlib
 import json
 import os
@@ -44,10 +46,12 @@ import subprocess
 import sys
 import tempfile
 import urllib.parse
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
+from om_extract.readers import copernicus as om_cm
+from om_extract.readers.copernicus import (DEPTH_RANGE, CellSeries, NoCellsError, cell_means, surface, window_cells,
+                                           windows)
 from om_indicators import __version__, contract
 from om_indicators.adapters import eco_indicators as eco
 from om_indicators.adapters import erddap_places as ep
@@ -64,8 +68,7 @@ LICENSE = "CC-BY-4.0"
 # the build machine's private copies of the reference collections (the places repo's publish_collections.sh): never
 # published, read in place; provenance names the product's DOI, not this path
 PLACES_INTERNAL = Path(os.environ.get("PLACES_INTERNAL") or Path.home() / "data" / "oceanmetrics" / "places-internal")
-DEPTH_RANGE = (0.0, 0.51)           # the surface level only: 0.506 m in the BGC dataset, 0.494 m in the physics one
-MAX_VALUES = 50_000_000             # grid values of one job (cells of the windows x time steps) before --max-values
+MAX_VALUES = om_cm.MAX_VALUES      # grid values of one job (cells of the windows x time steps) before --max-values
 PLACE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*:[A-Za-z0-9_.\-]+$")
 SLUG_RE = re.compile(r"^[a-z0-9_]+$")
 INDICATOR_RE = re.compile(r"^cmems:([A-Za-z0-9_.\-]+):([A-Za-z0-9_.\-]+):mean$")
@@ -78,10 +81,6 @@ METHOD = (
 
 class NeedsMaintainer(RuntimeError):
   """a place whose polygon cannot be fetched at run time (derived layer, tiles-only reference layer)."""
-
-
-class NoCellsError(RuntimeError):
-  """no grid cell centre inside the polygon, or none of them has a value: no rows are written."""
 
 
 # ---- the request, checked ----
@@ -158,211 +157,53 @@ def fetch_geometry(place_id: str, layer: dict | None, *, wkb_reader: Callable[[s
                         "a maintainer has to run it")
 
 
-# ---- windows: where to ask the Toolbox ----
-
-def windows(geom: Any, lon_step: float, lat_step: float, lon_range: tuple[float, float] = (-180.0, 180.0),
-            lat_range: tuple[float, float] = (-90.0, 90.0)) -> list[tuple[float, float, float, float]]:
-  """the (xmin, ymin, xmax, ymax) windows to subset: the polygon's bbox buffered by one grid cell and clamped to the
-  dataset's own range. a place across the antimeridian is stored split at +/-180 (parts touching both), whose plain bbox
-  would be the whole globe: it gets one window per side (parts by the sign of their centroid), each from its own parts."""
-  parts = list(geom.geoms) if hasattr(geom, "geoms") else [geom]
-  edge = 1e-6
-  across = any(p.bounds[2] >= 180 - edge for p in parts) and any(p.bounds[0] <= -180 + edge for p in parts)
-  groups = [[p for p in parts if p.centroid.x >= 0], [p for p in parts if p.centroid.x < 0]] if across else [parts]
-  out = []
-  for g in groups:
-    if not g:
-      continue
-    x0 = min(p.bounds[0] for p in g); y0 = min(p.bounds[1] for p in g)
-    x1 = max(p.bounds[2] for p in g); y1 = max(p.bounds[3] for p in g)
-    out.append((max(x0 - lon_step, lon_range[0]), max(y0 - lat_step, lat_range[0]),
-                min(x1 + lon_step, lon_range[1]), min(y1 + lat_step, lat_range[1])))
-  return out
-
-
-def window_cells(window: tuple[float, float, float, float], lon_step: float, lat_step: float) -> int:
-  """grid cells of a window (what the Toolbox returns), at least one per axis"""
-  x0, y0, x1, y1 = window
-  return max(1, int((x1 - x0) / lon_step + 1 + 1e-9)) * max(1, int((y1 - y0) / lat_step + 1 + 1e-9))
-
-
-# ---- the mean over the cells under the polygon ----
-
-@dataclass
-class CellSeries:
-  times: list[dt.date]
-  mean: list[float | None]
-  sd: list[float | None]
-  n_cells: list[int]          # cells with a value at each step
-  cells: int                  # cell centres inside the polygon (land cells included)
-
-
-def cell_means(arrays: Sequence[Any], geom: Any) -> CellSeries:
-  """per time step the mean (and the sample SD) of the cells whose centres are inside `geom`, NaN skipped.
-  `arrays` are xarray DataArrays with dims (time, latitude, longitude), one per window; a cell seen in two windows counts
-  once. boundary centres count as inside (a split place has cells centred exactly on -180). raises NoCellsError when no
-  centre is inside, or when every cell inside is NaN at every step."""
-  import numpy as np
-  import shapely
-  shapely.prepare(geom)
-  columns: dict[tuple[float, float], Any] = {}
-  times = None
-  for a in arrays:
-    a = a.transpose("time", "latitude", "longitude")
-    t = a["time"].values
-    if times is None:
-      times = t
-    elif not np.array_equal(times, t):
-      raise ValueError("the windows have different time steps")
-    lat, lon = a["latitude"].values, a["longitude"].values
-    lons, lats = np.meshgrid(lon, lat)
-    inside = shapely.intersects_xy(geom, lons, lats)
-    vals = np.asarray(a.values, dtype=float)
-    for j, i in zip(*np.nonzero(inside)):
-      columns.setdefault((round(float(lat[j]), 6), round(float(lon[i]), 6)), vals[:, j, i])
-  if not columns:
-    raise NoCellsError("no grid cell centre falls inside the place polygon: the place is too small for this grid")
-  m = np.stack(list(columns.values()), axis=1)               # (time, cells)
-  ok = np.isfinite(m)
-  n = ok.sum(axis=1)
-  if not n.any():
-    raise NoCellsError(f"the {len(columns)} cell centres inside the place polygon have no value at any time step "
-                       "(land or ice mask)")
-  total = np.where(ok, m, 0.0).sum(axis=1)
-  mean = np.where(n > 0, total / np.maximum(n, 1), np.nan)
-  dev = np.where(ok, (m - mean[:, None]) ** 2, 0.0).sum(axis=1)
-  sd = np.where(n > 1, np.sqrt(dev / np.maximum(n - 1, 1)), np.nan)
-  days = times.astype("datetime64[D]")
-  fin = lambda v: float(v) if np.isfinite(v) else None
-  return CellSeries([d.item() for d in days], [fin(v) for v in mean], [fin(v) for v in sd], [int(k) for k in n],
-                    len(columns))
-
+# ---- windows, the mean over the cells under the polygon: om_extract.readers.copernicus (windows, window_cells,
+# CellSeries, cell_means, surface are imported above) ----
 
 def place_rows(place_id: str, coll: str, indicator: str, unit: str, series: CellSeries) -> list[dict]:
   """month and year contract rows of one place (the rules of eco_indicators: n = 1 and sd per month; a year is the
   mean of 12 months, only when complete)."""
-  mean, sd = {}, {}
-  for d, v, s in zip(series.times, series.mean, series.sd):
-    m = contract.period_start("month", d)
-    mean[m], sd[m] = v, s
-  months = eco.month_rows(place_id, indicator, unit, mean, sd, coll)
-  return months + eco.year_rows(place_id, indicator, unit, months, coll)
+  return om_cm.place_rows(place_id, coll, indicator, unit, series)
 
 
 # ---- the Copernicus Marine Toolbox (network, injectable) ----
 
 def info_from_catalogue(cat: Any, dataset: str, var: str) -> dict:
-  """what the run needs from `copernicusmarine.describe()`: product, DOI, units, grid steps and ranges, version"""
-  product = next((p for p in cat.products if any(d.dataset_id == dataset for d in p.datasets)), None)
-  if product is None:
-    raise ValueError(f"{dataset} is not in the Copernicus Marine catalogue")
-  ds = next(d for d in product.datasets if d.dataset_id == dataset)
-  for version in sorted(ds.versions, key=lambda v: v.label, reverse=True):
-    for part in version.parts:
-      for service in part.services:
-        for v in service.variables:
-          if v.short_name != var:
-            continue
-          c = {x.coordinate_id: x for x in v.coordinates}
-          if "longitude" in c and "latitude" in c and c["longitude"].step and c["latitude"].step:
-            t = c.get("time")
-            doi = getattr(ds, "digital_object_identifier", None)
-            return {"product_id": product.product_id, "product_title": product.title,
-                    "doi": f"https://doi.org/{doi}" if doi else eco.PRODUCT_DOIS.get(product.product_id),
-                    "units": v.units, "version": version.label,
-                    "lon_step": float(c["longitude"].step), "lat_step": float(c["latitude"].step),
-                    "lon_range": (float(c["longitude"].minimum_value), float(c["longitude"].maximum_value)),
-                    "lat_range": (float(c["latitude"].minimum_value), float(c["latitude"].maximum_value)),
-                    "n_times": len(t.values) if t is not None and t.values else None}
-  raise ValueError(f"{var} of {dataset} has no gridded longitude/latitude description in the catalogue")
+  """what the run needs from `copernicusmarine.describe()` (om-extract's), a product without a DOI of its own taking
+  eco_indicators.PRODUCT_DOIS"""
+  return om_cm.info_from_catalogue(cat, dataset, var, eco.PRODUCT_DOIS)
 
 
 def dataset_info(dataset: str, var: str) -> dict:
-  import copernicusmarine
-  return info_from_catalogue(copernicusmarine.describe(dataset_id=dataset, disable_progress_bar=True), dataset, var)
-
-
-def surface(da: Any) -> Any:
-  """the shallowest depth level of a variable (the surface layer); a variable without a depth axis is returned as is"""
-  import numpy as np
-  if "depth" in da.dims:
-    da = da.isel(depth=int(np.argmin(da["depth"].values)))
-  return da
+  return om_cm.dataset_info(dataset, var, eco.PRODUCT_DOIS)
 
 
 def toolbox_subset(dataset: str, var: str, window: tuple[float, float, float, float], start: str | None, end: str | None,
                    workdir: Path, name: str = "w0") -> Any:
-  """one window of one variable through the Copernicus Marine Toolbox -> a loaded DataArray (time, latitude, longitude)
-  at the surface level. the Toolbox finds the login itself; a failure is re-raised with the host's setup in the message."""
-  import copernicusmarine
-  import xarray as xr
-  x0, y0, x1, y1 = window
-  try:
-    r = copernicusmarine.subset(
-      dataset_id=dataset, variables=[var], minimum_longitude=x0, maximum_longitude=x1, minimum_latitude=y0,
-      maximum_latitude=y1, minimum_depth=DEPTH_RANGE[0], maximum_depth=DEPTH_RANGE[1], start_datetime=start,
-      end_datetime=end, output_directory=str(workdir), output_filename=f"{name}.nc", overwrite=True,
-      disable_progress_bar=True)
-  except Exception as e:  # noqa: BLE001 -- say where the login lives; the cause stays chained
-    raise RuntimeError(f"Copernicus Marine subset of {dataset} failed ({type(e).__name__}: {e}); the Toolbox reads the "
-                       "maintainer's login from ~/.copernicusmarine") from e
-  with xr.open_dataset(r.file_path) as ds:
-    return surface(ds[var]).load()
+  """one window through the Copernicus Marine Toolbox (om-extract's `toolbox_subset()`)"""
+  return om_cm.toolbox_subset(dataset, var, window, start, end, workdir, name)
 
 
 # ---- provenance and the output folder ----
 
+PROCESSOR = {"name": "oceanmetrics/indicators", "roles": ["processor"], "url": REPO_URL}
+
+
 def dataset_meta(info: dict) -> dict:
-  """the Copernicus Marine product as provenance.dataset: the same statement eco_indicators makes, so one indicator
-  reads the same wherever its places were computed"""
-  title, doi = info["product_title"], info.get("doi")
-  return {
-    "id": info["product_id"], "title": title, "via": f"https://data.marine.copernicus.eu/product/{info['product_id']}/description",
-    "providers": [
-      {"name": "Copernicus Marine Service (Mercator Ocean International)", "roles": ["producer", "licensor"],
-       "url": "https://marine.copernicus.eu"},
-      {"name": "oceanmetrics/indicators", "roles": ["processor"], "url": REPO_URL},
-    ],
-    "license": "other",
-    "citation": f"E.U. Copernicus Marine Service Information; {title}; {doi}" if doi else f"E.U. Copernicus Marine Service Information; {title}",
-    "doi": doi,
-  }
+  """the Copernicus Marine product as provenance.dataset (om-extract's), with this repo as the processor: the same
+  statement eco_indicators makes, so one indicator reads the same wherever its places were computed"""
+  return om_cm.dataset_meta(info, PROCESSOR)
 
 
-def build_provenance(*, place_id: str, coll: str, indicator: str, dataset: str, var: str, info: dict, wins: list,
-                     series: CellSeries, rows: list[dict], polygon: dict, depth: float | None, toolbox_version: str,
-                     created: str, commit: str | None) -> tuple[dict, dict]:
-  """(the provenance embedded in the Parquet, which the platform schema values-provenance restricts to its own keys, and the
-  richer provenance.json written beside it)"""
-  first, last = min(series.times), max(series.times)
-  embedded = {
-    "producer": {"name": PRODUCER_NAME, "url": REPO_URL, "version": commit},
-    "sources": [
-      # the data read is the dataset's subset through the Toolbox (it has no file or STAC item of its own), the product
-      # page is where the dataset is described
-      {"href": f"copernicusmarine:{dataset}", "title": f"{dataset} {var}, Copernicus Marine Toolbox {toolbox_version}",
-       "updated": None, "end_datetime": last.isoformat(), "checksum": None, "item": None, "role": "data"},
-      {"href": f"https://data.marine.copernicus.eu/product/{info['product_id']}/description",
-       "title": f"product {info['product_id']}", "updated": None, "end_datetime": None, "checksum": None, "item": None,
-       "role": "product"},
-      {"href": polygon["url"], "title": f"polygon of {place_id} ({polygon['kind']})", "updated": None,
-       "end_datetime": None, "checksum": None, "item": None, "role": "geometry"},
-    ],
-    "source_version": f"{dataset} {info.get('version') or ''} {first.isoformat()} to {last.isoformat()}".replace("  ", " "),
-    "method": METHOD, "dataset": dataset_meta(info),
-    "code": {"name": "om-indicators", "version": __version__, "commit": commit, "adapter": MODULE},
-    "license": LICENSE, "created": created,
-  }
-  sidecar = {
-    **embedded, "contract": contract.CONTRACT_VERSION, "indicator": indicator, "coll": coll, "rows": len(rows),
-    "place_id": place_id, "dataset_id": dataset, "dataset_version": info.get("version"), "variable": var,
-    "unit": rows[0]["unit"], "product_doi": info.get("doi"),
-    "depth": {"requested": list(DEPTH_RANGE), "used_m": depth},
-    "windows": [list(w) for w in wins], "grid": {"lon_step": info["lon_step"], "lat_step": info["lat_step"]},
-    "cells": series.cells, "time_range": [first.isoformat(), last.isoformat()],
-    "polygon": polygon, "copernicusmarine_version": toolbox_version, "run_time": created,
-  }
-  return embedded, sidecar
+def build_provenance(x: om_cm.PlaceExtraction, reader: om_cm.CopernicusReader, polygon: dict, *, created: str,
+                     commit: str | None) -> tuple[dict, dict]:
+  """(the provenance embedded in the Parquet and the richer provenance.json beside it), om-extract's
+  `build_provenance()` naming this producer: its name, code, method and the data title it has always published"""
+  return om_cm.build_provenance(
+    x, reader, polygon, created=created, producer={"name": PRODUCER_NAME, "url": REPO_URL, "version": commit},
+    code={"name": "om-indicators", "version": __version__, "commit": commit, "adapter": MODULE}, processor=PROCESSOR,
+    method=METHOD, source_title=f"{reader.dataset_id} {reader.variable}, Copernicus Marine Toolbox {reader.version}",
+    contract_version=contract.CONTRACT_VERSION)
 
 
 def sha256_of(path: Path) -> str:
@@ -441,43 +282,27 @@ def produce(place_id: str, coll: str, indicator: str, out: Path, *, start: str |
             subset: Callable[..., Any] | None = None, created: str | None = None, commit: str | None = None,
             toolbox_version: str | None = None) -> dict:
   """compute one place x indicator and write its output folder (nothing with `check`: the polygon, the windows and the
-  size only). the network functions are parameters so tests run offline. returns a summary with the index `entry`."""
+  size only). the computation is om-extract's Copernicus reader (`extract_place()`); the network functions are
+  parameters so tests run offline. returns a summary with the index `entry`."""
   if not PLACE_RE.match(place_id or "") or not SLUG_RE.match(coll or ""):
     raise ValueError(f"malformed place {place_id!r} or collection {coll!r}")
   dataset, var = parse_indicator(indicator)
   layer = find_layer(layers if layers is not None else load_layers(), coll)
   geom, polygon = geometry(place_id, layer)
-  inf = info(dataset, var)
-  wins = windows(geom, inf["lon_step"], inf["lat_step"], inf["lon_range"], inf["lat_range"])
-  cells = sum(window_cells(w, inf["lon_step"], inf["lat_step"]) for w in wins)
-  values = cells * (inf.get("n_times") or 1)
-  summary = {"place_id": place_id, "coll": coll, "indicator": indicator, "windows": wins, "grid_cells": cells,
-             "time_steps": inf.get("n_times"), "grid_values": values, "polygon": polygon}
-  if values > max_values:
-    raise ValueError(f"about {values:,} grid values ({cells:,} cells x {inf.get('n_times')} time steps) is over the "
-                     f"{max_values:,} limit; raise --max-values if a maintainer really means it")
+  reader = om_cm.CopernicusReader(dataset, var, info=info(dataset, var), subset=subset, version=toolbox_version)
+  try:
+    x = om_cm.extract_place(reader, place_id, geom, coll, indicator=indicator, start=start, end=end,
+                            max_values=max_values, check=check)
+  finally:
+    reader.close()
+  summary = {"place_id": place_id, "coll": coll, "indicator": indicator, "windows": x.windows,
+             "grid_cells": x.grid_cells, "time_steps": x.time_steps, "grid_values": x.grid_values, "polygon": polygon}
   if check:
     return summary
-  if toolbox_version is None:
-    import copernicusmarine
-    toolbox_version = copernicusmarine.__version__
-  with tempfile.TemporaryDirectory() as tmp:
-    fetch = subset or (lambda ds, v, w, s, e: toolbox_subset(ds, v, w, s, e, Path(tmp), f"w{wins.index(w)}"))
-    arrays = [fetch(dataset, var, w, start, end) for w in wins]
-  series = cell_means(arrays, geom)
-  unit = (arrays[0].attrs.get("units") or inf.get("units") or "").strip()
-  if not unit:
-    raise ValueError(f"{indicator} has no units in the data or the catalogue")
-  rows = place_rows(place_id, coll, indicator, unit, series)
-  if not rows:
-    raise NoCellsError("no month has a value inside the place polygon: no rows written")
-  depth = next((float(a["depth"]) for a in arrays if "depth" in a.coords and a["depth"].ndim == 0), None)
-  embedded, sidecar = build_provenance(
-    place_id=place_id, coll=coll, indicator=indicator, dataset=dataset, var=var, info=inf, wins=wins, series=series,
-    rows=rows, polygon=polygon, depth=depth, toolbox_version=toolbox_version, created=created or contract.utc_now(),
-    commit=commit if commit is not None else ep._commit())
-  entry = write_outputs(Path(out), rows, embedded, sidecar)
-  return {**summary, "entry": entry, "rows": len(rows), "cells": series.cells}
+  embedded, sidecar = build_provenance(x, reader, polygon, created=created or contract.utc_now(),
+                                       commit=commit if commit is not None else ep._commit())
+  entry = write_outputs(Path(out), x.rows, embedded, sidecar)
+  return {**summary, "entry": entry, "rows": len(x.rows), "cells": x.series.cells}
 
 
 # ---- the command line ----

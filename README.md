@@ -11,7 +11,7 @@ compute them:
 | [erddap-places](https://github.com/oceanmetrics/erddap-places) precomputed stats | ERDDAP grids: SST, bleaching alerts, chlorophyll, pH, O₂, nutrients, NPP, precipitation, Seascapes ... | NOAA sanctuaries and a few others (gazetteer collection `places`) | `om_indicators/adapters/erddap_places.py`: daily → month and year rows |
 | `oceanmetrics/places` `proto/eez_indicators` | UN SDG 14 series (14.5.1, 14.1.1, 14.6.1) | Marine Regions EEZs (`mr_eez`) | `om_indicators/adapters/sdg.py`: latest year |
 | [noaa-onms/eco-indicators](https://github.com/noaa-onms/eco-indicators) | Copernicus Marine long records (1993- physics, 1997- ocean colour and plankton types) | NOAA sanctuaries (`places`) | `om_indicators/adapters/eco_indicators.py`: monthly means → month and year rows |
-| `om_indicators/producers/cmems_place.py` (this repo; run by a maintainer on a request) | The same Copernicus Marine products, for one place at a time: surface-layer monthly means | Any gazetteer place whose polygon can be fetched (vector collections, the Marine Regions EEZs), e.g. the Albanian EEZ | `om_indicators/adapters/cmems_places.py`: the producer's published folder → month and year rows |
+| `om_indicators/producers/cmems_place.py` (this repo; run by a maintainer on a request; the computation is om-extract's Copernicus Marine reader, `om_extract/readers/copernicus.py`) | The same Copernicus Marine products, for one place at a time: surface-layer monthly means | Any gazetteer place whose polygon can be fetched (vector collections, the Marine Regions EEZs), e.g. the Albanian EEZ | `om_indicators/adapters/cmems_places.py`: the producer's published folder → month and year rows |
 | [obisindicators](https://github.com/marinebon/obisindicators) `obis-h3` release | OBIS records, richness, Shannon, Simpson, ES(50), Hill, Berger-Parker, density, by year, decade and EOV | Marine Regions EEZs, the high seas and the high seas by FAO major fishing area (`mr_eez`, `mr_high_seas`, `fao_high_seas`) | `om_indicators/adapters/obis.py`: exact point-in-polygon indicators |
 
 The values are derived tables (no geometry). Code is MIT; values are CC BY 4.0 with the upstream credit carried in
@@ -380,9 +380,23 @@ Anyone with a GitHub account can ask for an indicator the catalog does not hold 
      "Accepting a request that needs review" below.
 3. **The run, on the Mac mini:** an `auto` request runs by itself while the repository variable `REQUESTS_AUTORUN` is
    `on`, at most `REQUESTS_PER_DAY` (default 10) a day. Otherwise, or past the cap, a maintainer starts it by adding the
-   `run` label (only people with triage access can add labels). erddap-places computes the place and publishes it, the
-   catalog is rebuilt and published, and the bot comments the Place view link and closes the issue. Issue #1 (Wells
-   NERR, precipitation) is the worked example.
+   `run` label (only people with triage access can add labels). The one engine computes the place:
+   `om-extract run --chunks --stats-dir` (oceanmetrics/extract, since 2026-10-23 in place of erddap-places'
+   `precompute.ts`) reads the place from the gazetteer, runs the chunked ERDDAP path over the whole record (the chunk
+   store `OM_CHUNKS`, default `~/.cache/oceanmetrics/chunks` on the runner, so a re-run fetches only what it lacks) and
+   writes erddap-places' `stats/` layout with its STAC item: `<dataset>/<variable>/<place>.parquet`, its
+   `.provenance.json` and `items/<dataset>_<variable>_<place>.json`. What happens next depends on the repository
+   variable `OM_STATS_PUBLISH`:
+   - **unset (the default) or anything but `publish`: a dry run.** The files are listed in the log and attached to the
+     run as the `stats` artifact (a tarball: an artifact cannot hold the `:` of a place id), nothing is uploaded, the
+     catalog is not rebuilt, and the bot comments that the values are computed but not published; the issue stays open.
+     The default waits on the parity criterion (ledger 2026-10-23): the engine's sums differ from erddap-places'
+     published ones in the last bits, so it writes nothing under `gazetteer/stats/` until "bit for bit" is restated.
+   - **`publish`:** the parquet, its provenance and then the item are uploaded to
+     `s3://oceanmetrics.io-public/gazetteer/stats/`, the item goes on the requested-items list, the catalog is rebuilt
+     and published, and the bot comments the Place view link and closes the issue.
+
+   Issue #1 (Wells NERR, precipitation) is the worked example (run by erddap-places before the switch).
 
 Requesters are answered on the issue only; no email is sent.
 
@@ -396,12 +410,17 @@ comment says "A maintainer can accept it by adding the `run` label; it runs on C
 account". Adding the `run` label (people with triage access only) starts the run job on the Mac mini:
 
 1. the check job runs again and the producer is chosen from the checked indicator id, never from the issue text;
-2. the **Copernicus Marine place producer** (`om_indicators/producers/cmems_place.py`) fetches the polygon, asks the
+2. the **Copernicus Marine place producer** (`om_indicators/producers/cmems_place.py`, a thin call into om-extract's
+   Copernicus Marine reader, the engine `om-extract run --reader copernicus` runs) fetches the polygon, asks the
    Copernicus Marine Toolbox for the surface layer over the polygon's box (one grid cell of margin; a place across ±180°
    in two windows), averages the cells whose centres fall inside the polygon at every month (the method of
    noaa-onms/eco-indicators, so sanctuary and EEZ values share one method), and writes month and year rows through the
    contract. It publishes the place's Parquet, its `provenance.json` and the merged `index.json` under
-   `s3://oceanmetrics.io-public/indicators/producers/cmems/`;
+   `s3://oceanmetrics.io-public/indicators/producers/cmems/` (not behind `OM_STATS_PUBLISH`: this folder is the
+   producer's own, not `gazetteer/stats/`). The windows, the subset, the mean, the rows and the provenance are the
+   reader's (`extract_place()`, `build_provenance()`); the producer keeps the request around them (the indicator check,
+   the polygon, the folder, the index, the upload), and `tests/test_cmems_place_golden.py` holds it to the files it wrote
+   before the move, byte for byte (`tests/fixtures/cmems_place/`);
 3. the catalog is rebuilt (the `cmems-places` adapter reads that folder into `values/indicator=<id>/coll=<place's
    collection>/`) and published, and the bot comments the Place view link and closes the issue.
 

@@ -1,0 +1,112 @@
+{
+ "cells": 2,
+ "code": {
+  "adapter": "om_indicators.producers.cmems_place",
+  "commit": "abc1234",
+  "name": "om-indicators",
+  "version": "0.1.0"
+ },
+ "coll": "mr_eez",
+ "contract": "1.2.0",
+ "copernicusmarine_version": "2.5.0",
+ "created": "2026-10-20T12:00:00Z",
+ "dataset": {
+  "citation": "E.U. Copernicus Marine Service Information; Global Ocean Biogeochemistry Hindcast; https://doi.org/10.48670/moi-00019",
+  "doi": "https://doi.org/10.48670/moi-00019",
+  "id": "GLOBAL_MULTIYEAR_BGC_001_029",
+  "license": "other",
+  "providers": [
+   {
+    "name": "Copernicus Marine Service (Mercator Ocean International)",
+    "roles": [
+     "producer",
+     "licensor"
+    ],
+    "url": "https://marine.copernicus.eu"
+   },
+   {
+    "name": "oceanmetrics/indicators",
+    "roles": [
+     "processor"
+    ],
+    "url": "https://github.com/oceanmetrics/indicators"
+   }
+  ],
+  "title": "Global Ocean Biogeochemistry Hindcast",
+  "via": "https://data.marine.copernicus.eu/product/GLOBAL_MULTIYEAR_BGC_001_029/description"
+ },
+ "dataset_id": "cmems_mod_glo_bgc_my_0.25deg_P1M-m",
+ "dataset_version": "202406",
+ "depth": {
+  "requested": [
+   0.0,
+   0.51
+  ],
+  "used_m": 0.5057
+ },
+ "grid": {
+  "lat_step": 1.0,
+  "lon_step": 1.0
+ },
+ "indicator": "cmems:cmems_mod_glo_bgc_my_0.25deg_P1M-m:no3:mean",
+ "license": "CC-BY-4.0",
+ "method": "Monthly mean of the cells of a Copernicus Marine Service product whose centres fall inside the place polygon, at the surface level (0 to 0.51 m), computed on request with the Copernicus Marine Toolbox by om_indicators.producers.cmems_place (the method of noaa-onms/eco-indicators: terra::extract mean over the polygon, with the cell SD in sd). A year is the mean of its 12 monthly means, written only when all 12 months have a value.",
+ "place_id": "MRGID:5670",
+ "polygon": {
+  "kind": "reference",
+  "url": "https://geo.example/wfs?mrgid=5670"
+ },
+ "producer": {
+  "name": "om-indicators/producers/cmems_place",
+  "url": "https://github.com/oceanmetrics/indicators",
+  "version": "abc1234"
+ },
+ "product_doi": "https://doi.org/10.48670/moi-00019",
+ "rows": 15,
+ "run_time": "2026-10-20T12:00:00Z",
+ "sha256": "sha256:d1d6119215908aae380f8a4517231e5dcd78e9d0db1cfc83528413b86b1e20c6",
+ "source_version": "cmems_mod_glo_bgc_my_0.25deg_P1M-m 202406 2020-01-01 to 2021-02-01",
+ "sources": [
+  {
+   "checksum": null,
+   "end_datetime": "2021-02-01",
+   "href": "copernicusmarine:cmems_mod_glo_bgc_my_0.25deg_P1M-m",
+   "item": null,
+   "role": "data",
+   "title": "cmems_mod_glo_bgc_my_0.25deg_P1M-m no3, Copernicus Marine Toolbox 2.5.0",
+   "updated": null
+  },
+  {
+   "checksum": null,
+   "end_datetime": null,
+   "href": "https://data.marine.copernicus.eu/product/GLOBAL_MULTIYEAR_BGC_001_029/description",
+   "item": null,
+   "role": "product",
+   "title": "product GLOBAL_MULTIYEAR_BGC_001_029",
+   "updated": null
+  },
+  {
+   "checksum": null,
+   "end_datetime": null,
+   "href": "https://geo.example/wfs?mrgid=5670",
+   "item": null,
+   "role": "geometry",
+   "title": "polygon of MRGID:5670 (reference)",
+   "updated": null
+  }
+ ],
+ "time_range": [
+  "2020-01-01",
+  "2021-02-01"
+ ],
+ "unit": "mmol m-3",
+ "variable": "no3",
+ "windows": [
+  [
+   -0.5,
+   -0.5,
+   3.5,
+   2.5
+  ]
+ ]
+}
