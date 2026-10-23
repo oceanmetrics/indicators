@@ -96,8 +96,11 @@ def test_the_stats_upload_is_a_dry_run_unless_om_stats_publish_is_publish():
   script = st["run"]
   assert "mode=dry-run\n" in script and 'elif [ "${OM_STATS_PUBLISH:-}" = publish ]; then' in script
   upload, dry = script.split('if [ "$mode" = publish ]; then', 1)[1].split("else", 1)
-  assert "aws s3 cp" in upload and "s3://oceanmetrics.io-public/gazetteer/$f" in upload
-  assert "aws s3 cp" not in script.split('if [ "$mode" = publish ]; then', 1)[0] and "aws s3" not in dry
+  # om-publish.sh (both stores), the parquet first, then the provenance, then the item; never aws, never a delete
+  assert '"$OM_PUBLISH" --really' in upload and upload.rstrip().endswith("stats gazetteer/stats")
+  assert upload.index("--last '*.provenance.json'") < upload.index("--last 'items/*'")
+  assert "aws s3" not in script and "--delete" not in script
+  assert "OM_PUBLISH" not in script.split('if [ "$mode" = publish ]; then', 1)[0] and "OM_PUBLISH" not in dry
   assert "waits on the parity criterion, ledger 2026-10-23" in script
   # the files are listed and attached as an artifact either way (a tarball: upload-artifact refuses ':' in a name)
   assert "tar -czf ../stats.tgz stats" in script
@@ -189,3 +192,14 @@ def test_a_refresh_label_counts_only_from_someone_with_write_access():
   assert '[ "$ACTION" != labeled ] || [ "$refresh" = true ]' in script
   # the run job takes it as it takes an approved request: only on the `run` label
   assert "outputs.approvable == 'true'" in RUN["if"] and "github.event.label.name == 'run'" in RUN["if"]
+
+
+def test_every_upload_of_the_run_job_goes_through_om_publish_from_a_platform_checkout():
+  assert RUN["env"]["OM_PUBLISH"] == "${{ github.workspace }}/.om-platform/scripts/om-publish.sh"
+  co = [s for s in RUN["steps"] if s.get("with", {}).get("repository") == "oceanmetrics/platform"]
+  assert len(co) == 1 and co[0]["with"]["path"] == ".om-platform" and co[0]["with"]["sparse-checkout"] == "scripts/om-publish.sh"
+  assert RUN["steps"].index(co[0]) == 1, "after the repo's own checkout, which cleans the workspace"
+  for name, script in scripts(RUN):
+    assert "aws s3 cp" not in script and "aws s3 sync" not in script, name
+  rebuild = next(s for s in RUN["steps"] if s.get("name") == "rebuild and publish the catalog")["run"]
+  assert '"$OM_PUBLISH" --really --cache-control "public, max-age=300" requested_items.json indicators/requests --as items.json' in rebuild

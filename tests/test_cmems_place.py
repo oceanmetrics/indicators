@@ -337,13 +337,15 @@ def test_publish_uploads_the_place_files_first_and_the_merged_index_last(tmp_pat
   other = {"indicator": NO3, "place_id": "MRGID:9", "coll": "mr_eez"}
   (base / "index.json").write_text(json.dumps({"version": 1, "updated": "x", "entries": [other]}))
   calls = []
-  idx = cp.publish(tmp_path / "out", [e], dest="s3://bucket/producers/cmems", base=str(base),
-                   created="2026-10-20T13:00:00Z", run=lambda cmd, check: calls.append(cmd))
-  assert [c[3:5] for c in calls] == [
-    [str(tmp_path / "out" / e["path"]), f"s3://bucket/producers/cmems/{e['path']}"],
-    [str(tmp_path / "out" / e["provenance"]), f"s3://bucket/producers/cmems/{e['provenance']}"],
-    [str(tmp_path / "out" / "index.json"), "s3://bucket/producers/cmems/index.json"]]
-  assert all(c[:3] == ["aws", "s3", "cp"] for c in calls)
+  idx = cp.publish(tmp_path / "out", [e], dest="indicators/producers/cmems", base=str(base),
+                   created="2026-10-20T13:00:00Z", run=lambda cmd, check: calls.append(cmd), publisher="om-publish.sh")
+  # om-publish.sh <file> <prefix>: the file keeps its name under the prefix of its folder; both stores, never a delete
+  assert [c[-2:] for c in calls] == [
+    [str(tmp_path / "out" / e["path"]), "indicators/producers/cmems/" + e["path"].rsplit("/", 1)[0]],
+    [str(tmp_path / "out" / e["provenance"]), "indicators/producers/cmems/" + e["provenance"].rsplit("/", 1)[0]],
+    [str(tmp_path / "out" / "index.json"), "indicators/producers/cmems"]]
+  assert all(c[:4] == ["om-publish.sh", "--really", "--cache-control", "public, max-age=300"] for c in calls)
+  assert not any("aws" in a or a.startswith("--delete") for c in calls for a in c)
   assert [x["place_id"] for x in idx["entries"]] == ["MRGID:5670", "MRGID:9"]
   assert json.loads((tmp_path / "out" / "index.json").read_text()) == idx
 

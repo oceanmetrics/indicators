@@ -40,6 +40,7 @@ import argparse
 import hashlib
 import json
 import os
+import posixpath
 import re
 import shutil
 import subprocess
@@ -58,6 +59,7 @@ from om_indicators import __version__, contract
 from om_indicators.adapters import eco_indicators as eco
 from om_indicators.adapters import erddap_places as ep
 from om_indicators.producers import geometry_kind, source_id_of
+from om_indicators.publish import om_publish_path
 
 PRODUCER_NAME = "om-indicators/producers/cmems_place"
 MODULE = "om_indicators.producers.cmems_place"
@@ -65,7 +67,7 @@ REPO_URL = "https://github.com/oceanmetrics/indicators"
 GAZETTEER = "https://storage.oceanmetrics.io/gazetteer/"
 LAYERS_URL = GAZETTEER + "index/layers.json"
 PUBLIC_BASE = storage_url("indicators/producers/cmems/", host=storage_host_from_env())
-DEST = "s3://oceanmetrics.io-public/indicators/producers/cmems"
+DEST = "indicators/producers/cmems"      # the prefix in the public bucket (both stores, through om-publish.sh)
 LICENSE = "CC-BY-4.0"
 # the build machine's private copies of the reference collections (the places repo's publish_collections.sh): never
 # published, read in place; provenance names the product's DOI, not this path
@@ -248,20 +250,21 @@ def read_index(base: str) -> dict | None:
 
 
 def publish(out: Path, entries: list[dict], dest: str = DEST, base: str = PUBLIC_BASE, created: str | None = None,
-            run: Callable[..., Any] = subprocess.run) -> dict:
-  """upload this run's place folders, then the merged index.json last (a reader never follows the index to a file that is
-  not there yet), with the host's AWS profile: the repository holds no secrets. the published index is read first and an
-  unreadable one stops the run rather than being overwritten."""
+            run: Callable[..., Any] = subprocess.run, publisher: str | None = None) -> dict:
+  """upload this run's place files, then the merged index.json last (a reader never follows the index to a file that is
+  not there yet), through oceanmetrics/platform scripts/om-publish.sh (both stores, R2 then S3, with the host's AWS
+  profile and R2 rclone wrapper: the repository holds no secrets; the content types by extension, parquet and json).
+  the published index is read first and an unreadable one stops the run rather than being overwritten."""
   index = merge_index(read_index(base), entries, created or contract.utc_now())
+  p = publisher or om_publish_path()
   cc = "public, max-age=300"
   for e in entries:
-    for rel, ctype in ((e["path"], "application/vnd.apache.parquet"), (e["provenance"], "application/json")):
-      run(["aws", "s3", "cp", str(Path(out) / rel), f"{dest}/{rel}", "--only-show-errors", "--content-type", ctype,
-           "--cache-control", cc], check=True)
+    for rel in (e["path"], e["provenance"]):
+      sub = posixpath.dirname(rel)
+      run([p, "--really", "--cache-control", cc, str(Path(out) / rel), f"{dest}/{sub}" if sub else dest], check=True)
   Path(out).mkdir(parents=True, exist_ok=True)
   (Path(out) / "index.json").write_text(json.dumps(index, indent=1) + "\n")
-  run(["aws", "s3", "cp", str(Path(out) / "index.json"), f"{dest}/index.json", "--only-show-errors", "--content-type",
-       "application/json", "--cache-control", cc], check=True)
+  run([p, "--really", "--cache-control", cc, str(Path(out) / "index.json"), dest], check=True)
   return index
 
 
@@ -317,8 +320,8 @@ def main(argv: Sequence[str] | None = None) -> int:
   ap.add_argument("--out", type=Path, default=Path("catalog/producers/cmems"))
   ap.add_argument("--from", dest="start", help="first time step (ISO date); default the whole record")
   ap.add_argument("--to", dest="end", help="last time step (ISO date)")
-  ap.add_argument("--publish", action="store_true", help=f"upload the output folder to {DEST}/ (the host's AWS profile)")
-  ap.add_argument("--dest", default=DEST, help="the s3:// destination of --publish")
+  ap.add_argument("--publish", action="store_true", help=f"upload the output folder to {DEST}/ (om-publish.sh: both stores)")
+  ap.add_argument("--dest", default=DEST, help="the bucket prefix of --publish")
   ap.add_argument("--check", action="store_true", help="resolve the polygon and the windows, print the size; no Copernicus call")
   ap.add_argument("--max-values", type=int, default=MAX_VALUES)
   a = ap.parse_args(argv)

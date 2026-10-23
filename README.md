@@ -252,8 +252,15 @@ back to the Place view; `?theme=` and `?brand=` work as in the app, and `main.em
   it) runs this repo's short jobs: the catalog and the request runs, which otherwise waited behind the precompute.
 - **Catalog:** `.github/workflows/catalog.yml` runs daily (08:07 UTC) on the self-hosted `macmini-quick` runner:
   `scripts/build_catalog.sh` (erddap-places, eco-indicators, the Copernicus Marine place producer's folder and obis rebuilt from what they publish, the SDG series pulled
-  from the published catalog), then `scripts/publish_catalog.sh` syncs to `s3://oceanmetrics.io-public/indicators/` (values first, the
-  manifest last; `--delete` only under `indicators/values/`). Read it at https://storage.oceanmetrics.io/indicators/
+  from the published catalog), then `scripts/publish_catalog.sh` publishes to `indicators/` of the bucket (values first, the
+  manifest last) through oceanmetrics/platform `scripts/om-publish.sh`, the one publisher: both stores (R2, which the
+  storage host serves, then S3), content types by extension, nothing deleted (until 2026-10-24 `values/` was synced with
+  `--delete`, which removed nothing in its last 30 days: a values file a build stops writing now stays, unlinked from
+  `indicators.json`), and the R2 copies of `coverage.parquet` and `indicators.json` it replaces kept under
+  `indicators/_history/<date>/` (R2 has no object versions). The workflows check platform out at `main` and set
+  `OM_PUBLISH`; by hand, a platform checkout beside this repo is found (`scripts/om_publish_path.sh`); `--dry-run` runs
+  om-publish's dry run (read-only listings of both stores). Tested against a fake om-publish in
+  `tests/test_publish_scripts.py`. Read it at https://storage.oceanmetrics.io/indicators/
   (a 302 to the bucket, with CORS; since 2026-10-20) or straight from the bucket host
   https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/, which the viewer uses (one round trip fewer).
   To refresh the SDG series from the places prototype:
@@ -269,8 +276,8 @@ back to the Place view; `?theme=` and `?brand=` work as in the app, and `main.em
   change; the newest 100 entries of the last 30 files; the opening day's `new` rows, 2026-10-20, fold to one "Catalog
   opened" entry per place, `foldOpened`, while its change file keeps every row) with `feeds/index.json`, each validated
   against its schema.
-  `scripts/publish_changes.sh` uploads them (called by `publish_catalog.sh` after `coverage.parquet` and before
-  `indicators.json`; `latest.json` last; nothing deleted). The step is `continue-on-error`: a failure never blocks the
+  `scripts/publish_changes.sh` uploads them through om-publish (called by `publish_catalog.sh` after `coverage.parquet`
+  and before `indicators.json`; `latest.json` last; nothing deleted). The step is `continue-on-error`: a failure never blocks the
   catalog, and a missed day is recovered from the bucket's object versions with `scripts/backfill_changes.mjs` (the same
   diff over each consecutive pair of `coverage.parquet` versions; `--publish` uploads through `publish_changes.sh`). A
   request run (`requests.yml`) writes them too. The feeds are read at

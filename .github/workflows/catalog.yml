@@ -1,4 +1,4 @@
-# build the indicator catalog from what the producers publish and sync it to s3://oceanmetrics.io-public/indicators/
+# build the indicator catalog from what the producers publish and publish it to indicators/ of the bucket (om-publish.sh)
 #
 # runs on the self-hosted `macmini` runner (the oceanmetrics org runner that also runs erddap-places `stats` and
 # places `sync`, one job at a time): uv, node and the aws cli come from Homebrew, and the sync uses the host's AWS
@@ -31,8 +31,18 @@ jobs:
     timeout-minutes: 60
     env:
       AWS_DEFAULT_REGION: us-east-1
+      OM_PUBLISH: ${{ github.workspace }}/.om-platform/scripts/om-publish.sh
     steps:
       - uses: actions/checkout@v4
+      # the one publisher of the bucket, oceanmetrics/platform scripts/om-publish.sh at main (both stores, R2 then S3;
+      # never deletes), found by the publish scripts through OM_PUBLISH; the R2 keys stay on the host like the AWS profile
+      # (~/.config/oceanmetrics/rclone-r2.sh sources r2.env)
+      - uses: actions/checkout@v4
+        with:
+          repository: oceanmetrics/platform
+          path: .om-platform
+          sparse-checkout: scripts/om-publish.sh
+          sparse-checkout-cone-mode: false
       - name: host tools
         run: |
           export PATH=/opt/homebrew/bin:$PATH

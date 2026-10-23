@@ -8,6 +8,7 @@ catalog, so a run never drops an indicator it did not rebuild.
 from __future__ import annotations
 
 import json
+import os
 import urllib.parse
 from pathlib import Path
 
@@ -16,6 +17,19 @@ from om_extract.storage import storage_host_from_env, storage_url
 
 # the catalog root on the storage host: OM_STORAGE, else om_extract.storage's default (the storage host since 0.6.3)
 PUBLIC_BASE = storage_url("indicators/", host=storage_host_from_env())
+
+
+def om_publish_path() -> str:
+  """the one publisher of the bucket, oceanmetrics/platform `scripts/om-publish.sh` (both stores, R2 then S3; never
+  deletes; a dry run unless --really): OM_PUBLISH (the workflows check platform out and set it), else a platform
+  checkout beside this repo, else ~/Github/oceanmetrics/platform. scripts/om_publish_path.sh is the shell twin."""
+  env = os.environ.get("OM_PUBLISH")
+  cands = [Path(env)] if env else [Path(__file__).resolve().parents[2] / "platform" / "scripts" / "om-publish.sh",
+                                   Path.home() / "Github" / "oceanmetrics" / "platform" / "scripts" / "om-publish.sh"]
+  for c in cands:
+    if c.is_file() and os.access(c, os.X_OK):
+      return str(c)
+  raise FileNotFoundError("om-publish.sh not found (set OM_PUBLISH to oceanmetrics/platform scripts/om-publish.sh)")
 
 
 def _read(base: str, rel: str) -> bytes:

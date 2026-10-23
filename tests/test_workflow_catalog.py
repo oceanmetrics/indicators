@@ -33,18 +33,18 @@ def test_the_change_step_diffs_against_the_published_coverage_and_never_blocks_t
 
 def test_the_publish_uploads_changes_and_feeds_between_coverage_and_the_manifest():
   pub = (ROOT / "scripts" / "publish_catalog.sh").read_text()
-  cov = pub.index('"$OUT/coverage.parquet" "$DEST/coverage.parquet"')
+  cov = pub.index('"$OUT/coverage.parquet" "$PREFIX"')
   ch = pub.index('scripts/publish_changes.sh "$OUT"')
-  man = pub.index('"$OUT/indicators.json" "$DEST/indicators.json"')
+  man = pub.index('"$OUT/indicators.json" "$PREFIX"')
   assert cov < ch < man
   assert 'if [ -f "$OUT/changes/latest.json" ]' in pub
 
 
 def test_publish_changes_writes_latest_json_last_and_deletes_nothing():
   sh = (ROOT / "scripts" / "publish_changes.sh").read_text()
-  lines = [l for l in sh.splitlines() if l.startswith("aws s3")]
-  assert lines[-1].startswith('aws s3 cp "$OUT/changes/latest.json"')
-  assert "--delete" not in sh
+  lines = [l for l in sh.splitlines() if '"$P" $REALLY' in l]
+  assert lines[-1].endswith('"$OUT/changes/latest.json" "$PREFIX/changes"')
+  assert "--delete" not in sh and "aws s3" not in sh
   assert 'application/atom+xml; charset=utf-8' in sh
   for schema in ("changes-latest", "feeds-index"):
     assert f"om-catalog validate {schema}" in sh
@@ -55,3 +55,11 @@ def test_a_request_run_writes_the_change_files_before_its_publish():
   run = next(s for s in req["jobs"]["run"]["steps"] if s.get("name") == "rebuild and publish the catalog")["run"]
   assert run.index("scripts/build_catalog.sh") < run.index("changes:build") < run.index("scripts/publish_catalog.sh")
   assert f"--prev {PUBLISHED}" in run.replace("\\\n", "").replace("  ", " ")
+
+
+def test_the_catalog_job_publishes_through_om_publish_from_a_platform_checkout():
+  job = CATALOG["jobs"]["catalog"]
+  assert job["env"]["OM_PUBLISH"] == "${{ github.workspace }}/.om-platform/scripts/om-publish.sh"
+  co = [s for s in STEPS if s.get("with", {}).get("repository") == "oceanmetrics/platform"]
+  assert len(co) == 1 and STEPS.index(co[0]) == 1 and co[0]["with"]["sparse-checkout"] == "scripts/om-publish.sh"
+  assert not any("aws s3" in s.get("run", "") for s in STEPS)
