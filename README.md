@@ -285,8 +285,9 @@ values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` 
 - **Compare: Then vs Now as two slices of one layer** (`compare.ts`; `t2=<period>` in the hash, shared like `t`, absent = off; the
   "Compare" Toggle beside the Period scrubber, its "Compare with" period and the "Difference" Toggle). The layer is drawn at `t` (the
   scrubber's) and a second grid slot of the same layer at `t2` (`gridSlot`'s `instance`, ids `slot:grid@t2`, map 0.2.3) sits just above
-  it, cut to the left of a swipe handle: **one MapLibre map, two layer groups**, the second slot's fill bracketed by two custom layers
-  that set and clear the WebGL scissor box (MapLibre 6 uses the scissor only for its debug drawing). That is erddap-places'
+  it: **one MapLibre map, two layer groups**, each slot's fill bracketed by two custom layers that set and clear the WebGL scissor
+  box, the slot at `t2` left of the swipe handle and the slot at `t` right of it, so neither shows through the other at 0.9 opacity
+  (`swipeLayers.ts` places the pairs; MapLibre 6 uses the scissor only for its debug drawing). That is erddap-places'
   `thenNow/swipe.ts` `clipFor` (a CSS clip of the right-hand map of two synced maps) inside one canvas: a straight screen line on the
   flat map and the globe, nothing re-laid-out while the handle or the camera moves. A `setFilter` on the cells' `lon` was the other
   one-map way and was not taken: it rebuilds every tile of a 100,000-square GeoJSON source each frame, and on the globe a meridian is
@@ -427,7 +428,7 @@ wasm (eh 7.6 MB, mvp 8.7 MB gzip, one of them fetched by the engine's worker), t
 package's COG protocol chunks (219.6 kB, requested on the first `cog://`, which no kind registered here makes).
 
 With the compare mode (2026-10-23: `t2`, `anom` and `swipe` in the hash, `compare.ts`, the swipe handle, the kit's Toggle, the slice cache, the
-companion slot, the anomaly SQL) the entry is 97.6 kB (+0.2, the hash keys), the other JS 197.0 kB, the map JS 319.9 kB of 330 (+3.5) and the
+companion slot, the anomaly SQL) the entry is 97.6 kB (+0.2, the hash keys), the other JS 197.0 kB, the map JS 320.0 kB of 330 (+3.6) and the
 engine JS 139.5 kB of 160 (+0.3, `gridAnomaly.ts`); nothing was raised.
 
 ## Brand and icons

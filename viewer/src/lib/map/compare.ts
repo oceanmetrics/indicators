@@ -3,8 +3,8 @@
 // cell instead of the second slice. no MapLibre and no DuckDB here: MapCanvas draws, gridKind.ts makes the two slots,
 // gridSource.ts runs the SQL.
 //
-// one map, two layer groups. the slot at `t` is drawn whole; the slot at `t2` sits above it and is clipped to the left of
-// the swipe handle by two custom layers around its fill that set and clear the WebGL scissor box (`scissorBox`). MapLibre 6
+// one map, two layer groups. the slot at `t2` sits just above the slot at `t`; each is cut to its side of the swipe handle
+// (t2 left, t right) by two custom layers around its fill that set and clear the WebGL scissor box (`scissorBox`). MapLibre 6
 // touches the scissor only in its debug drawing, so nothing else is clipped. that is erddap-places' `thenNow/swipe.ts`
 // `clipFor` (a CSS clip of the right-hand map of two maps) done inside one canvas: a straight screen line on the flat map
 // and on the globe alike, and nothing re-laid-out while the handle or the map moves (a `setFilter` on the cells' `lon`
@@ -26,12 +26,14 @@ export const clampSwipe = (f: number) => (Number.isFinite(f) ? Math.min(SWIPE_MA
 export const swipeX = (fraction: number, width: number) => Math.round(clampSwipe(fraction) * width)
 
 /**
- * the scissor box of the second slot (left of the handle) in drawing-buffer pixels, origin bottom-left as WebGL has it:
- * the whole height, from the left edge to the handle. the buffer is the canvas at the device pixel ratio, so the line
- * lands on the handle at any ratio
+ * the scissor box of a side of the swipe in drawing-buffer pixels, origin bottom-left as WebGL has it, the whole height:
+ * `left` (the slot at t2) from the left edge to the handle, `right` (the slot at t) from the handle to the right edge. each
+ * slot is cut to its own side, so neither shows through the other (both are drawn at 0.9 opacity). the buffer is the canvas
+ * at the device pixel ratio, so the line lands on the handle at any ratio
  */
-export function scissorBox(fraction: number, bufferWidth: number, bufferHeight: number): [number, number, number, number] {
-  return [0, 0, Math.round(clampSwipe(fraction) * bufferWidth), bufferHeight]
+export function scissorBox(fraction: number, bufferWidth: number, bufferHeight: number, side: 'left' | 'right' = 'left'): [number, number, number, number] {
+  const x = Math.round(clampSwipe(fraction) * bufferWidth)
+  return side === 'left' ? [0, 0, x, bufferHeight] : [x, 0, bufferWidth - x, bufferHeight]
 }
 
 /** the handle's keys: arrows move it 5 % (Shift 1 %), Home and End to the edges, PageUp/PageDown 25 %; null for any other key */

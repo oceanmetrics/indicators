@@ -35,6 +35,7 @@
   import { GRID_LAYER } from '@oceanmetrics/map'
   import type { GridSlot } from '@oceanmetrics/map'
   import { scissorBox } from './compare.ts'
+  import { placeSwipePairs } from './swipeLayers.ts'
 
   interface Props {
     parts: MapPart[]
@@ -351,8 +352,8 @@
   // ---- the data layers ----
   // everything the basemap does not name goes, the slot's `slot:` layers with it
   function clear(m: MlMap) {
-    // custom layers are not in getStyle(): the swipe's two go by name
-    for (const id of [SWIPE_ON, SWIPE_OFF]) if (m.getLayer(id)) m.removeLayer(id)
+    // custom layers are not in getStyle(): the swipe's go by name
+    for (const id of SWIPE_IDS) if (m.getLayer(id)) m.removeLayer(id)
     for (const l of m.getStyle().layers) if (isOurs(l.id)) m.removeLayer(l.id)
     for (const id of Object.keys(m.getStyle().sources)) if (!baseSources.has(id)) m.removeSource(id)
   }
@@ -375,23 +376,24 @@
   // ---- the compare slot and the swipe ----
   let mounted2: LayerSlot | null = null
   let mounted2T: string | null = null
-  const SWIPE_ON = 'slot:swipe:on'
-  const SWIPE_OFF = 'slot:swipe:off'
+  // each slot is cut to its side of the handle: the second (t2) left of it, the first (t) right of it
+  const SWIPE_IDS = ['slot:swipe:left', 'slot:swipe:left:off', 'slot:swipe:right', 'slot:swipe:right:off']
   // what the scissor reads each frame: the swipe fraction, or null to draw the second slot whole (the anomaly)
   let clipAt: number | null = null
-  const swipeOn: CustomLayerInterface = {
-    id: SWIPE_ON, type: 'custom', renderingMode: '2d',
+  const clipOn = (id: string, side: 'left' | 'right'): CustomLayerInterface => ({
+    id, type: 'custom', renderingMode: '2d',
     render(gl) {
       if (clipAt == null) return
-      const [x, y, w, h] = scissorBox(clipAt, gl.drawingBufferWidth, gl.drawingBufferHeight)
+      const [x, y, w, h] = scissorBox(clipAt, gl.drawingBufferWidth, gl.drawingBufferHeight, side)
       gl.enable(gl.SCISSOR_TEST)
       gl.scissor(x, y, w, h)
     },
-  }
-  const swipeOff: CustomLayerInterface = { id: SWIPE_OFF, type: 'custom', renderingMode: '2d', render(gl) { gl.disable(gl.SCISSOR_TEST) } }
+  })
+  const clipOff = (id: string): CustomLayerInterface => ({ id, type: 'custom', renderingMode: '2d', render(gl) { gl.disable(gl.SCISSOR_TEST) } })
+  const swipeLayers = [clipOn(SWIPE_IDS[0], 'left'), clipOff(SWIPE_IDS[1]), clipOn(SWIPE_IDS[2], 'right'), clipOff(SWIPE_IDS[3])] as const
   const layerOf = (sl: LayerSlot | null) => (sl ? (sl as Partial<GridSlot>).ids?.layer ?? GRID_LAYER : null)
   function unmountSlot2(m: MlMap) {
-    for (const id of [SWIPE_ON, SWIPE_OFF]) if (m.getLayer(id)) m.removeLayer(id)
+    for (const id of SWIPE_IDS) if (m.getLayer(id)) m.removeLayer(id)
     mounted2?.unmount(m)
     mounted2 = null
   }
@@ -408,18 +410,13 @@
     }
     placeSwipe(m)
   }
-  /** the scissor pair around the second slot's fill, and the first slot hidden under the anomaly */
+  /** a scissor pair around each slot's fill (t2 left of the handle, t right of it), and the first slot hidden under the anomaly */
   function placeSwipe(m: MlMap) {
-    for (const id of [SWIPE_ON, SWIPE_OFF]) if (m.getLayer(id)) m.removeLayer(id)
+    for (const id of SWIPE_IDS) if (m.getLayer(id)) m.removeLayer(id)
     clipAt = anom ? null : swipe
     const first = layerOf(mounted)
     if (first && m.getLayer(first)) m.setLayoutProperty(first, 'visibility', mounted2 && anom ? 'none' : 'visible')
-    const second = layerOf(mounted2)
-    if (!second || !m.getLayer(second)) return
-    const ids = m.getStyle().layers.map(l => l.id)
-    const next = ids[ids.indexOf(second) + 1]
-    m.addLayer(swipeOn, second)
-    m.addLayer(swipeOff, next)
+    placeSwipePairs(m, first, layerOf(mounted2), swipeLayers)
   }
   // a new slot source has asked for no tile yet, so "every tile is in" is true at once: until the map has been idle once since,
   // the slow poll in settle() does not call the map done (the slot's tiles are slow: a WMS draws each one)

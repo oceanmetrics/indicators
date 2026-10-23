@@ -93,8 +93,8 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   `composeStyle(..., { dem: false })` (`VITE_BASEMAP_DEM=1` reads the GEBCO tiers from the bucket's path-style url until storage.oceanmetrics.io serves them). **The `clear()` rule:** what is the basemap's is `basemapLayerIds(style)` of the style set; `clear()` removes
   every other layer and source, a click tests those that are neither the basemap's nor `isSlotLayer`, and a theme flip is `setStyle(next, { diff: true, transformStyle: carryLayers(id => !basemap.has(id)) })`.
   Never key on an id prefix such as `base-`: no CARTO layer has one. **Compare** (`map/compare.ts`, hash `t2` shared like `t`, the Map's `anom=1`): a second grid slot of the same layer at `t2`
-  (`companion()` in `gridKind.ts`, ids `slot:grid@t2`) above the first, clipped left of the swipe by two custom layers that set and clear the
-  WebGL scissor (one map, never a second canvas or a `setFilter` per frame); both slots on one scale (the union of their ranges), one slice per
+  (`companion()` in `gridKind.ts`, ids `slot:grid@t2`) above the first, each slot cut to its side of the swipe (t2 left, t right) by a pair of custom layers that set and clear the
+  WebGL scissor (`swipeLayers.ts`; one map, never a second canvas or a `setFilter` per frame); both slots on one scale (the union of their ranges), one slice per
   period (`sliceCache.ts`), `t2 - t` in the engine's SQL (`gridAnomaly.ts`); `t` and `t2` are periods of the layer's grain, so erddap-places' `md` has no counterpart.
   Every map shares one `setupMapLibre` (`map/setup.ts`); a `$effect` that makes a slot keys on strings
   (`layerKey`, the places' key), never on `view`, which is a new object on every hash change, or a new `t` remakes the slot instead of `update(t)`.

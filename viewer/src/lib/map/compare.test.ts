@@ -16,6 +16,14 @@ describe('the swipe geometry (one map: the second slot cut by the scissor box)',
     expect(scissorBox(0.3, 1170, 1500)).toEqual([0, 0, 351, 1500])
     expect(scissorBox(-1, 1000, 600)).toEqual([0, 0, 20, 600])
   })
+  it('regression: the slot at t is cut to the right of the handle, so it does not show through the slot at t2 on the left', () => {
+    expect(scissorBox(0.5, 2560, 1800, 'right')).toEqual([1280, 0, 1280, 1800])
+    expect(scissorBox(0.3, 1170, 1500, 'right')).toEqual([351, 0, 819, 1500])
+    // the two boxes meet at the handle and cover the buffer once
+    const [l, r] = [scissorBox(0.37, 999, 10, 'left'), scissorBox(0.37, 999, 10, 'right')]
+    expect(l[2] + r[2]).toBe(999)
+    expect(r[0]).toBe(l[2])
+  })
   it('the handle\'s keys: arrows 5 %, Shift 1 %, PageUp/PageDown 25 %, Home and End to the edges, other keys nothing', () => {
     expect(keySwipe('ArrowLeft', false, 0.5)).toBeCloseTo(0.45, 10)
     expect(keySwipe('ArrowRight', true, 0.5)).toBeCloseTo(0.51, 10)
