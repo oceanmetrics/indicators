@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   axisSteps, boxCells, budgetLobes, collectionUrl, gridCredit, gridTitle, gridVia, layerChoices, leftOutLine, producersOf, slicePlaces, slicePlacesKey,
-  slicedIds, slotLegendLine, stepDate, uniqueCells, unitLabel,
+  slicedIds, slotLegendLine, stepDate, unitLabel,
 } from './gridLayer.ts'
 import type { MapPart } from './parts.ts'
+import { gridOutline } from '@oceanmetrics/map'
 
 const ind = (id: string, short: string, ds: string, title: string) => ({ id, short, dataset: { id: ds, title, providers: [] } })
 
@@ -107,10 +108,11 @@ describe('the legend and the credit', () => {
 })
 
 describe('one row per cell', () => {
-  it('regression: where two places\' boxes overlap the slice gave each cell twice (drawn darker); the first is kept', () => {
-    const a = { lat: 34.005, lon: -120.005, value: 16.2, weight: 1 }
-    const b = { lat: 34.005, lon: -119.995, value: 16.3, weight: 1 }
-    expect(uniqueCells([a, b, { ...a }, { ...b, weight: 0.4 }])).toEqual([a, b])
+  // the two package fixes this Map found (map 0.2.2, engine 0.1.1) replaced indicators' own workarounds; the cell twice where two
+  // places' boxes overlap is the engine's regression test now (`sliceSource` reads the lobes with SELECT DISTINCT)
+  it('consumer check (map 0.2.2): no square outline on the grids drawn here (CRW 0.05°, MUR 0.01°), so no mesh over the data', () => {
+    expect(gridOutline(0.05)).toBeNull()
+    expect(gridOutline(0.01)).toBeNull()
   })
 })
 

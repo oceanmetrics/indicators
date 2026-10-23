@@ -143,24 +143,6 @@ export function axisSteps(collection: { 'cube:dimensions'?: Record<string, { ste
   return [num(d.longitude?.step ?? d.lon?.step), num(d.latitude?.step ?? d.lat?.step)]
 }
 
-/**
- * one row per cell of a slice over several places: the engine's `sliceSource` reads every lobe's slab as one
- * `read_parquet([...])` without DISTINCT (runPreview has it), so where two places' boxes overlap (the Channel Islands and
- * Chumash) each masked cell joins two identical slab rows and is drawn twice, darker; a cell on the shared edge of two
- * places is in both masks. the first row of a cell is kept, in the order given
- */
-export function uniqueCells<C extends { lat: number; lon: number }>(rows: readonly C[]): C[] {
-  const seen = new Set<string>()
-  const out: C[] = []
-  for (const r of rows) {
-    const k = `${Math.round(r.lat * 1e5)},${Math.round(r.lon * 1e5)}`
-    if (seen.has(k)) continue
-    seen.add(k)
-    out.push(r)
-  }
-  return out
-}
-
 // ---- the time asked for ----
 
 /** the step's date of a period (`t` of the hash: "2024-07" -> "2024-07-01", "2024" -> "2024-01-01"); null stays null (the latest) */

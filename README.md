@@ -236,7 +236,7 @@ values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` 
   `@oceanmetrics/engine` (the mask, the lobes, the ERDDAP requests, DuckDB-WASM, the slice) on MapLibre 6 (named imports: it has no
   default export). `MapCanvas.svelte` calls `setupMapLibre` once a page with MapLibre's worker module (`maplibre-gl-worker.mjs?worker&url`;
   `vite.config.ts` names worker chunks `.mjs`, which MapLibre 6's `importScriptInWorkers` requires) and registers `pmtiles://` (`setup.ts`:
-  one setup a page for every map, given the same three functions each time). Both packages come from npm (`^0.2.1`, `^0.1.0`).
+  one setup a page for every map, given the same three functions each time). Both packages come from npm (`^0.2.2`, `^0.1.1`).
 - **The basemap** is CARTO's positron (light) or dark-matter (dark) through `composeStyle(baseStyle(theme), { theme, dem: false })`:
   the GEBCO sea floor, isobaths, land mask and undersea names are built and in the bucket, but `storage.oceanmetrics.io/basemap/`
   (the package's `DEFAULT_TILES`) answers 404 until the storage host lets `basemap` through, and MapLibre schedules no frame while a source
@@ -272,8 +272,8 @@ values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` 
   sanctuaries took 6 to 15 s from mount on 2026-10-23 (MUR monthly at 0.01°, `grid:jplMURSST41mday:sst`, 101,626 cells in 14 lobes, from
   erddap.oceanmetrics.io; 13 to 45 s for MUR daily); a new `t` only refetches the slabs (`update(t)`, 17 to 21 s a step from MUR daily).
   PacIOOS did not answer that night, so the layer shots use the mirror (`shoot.mjs --layer grid:jplMURSST41mday:sst`). Each slice logs its
-  time to the console (`[om] grid slice ...`). Where two places' boxes overlap the engine's `sliceSource` joins each cell twice (it reads the
-  lobes without DISTINCT); `uniqueCells` keeps one.
+  time to the console (`[om] grid slice ...`). Where two places' boxes overlap, the engine's `sliceSource` reads the lobes' slabs with
+  `SELECT DISTINCT` (engine 0.1.1), so a cell of the overlap is drawn once; the squares of a 0.05° or finer grid have no outline (map 0.2.2).
 - **The Period scrubber** (`TimeScrubber.svelte`, rules in `timeWindow.ts`): `t` is the handle and the right edge of a window
   `[t - w, t]` drawn as a band behind it, `w` defaulting by grain (12 months, 10 years, 3 decades, 30 days). Brush across the track to set
   the window (t is its later end), drag the band or the handle to pan it, the wheel over the track zooms it anchored at t, double-click
