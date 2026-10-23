@@ -28,8 +28,8 @@ brand = ["pillow>=11", "potracer>=0.0.4"]
 cmems = ["copernicusmarine>=2.0", "xarray>=2024.1", "shapely>=2.0", "numpy>=1.26", "h5netcdf>=1.3", "h5py>=3.10", "netCDF4>=1.7"]
 
 [tool.uv.sources]
-# om_extract.contract is the values contract (oceanmetrics/extract); the contract branch is not pushed yet
-om-extract = { git = "https://github.com/oceanmetrics/extract", rev = "7eea6c2bc62d5374281002899ad7dc9503cd6932" }
+# om_extract.contract is the values contract (oceanmetrics/extract), pinned to a commit of its main
+om-extract = { git = "https://github.com/oceanmetrics/extract", rev = "82b33d8bc7fb7df6a0ffc8396f13a41806b5c192" }
 
 [build-system]
 requires = ["hatchling"]
