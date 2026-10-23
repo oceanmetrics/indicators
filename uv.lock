@@ -786,8 +786,8 @@ wheels = [
 
 [[package]]
 name = "om-extract"
-version = "0.6.0"
-source = { git = "https://github.com/oceanmetrics/extract?rev=17adcd1e04fe16efb1541d8e0265ddf029569873#17adcd1e04fe16efb1541d8e0265ddf029569873" }
+version = "0.6.1"
+source = { git = "https://github.com/oceanmetrics/extract?rev=e5fb52dfe2f0859c620edb3b45e21d453a81e344#e5fb52dfe2f0859c620edb3b45e21d453a81e344" }
 dependencies = [
     { name = "duckdb" },
     { name = "httpx" },
@@ -834,7 +834,7 @@ dev = [
 requires-dist = [
     { name = "duckdb", specifier = ">=1.4" },
     { name = "jsonschema", specifier = ">=4.23" },
-    { name = "om-extract", git = "https://github.com/oceanmetrics/extract?rev=17adcd1e04fe16efb1541d8e0265ddf029569873" },
+    { name = "om-extract", git = "https://github.com/oceanmetrics/extract?rev=e5fb52dfe2f0859c620edb3b45e21d453a81e344" },
     { name = "pyarrow", specifier = ">=21" },
     { name = "pyyaml", specifier = ">=6" },
     { name = "requests", specifier = ">=2.32" },

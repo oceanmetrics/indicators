@@ -52,6 +52,8 @@ from typing import Any, Callable, Sequence
 from om_extract.readers import copernicus as om_cm
 from om_extract.readers.copernicus import (DEPTH_RANGE, CellSeries, NoCellsError, cell_means, surface, window_cells,
                                            windows)
+from om_extract.storage import storage_host_from_env, storage_url
+
 from om_indicators import __version__, contract
 from om_indicators.adapters import eco_indicators as eco
 from om_indicators.adapters import erddap_places as ep
@@ -62,7 +64,7 @@ MODULE = "om_indicators.producers.cmems_place"
 REPO_URL = "https://github.com/oceanmetrics/indicators"
 GAZETTEER = "https://storage.oceanmetrics.io/gazetteer/"
 LAYERS_URL = GAZETTEER + "index/layers.json"
-PUBLIC_BASE = "https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/producers/cmems/"
+PUBLIC_BASE = storage_url("indicators/producers/cmems/", host=storage_host_from_env())
 DEST = "s3://oceanmetrics.io-public/indicators/producers/cmems"
 LICENSE = "CC-BY-4.0"
 # the build machine's private copies of the reference collections (the places repo's publish_collections.sh): never

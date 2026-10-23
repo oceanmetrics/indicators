@@ -10,9 +10,10 @@ import { parquetWriteBuffer } from 'hyparquet-writer'
 import { coverageOf, displayIds, placeCentres, placeHomes } from './build.ts'
 import type { CoverageRow, IndexEntry, ManifestIndicator, ValueRow } from './build.ts'
 import type { Centre } from './centre.ts'
+import { store } from '../storage.ts'
 
-const INDEX_URL = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer/index/places_index.parquet'
-const LAYERS_URL = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer/index/layers.json'
+const INDEX_URL = store('gazetteer/index/places_index.parquet')
+const LAYERS_URL = store('gazetteer/index/layers.json')
 const CACHE_DIR = 'cache/gazetteer'
 const DAY_MS = 24 * 3600 * 1000
 

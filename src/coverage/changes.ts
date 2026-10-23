@@ -17,8 +17,9 @@ import { atomFeed, CHANGE_KINDS, countKinds, diffCoverage, feedsFor, feedsIndex,
 import type { ChangeRow, DiffRow, FeedsPlaces } from '@oceanmetrics/catalog/changes'
 import type { IndicatorsManifest } from '@oceanmetrics/catalog'
 import { validate } from '@oceanmetrics/catalog/validate'
+import { store } from '../storage.ts'
 
-export const PUBLISHED_BASE = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/'
+export const PUBLISHED_BASE = store('indicators/')
 /** the change files latest.json lists, and the feeds read */
 export const RECENT_FILES = 30
 /** the coverage columns a diff reads */

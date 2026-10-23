@@ -3,12 +3,12 @@
 // (place_id, name, collection, bbox), the first time a group with places that are not computed is opened or chosen: never in the
 // entry chunk. plain functions, tested with a synthetic reader.
 import { bboxCentre } from '../../../src/coverage/centre.ts'
+import { store } from '../../../src/storage.ts'
 import type { CoverageIndex, Place } from './matrix.ts'
 import type { Layers, PlaceSet } from './data.ts'
 import type { PlaceSel } from './selection.ts'
 
-/** the bucket host, not the storage host: that one answers with a 302 that has no CORS headers (as map/gazetteer.ts directUrl) */
-export const PLACES_INDEX_URL = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer/index/places_index.parquet'
+export const PLACES_INDEX_URL = store('gazetteer/index/places_index.parquet')
 export const INDEX_COLUMNS = ['place_id', 'name', 'collection', 'bbox']
 
 export type GazetteerPlaces = Map<string, Place[]>

@@ -8,12 +8,13 @@
 // run from American Samoa to Lake Huron: their union box at 0.05° is about 4.5 million cells a step, the eighteen lobes
 // together about 0.2 million, and a cell outside every place would be masked away anyway.
 import type { Indicator } from '../data.ts'
+import { store } from '../../../../src/storage.ts'
 import { formatLayerKey, parseLayerKey } from './layerSlot.ts'
 import type { LegendSpec } from './layerSlot.ts'
 import type { MapPart } from './parts.ts'
 
 /** the gazetteer's STAC root; an ERDDAP dataset is `erddap/<dataset id>/collection.json` under it, its places `<coll>/places.parquet` */
-export const GAZETTEER_STAC = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer/'
+export const GAZETTEER_STAC = store('gazetteer/')
 export const collectionUrl = (datasetId: string) => `${GAZETTEER_STAC}erddap/${datasetId}/collection.json`
 export const placesParquetUrl = (coll: string) => `${GAZETTEER_STAC}${coll}/places.parquet`
 

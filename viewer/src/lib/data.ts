@@ -2,6 +2,7 @@
 // Matrix: coverage carries each place's name, so no gazetteer file is read. plain functions, tested without a browser.
 import { parquetReadObjects } from 'hyparquet'
 import type { CoverageRow } from '../../../src/coverage/build.ts'
+import { store } from '../../../src/storage.ts'
 import type { Grain, MethodId } from '@oceanmetrics/status'
 
 export type VocabId = 'onms' | 'names' | 'eov'
@@ -99,8 +100,8 @@ export interface Catalog {
   coverage: CoverageRow[]
 }
 
-/** the production default: the bucket host, path-style (storage.oceanmetrics.io answers with a 302, one redirect per request) */
-export const PUBLISHED_BASE = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/'
+/** the production default: the catalog on the storage host (src/storage.ts) */
+export const PUBLISHED_BASE = store('indicators/')
 /** the dev default: the repo's catalog/, served by the dev middleware in vite.config.ts */
 export const DEV_BASE = './catalog/'
 
@@ -155,7 +156,7 @@ export const GROUP_TITLES: Record<string, string> = {
 /** the groups in the order the Matrix lists them: sanctuaries first, then the other protected areas, then the Marine Regions ones */
 export const GROUP_ORDER = ['noaa_sanctuaries', 'places', 'noaa_nerrs', 'noaa_marine_monuments', 'mpa_inventory', 'protectedseas_mpa', 'mr_eez', 'fao_high_seas', 'mr_high_seas']
 
-export const LAYERS_URL = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/gazetteer/index/layers.json'
+export const LAYERS_URL = store('gazetteer/index/layers.json')
 export const GAZETTEER_URL = 'https://oceanmetrics.io/places/'
 
 /** a gazetteer collection: its title and its number of places */

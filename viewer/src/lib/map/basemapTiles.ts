@@ -3,8 +3,9 @@
 // (platform packages/map README, "Open"); the same objects answer range reads at the bucket's path-style url, so the tiers
 // are read from there. plain data, tested; MapCanvas passes the result as composeStyle's `tiles`.
 import type { BasemapTiles } from '@oceanmetrics/map'
+import { store } from '../../../../src/storage.ts'
 
-export const BASEMAP_BUCKET = 'https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/basemap/'
+export const BASEMAP_BUCKET = store('basemap/')
 
 /** every tier url under `from` moved under `to` (the regional list too); a null tier stays null */
 export function tilesAt(tiles: Readonly<BasemapTiles>, from: string, to: string = BASEMAP_BUCKET): BasemapTiles {

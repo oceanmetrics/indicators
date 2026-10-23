@@ -12,8 +12,10 @@ import urllib.parse
 from pathlib import Path
 
 import requests
+from om_extract.storage import storage_host_from_env, storage_url
 
-PUBLIC_BASE = "https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/"
+# the catalog root on the storage host: OM_STORAGE, else om_extract.storage's default (path-style S3 until the cutover)
+PUBLIC_BASE = storage_url("indicators/", host=storage_host_from_env())
 
 
 def _read(base: str, rel: str) -> bytes:
