@@ -31,7 +31,7 @@ copying `brand/v1/icons/{om-icons.svg,icons.css,index.html}` to `oceanmetrics.gi
 
 The platform packages come from npm, never from a sibling checkout: `@oceanmetrics/status` (the status methods; source in
 `oceanmetrics/platform`, `packages/status`) and `@oceanmetrics/catalog` (the JSON schemas and the `om-catalog` bin) are
-ordinary dependencies in `package.json`, so `npm ci` / `npm install` here picks them up. `om_extract.schemas` finds the
+ordinary dependencies in `package.json`, so `npm ci` / `npm install` here picks them up. So are `@oceanmetrics/engine` (the browser engine) and `@oceanmetrics/map` (the map stack). `om_extract.schemas` finds the
 values contract's schemas at `node_modules/@oceanmetrics/catalog/schemas` from the working directory, so run Python from the
 repo root after `npm install` and set no `OM_SCHEMAS_DIR`. A change to a status method or a schema is made in
 `oceanmetrics/platform` and released there; bump the version range here and run `npm install` to take it. The status tests
@@ -72,7 +72,7 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   own `places` and `indicators` rules, in the hash as `pi`, `px` (place ids, `coll:<slug>`, `set:<id>`; default `coll:places`) and `ii`, `ix`
   (`*` = leads, `all`, `cat:`, `series:`, ids). The old keys (`colls`, `xp`, `xi`, `ai`, `leads`, a Map's `coll`) are read as the same selection on
   parse. Other hash keys: `q`, `vocab`, `depth`, `cell`, `axes=p`, `empty=1`, `t` (shared by every view since 2026-10-22; the Map reads it, the Matrix from
-  build week 3), the Map's `layer=<kind>:<id>[:<variable>]` (the layer slot, `map/layerSlot.ts`), and the order `ps pg po is ig io` (README "Matrix view"). The place picker lists every polygon
+  build week 3), the Map's `layer=<kind>:<id>[:<variable>]` (the layer slot, `map/layerSlot.ts`; `grid:dhw_5km:CRW_SST`), and the order `ps pg po is ig io` (README "Matrix view"). The place picker lists every polygon
   collection of the gazetteer; the gazetteer's places are read lazily (`gazetteerPlaces.ts`), never for the default selection.
 - **The order of places and indicators** (`src/report/order.ts`, `ReportSpec.order`) is part of the shared selection: sort key, grouping on or off and a custom id list
   per axis (`ps pg po` / `is ig io`; `po`/`io` lead with `g:<group id>` entries). One tested ordering function serves the Matrix (`selectionRows`, `groupColumns`), the Report (`buildReport`), the Map's
@@ -86,8 +86,14 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   drawn by layering them (`parts.ts`: vector and derived groups first, WMS on top, one legend and scale), a **derived**
   group as the features of its `via` layer matched by `display_id`; a click answers from the top part down. Reference
   geometry (Marine Regions) is never hosted by us, in a set as anywhere: the EEZs stay Marine Regions' own WMS. Under the places sits the **layer slot**
-  (`map/layerSlot.ts`: one `LayerSlot` per hash `layer`, made by the factory of its kind, ids prefixed `slot:`, mounted under the first part); the
-  `erddap` kind (`erddapWms.ts` rules, `erddapSlot.ts` wiring) is provisional until the `@oceanmetrics/map` renderer of build week 2 (2026-11-06 to 11-12).
+  (`map/layerSlot.ts` re-exports `@oceanmetrics/map`'s contract: one `LayerSlot` per hash `layer`, made by the factory of its kind, ids prefixed `slot:`, mounted under the first part's fill);
+  the one kind is `grid` (`gridKind.ts`: `gridSlot` over `@oceanmetrics/engine` `sliceSource`, one slice per place lobe of the polygon places drawn, each masked by its own place; rules in
+  `gridLayer.ts`), and the engine with DuckDB-WASM (1.32.0 exact, self-hosted `?url` bundles) is one lazy chunk (`gridSource.ts`), never in the entry or the map chunk. The packages replaced the
+  provisional ERDDAP WMS kind (`erddap:` links parse as `grid:`). The map runs on **MapLibre 6** (named imports only; worker chunks are `.mjs`, `vite.config.ts`) and boots on CARTO's style through
+  `composeStyle(..., { dem: false })` (`VITE_BASEMAP_DEM=1` reads the GEBCO tiers from the bucket's path-style url until storage.oceanmetrics.io serves them). **The `clear()` rule:** what is the basemap's is `basemapLayerIds(style)` of the style set; `clear()` removes
+  every other layer and source, a click tests those that are neither the basemap's nor `isSlotLayer`, and a theme flip is `setStyle(next, { diff: true, transformStyle: carryLayers(id => !basemap.has(id)) })`.
+  Never key on an id prefix such as `base-`: no CARTO layer has one. Every map shares one `setupMapLibre` (`map/setup.ts`); a `$effect` that makes a slot keys on strings
+  (`layerKey`, the places' key), never on `view`, which is a new object on every hash change, or a new `t` remakes the slot instead of `update(t)`.
 - **The pickers** (`viewer/src/lib/pick/`): one place picker and one indicator picker for every view, the rules in plain
   `.ts` (`places.ts`, `placesTree.ts`, `indicators.ts`, `indicatorsTree.ts`; the `*Tree` files and the panels load on the
   first open, so keep them out of the entry). Shared look-alike CSS lives once in `viewer/src/app.css` as `om-*` classes

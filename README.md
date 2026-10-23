@@ -228,19 +228,58 @@ back to the Place view; `?theme=` and `?brand=` work as in the app, and `main.em
 `#view=map` colours one indicator over **the places of the selection** (the Select section above the tabs): by its
 value (five quantile classes), its departure from the place's own mean (in SD), its status or trend (iea-sd or names-pct, computed by
 `@oceanmetrics/status` as of the period shown), the length of its record, or, for a categorical indicator, its largest class or the share of
-one class. A slider walks the periods. Hash keys: `ind` (the indicator: the hash's when it is in the selection, else the first selected one with
+one class. The Period scrubber walks the periods. Hash keys: `ind` (the indicator: the hash's when it is in the selection, else the first selected one with
 values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` (the place selected), `color` (`value|departure|status|trend|record|class|share`), `t`
 (shared by every view: `2024` or `2024-07`; none = each place's latest), `cls` (the class `share` maps), `grain`, `proj` (`globe`; absent = the flat map), `layer`
-(the layer under the map, below) and `method`.
-- **The layer under the map** (`layer=<kind>:<id>[:<variable>]`, e.g. `layer=erddap:dhw_5km:CRW_SST`; the "Layer under the map" select beside the Period slider):
-  a raster drawn under the places at the period shown (the period start of `t`, else the latest period). `viewer/src/lib/map/layerSlot.ts` is the slot: a
-  `LayerSlot` (`mount`, `update(t)`, `unmount`, `legend`) made by the factory its kind registers (`registerSlotKind`, `slotFor`); MapCanvas mounts it under the
-  first vector part's fill (else the first WMS part) and its ids start `slot:`, so a rebuild clears it and a click never hits it. The renderer of build week 2
-  (2026-11-06 to 11-12, `@oceanmetrics/map`: grid slices, COGs, H3) registers its kinds there. Until then the one kind is `erddap`: the dataset's own ERDDAP WMS,
-  its server and variables read from the gazetteer's `erddap/<id>/collection.json`, at 0.7 opacity, with a legend line ("ERDDAP WMS, provisional until ...")
-  and its credit in the credit line. ERDDAP's WMS draws only CRS:84 / EPSG:4326 pictures, so each tile goes through an `erddapwms://` protocol that asks for
-  the tile's lon/lat box and stretches the rows onto Mercator (`erddapWms.ts`, `erddapSlot.ts`). A server that sends no picture leaves the legend saying
-  "no tiles from <host>". The select lists the ERDDAP datasets of the manifest's indicators, one entry per variable, the shown indicator's dataset first.
+(the layer under the map, below) and `method`. The grammar did not change with the packages below.
+- **The map stack** is `@oceanmetrics/map` (the slot contract, `setupMapLibre`, the basemap, the ramps, the grid provider) and
+  `@oceanmetrics/engine` (the mask, the lobes, the ERDDAP requests, DuckDB-WASM, the slice) on MapLibre 6 (named imports: it has no
+  default export). `MapCanvas.svelte` calls `setupMapLibre` once a page with MapLibre's worker module (`maplibre-gl-worker.mjs?worker&url`;
+  `vite.config.ts` names worker chunks `.mjs`, which MapLibre 6's `importScriptInWorkers` requires) and registers `pmtiles://` (`setup.ts`:
+  one setup a page for every map, given the same three functions each time). Both packages come from npm (`^0.2.1`, `^0.1.0`).
+- **The basemap** is CARTO's positron (light) or dark-matter (dark) through `composeStyle(baseStyle(theme), { theme, dem: false })`:
+  the GEBCO sea floor, isobaths, land mask and undersea names are built and in the bucket, but `storage.oceanmetrics.io/basemap/`
+  (the package's `DEFAULT_TILES`) answers 404 until the storage host lets `basemap` through, and MapLibre schedules no frame while a source
+  fails, so `dem: false` stays the default. `VITE_BASEMAP_DEM=1` at build or dev time turns them on, read from the bucket's path-style url
+  (`basemapTiles.ts`, `tilesAt`). The credit line is the style's own attribution
+  (`styleCredit`: "© OpenStreetMap contributors © CARTO"). What is the basemap's is the layer ids of the style set (`basemapLayerIds`):
+  `clear()` removes every other layer and source, a click or the pointer tests the others that are not the slot's (`isSlotLayer`), and a
+  theme flip is `setStyle(next, { diff: true, transformStyle: carryLayers(id => !basemap.has(id)) })`, which carries the parts and the slot
+  into the other theme's style under the layers they sat under. If CARTO does not answer, the map draws on a plain `--map-sea` background.
+- **The layer under the map** (`layer=<kind>:<id>[:<variable>]`, e.g. `layer=grid:dhw_5km:CRW_SST`; the "Layer under the map" select beside the
+  Period scrubber; Day 6's `layer=erddap:...` links open the same layer and are written back as `grid:`): a **grid slice** of an ERDDAP dataset
+  drawn under the places at the step of `t` (the period's first day, `2024-07` -> `2024-07-01`; the dataset's latest step when `t` is
+  absent), computed in the browser. `viewer/src/lib/map/layerSlot.ts` re-exports the contract of `@oceanmetrics/map` (a `LayerSlot`: `mount`,
+  `update(t)`, `unmount`, `legend`, made by the factory its kind registers); MapCanvas mounts it under the first vector part's fill (else
+  the first layer of ours, else the basemap's sea surface) and its ids start `slot:`. The one kind is `grid` (`gridKind.ts`): `gridSlot`
+  (one square per cell of the dataset's own lattice, a ramp from `defaultRampFor`, holes where the step has no data) over the engine's
+  `sliceSource`. The dataset is the gazetteer's `erddap/<id>/collection.json` through `toDataset`; the places are the polygon places the map
+  draws (`slicePlaces`: every computed place of a vector group, from that group's gazetteer collection; a reference group such as the
+  EEZs, drawn by Marine Regions' WMS, and a derived group have no polygon here and are named in the legend). **One slice per place lobe**:
+  each place's polygon is read from `<coll>/places.parquet` (`placeGeometry.ts`, range requests on the row groups that hold it), split at
+  ±180 (`placeLobes`), and each lobe asks ERDDAP for its own box at the step and is masked by its own place (`lobeMasks`); never one box over
+  the union of the places (the sanctuaries' union at 0.05° is about 4.5 million cells a step, their lobes together about 0.2 million).
+  A place with a lobe over 250,000 cells a request, or one past 600,000 cells in all, is left out whole and named in the legend
+  (Papahānaumokuākea at MUR's 0.01°). Over the slot the sliced places lose their fill (the slice is masked to them) and keep their class on
+  the outline, in the legend and in the table. The legend shows the ramp and a line with the layer's title, its step, how it is drawn
+  ("grid slice in the browser (DuckDB-WASM) from ERDDAP at <host>"), its range, and "loading the slice…" until it is in; the credit line
+  names the layer, its producers and its server. The select lists the ERDDAP datasets of the manifest's indicators, one entry per variable,
+  the shown indicator's dataset first.
+- **The engine chunk.** `gridSource.ts` is loaded with `import()` the first time a grid slot asks for a slice: `@oceanmetrics/engine`,
+  Apache Arrow, the mask (turf), hyparquet's codecs for the gazetteer's ZSTD GeoParquet, and DuckDB-WASM 1.32.0 (pinned exactly, as obis-hex
+  and atlas: 1.33 dev builds broke OPFS), whose mvp and eh wasm and worker files are self-hosted through `?url` imports and booted once a page
+  in its own Web Worker by `connectBrowser`. None of it is in the entry or the map chunk (README "Size budget"). A first slice of the
+  sanctuaries took 6 to 15 s from mount on 2026-10-23 (MUR monthly at 0.01°, `grid:jplMURSST41mday:sst`, 101,626 cells in 14 lobes, from
+  erddap.oceanmetrics.io; 13 to 45 s for MUR daily); a new `t` only refetches the slabs (`update(t)`, 17 to 21 s a step from MUR daily).
+  PacIOOS did not answer that night, so the layer shots use the mirror (`shoot.mjs --layer grid:jplMURSST41mday:sst`). Each slice logs its
+  time to the console (`[om] grid slice ...`). Where two places' boxes overlap the engine's `sliceSource` joins each cell twice (it reads the
+  lobes without DISTINCT); `uniqueCells` keeps one.
+- **The Period scrubber** (`TimeScrubber.svelte`, rules in `timeWindow.ts`): `t` is the handle and the right edge of a window
+  `[t - w, t]` drawn as a band behind it, `w` defaulting by grain (12 months, 10 years, 3 decades, 30 days). Brush across the track to set
+  the window (t is its later end), drag the band or the handle to pan it, the wheel over the track zooms it anchored at t, double-click
+  resets it; click sets t; arrows move t, Shift+arrows resize the window, Home/End and PageUp/PageDown jump. A drag asks for the period once,
+  on release. The slice always shows the step at t; the window is the view's own (not in the hash) and is what the live series reads once
+  it is on the Map (build week 3, 2026-11-13 to 11-19).
 - **Every group of the selection is a layered part** of the map, as a place set is (see below): `viewer/src/lib/map/selection.ts` turns the rules into groups; a group chosen in part
   (places picked by id, or some taken away) is drawn restricted to its chosen places (a vector filter; for a Marine Regions group an SLD filter on the
   MRGIDs, up to 120 of them: past that the whole group is drawn). Excluded places are not drawn and not in the legend or the table.
@@ -355,6 +394,15 @@ loaded on Export.
 
 With the layer slot (2026-10-22: `layerSlot.ts`, the `erddap` kind and its protocol, the "Layer under the map" select) the entry is 97.2 kB (the
 hash's `layer` codec), the other JS 196.5 kB and the map JS 293.4 kB of 330 (+2.7): the kind's code is in the map chunk, so nothing was lazy-loaded or raised.
+
+With the map packages (2026-10-23: MapLibre 6, `@oceanmetrics/map` with the CARTO basemap and the grid slot, the Period scrubber) the
+entry is 97.4 kB (the codec now comes from the package), the other JS 196.8 kB and the map JS 316.3 kB of 330 (+22.9: MapLibre 6 over 5.24,
+the package's setup, basemap and grid provider, the grid kind, the scrubber); nothing in the map chunk was lazy-loaded or raised. The engine
+is a new lazy chunk with its own line, **engine JS ≤ 160 kB**, now 139.2 kB (`gridSource.ts`: `@oceanmetrics/engine`, Apache Arrow, the mask,
+hyparquet's codecs), loaded on the first slice. The budget script tells chunks apart by Vite's manifest (`build.manifest`): a chunk belongs to
+a lazy root when only that root's static imports reach it. Outside every line, and printed: DuckDB-WASM's worker scripts (381.3 kB gzip) and
+wasm (eh 7.6 MB, mvp 8.7 MB gzip, one of them fetched by the engine's worker), the worker modules (`.mjs`, 147.1 kB: MapLibre's), and the map
+package's COG protocol chunks (219.6 kB, requested on the first `cog://`, which no kind registered here makes).
 
 ## Brand and icons
 
