@@ -609,6 +609,28 @@ With the shared bar (2026-10-23: `<om-nav>` from `@oceanmetrics/nav` 0.1.0, the 
 only for the Ocean Metrics instance (`main.ts`: `if (brand !== 'mbon') import('@oceanmetrics/nav/define')`), minus 2.2 kB for the header copy and the mark it replaces.
 The alternative, a static import into the entry, would make the MBON instance pay for a bar it never shows. The CSS is unchanged in budget.
 
+## Analytics
+
+Off unless the repository variable **`VITE_GA_ID`** (Settings -> Secrets and variables -> Actions -> Variables) holds a
+GA4 measurement id. `pages.yml` passes it to `vite build`; `viewer/src/lib/ga.ts` `gaId()` keeps it only when it matches
+`^G-[A-Z0-9]{4,16}$`, and `navAttrs()` (`viewer/src/lib/brand/brand.ts`) sets it on the bar as
+`<om-nav data-ga data-ga-keep="view" data-ga-title="Ocean Metrics Indicators">`. The bar (`@oceanmetrics/nav` >= 0.2.0,
+its README "Analytics") loads gtag.js once, with `anonymize_ip`, no Google signals and no ad personalization, and sends a
+page_view on load and on each step (pushState, hashchange) with a rebuilt `page_location`: origin + path + the hash's
+`view` and nothing else (no place, selection, period or report title). The page_title is fixed because a report's
+document title is the reader's own title. The MBON instance (`?brand=mbon`) has no bar and so no analytics, and the
+embeds load none. No id is written in the repo. The bar's loader adds 0.8 kB to the lazy nav chunk ("JS but map" 209.0
+of 210 kB on 2026-10-23).
+
+- `npm test`: `viewer/src/lib/ga.test.ts` (the id rule, and `scripts/check-ga.mjs` on small dists) and the `navAttrs`
+  cases in `brand.test.ts`.
+- `npm run check:ga` (after a build; `pages.yml` runs it with `--id "$VITE_GA_ID"`): no page carries a gtag.js script
+  tag, and a measurement id is in the bundle exactly when one was given.
+- In a browser: places' `web/scripts/ga-e2e.mjs --url <preview>/indicators/ --id G-TEST000000 --keep view` (this repo has
+  no Playwright) checked both builds on 2026-10-23.
+
+The GA4 stream's enhanced measurement "Page changes based on browser history events" must be off (the nav README says why).
+
 ## Brand and icons
 
 - **The bar:** the Ocean Metrics instance wears the shared bar of the apps and the site, `<om-nav current="indicators">`

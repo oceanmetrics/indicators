@@ -33,9 +33,15 @@ jobs:
         env:
           OM_OFFLINE: '1'
       - run: npm run check
+      # analytics only when the repository variable VITE_GA_ID is set (a GA4 id; the bar loads it, README "Analytics")
       - run: npm run build
         env:
           VITE_BASE: /indicators/
+          VITE_GA_ID: ${{ vars.VITE_GA_ID }}
+      # no gtag.js script tag in any page, and the id in the bundle exactly when the variable is set
+      - run: node scripts/check-ga.mjs viewer/dist --id "$VITE_GA_ID"
+        env:
+          VITE_GA_ID: ${{ vars.VITE_GA_ID }}
       - run: node scripts/size-budget.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
