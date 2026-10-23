@@ -49,7 +49,7 @@ WHERE time_grain = 'year' ORDER BY place_id, time;
 | `brand/` | Python, Node | icon pipeline (MDI by export name + generated glyphs + traced GOOS EOV glyphs), themes, favicons |
 | `assets/goos-eov/` | PNG, WebP | the GOOS EOV badges, unmodified (see its `SOURCE.md`) |
 | `viewer/` | Svelte 5 + Vite | the Matrix view on `indicators.json` + `coverage.parquet`, with `@marinebon/ui`; one selection (the Select section: places, indicators) shared by the Matrix, Map and Report views; places as rows with `#axes=p`, remove places or indicators with the x on a header (`px=`, `ix=`) and tick them back in a picker |
-| `catalog/` | (git-ignored) | build output, published to `s3://oceanmetrics.io-public/indicators/` |
+| `catalog/` | (git-ignored) | build output, published to `indicators/` of the bucket (both stores, `om-publish.sh`) |
 
 ## Commands
 
@@ -495,8 +495,8 @@ Anyone with a GitHub account can ask for an indicator the catalog does not hold 
      catalog is not rebuilt, and the bot comments that the values are computed but not published; the issue stays open.
      The default waits on the parity criterion (ledger 2026-10-23): the engine's sums differ from erddap-places'
      published ones in the last bits, so it writes nothing under `gazetteer/stats/` until "bit for bit" is restated.
-   - **`publish`:** the parquet, its provenance and then the item are uploaded to
-     `s3://oceanmetrics.io-public/gazetteer/stats/`, the item goes on the requested-items list, the catalog is rebuilt
+   - **`publish`:** the parquet, its provenance and then the item are uploaded to `gazetteer/stats/` of the bucket
+     (one `om-publish.sh` call, both stores), the item goes on the requested-items list, the catalog is rebuilt
      and published, and the bot comments the Place view link and closes the issue.
 
    Issue #1 (Wells NERR, precipitation) is the worked example (run by erddap-places before the switch).
@@ -537,7 +537,7 @@ account". Adding the `run` label (people with triage access only) starts the run
    in two windows), averages the cells whose centres fall inside the polygon at every month (the method of
    noaa-onms/eco-indicators, so sanctuary and EEZ values share one method), and writes month and year rows through the
    contract. It publishes the place's Parquet, its `provenance.json` and the merged `index.json` under
-   `s3://oceanmetrics.io-public/indicators/producers/cmems/` (not behind `OM_STATS_PUBLISH`: this folder is the
+   `indicators/producers/cmems/` of the bucket through `om-publish.sh` (not behind `OM_STATS_PUBLISH`: this folder is the
    producer's own, not `gazetteer/stats/`). The windows, the subset, the mean, the rows and the provenance are the
    reader's (`extract_place()`, `build_provenance()`); the producer keeps the request around them (the indicator check,
    the polygon, the folder, the index, the upload), and `tests/test_cmems_place_golden.py` holds it to the files it wrote
