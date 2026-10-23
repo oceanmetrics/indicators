@@ -72,7 +72,7 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   own `places` and `indicators` rules, in the hash as `pi`, `px` (place ids, `coll:<slug>`, `set:<id>`; default `coll:places`) and `ii`, `ix`
   (`*` = leads, `all`, `cat:`, `series:`, ids). The old keys (`colls`, `xp`, `xi`, `ai`, `leads`, a Map's `coll`) are read as the same selection on
   parse. Other hash keys: `q`, `vocab`, `depth`, `cell`, `axes=p`, `empty=1`, `t` (shared by every view since 2026-10-22; the Map reads it, the Matrix from
-  build week 3), the Map's `layer=<kind>:<id>[:<variable>]` (the layer slot, `map/layerSlot.ts`; `grid:dhw_5km:CRW_SST`), and the order `ps pg po is ig io` (README "Matrix view"). The place picker lists every polygon
+  build week 3), `t2` (the compare mode's second period, shared like `t`), the Map's `anom=1` and `layer=<kind>:<id>[:<variable>]` (the layer slot, `map/layerSlot.ts`; `grid:dhw_5km:CRW_SST`), and the order `ps pg po is ig io` (README "Matrix view"). The place picker lists every polygon
   collection of the gazetteer; the gazetteer's places are read lazily (`gazetteerPlaces.ts`), never for the default selection.
 - **The order of places and indicators** (`src/report/order.ts`, `ReportSpec.order`) is part of the shared selection: sort key, grouping on or off and a custom id list
   per axis (`ps pg po` / `is ig io`; `po`/`io` lead with `g:<group id>` entries). One tested ordering function serves the Matrix (`selectionRows`, `groupColumns`), the Report (`buildReport`), the Map's
@@ -92,7 +92,11 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   provisional ERDDAP WMS kind (`erddap:` links parse as `grid:`). The map runs on **MapLibre 6** (named imports only; worker chunks are `.mjs`, `vite.config.ts`) and boots on CARTO's style through
   `composeStyle(..., { dem: false })` (`VITE_BASEMAP_DEM=1` reads the GEBCO tiers from the bucket's path-style url until storage.oceanmetrics.io serves them). **The `clear()` rule:** what is the basemap's is `basemapLayerIds(style)` of the style set; `clear()` removes
   every other layer and source, a click tests those that are neither the basemap's nor `isSlotLayer`, and a theme flip is `setStyle(next, { diff: true, transformStyle: carryLayers(id => !basemap.has(id)) })`.
-  Never key on an id prefix such as `base-`: no CARTO layer has one. Every map shares one `setupMapLibre` (`map/setup.ts`); a `$effect` that makes a slot keys on strings
+  Never key on an id prefix such as `base-`: no CARTO layer has one. **Compare** (`map/compare.ts`, hash `t2` shared like `t`, the Map's `anom=1`): a second grid slot of the same layer at `t2`
+  (`companion()` in `gridKind.ts`, ids `slot:grid@t2`) above the first, clipped left of the swipe by two custom layers that set and clear the
+  WebGL scissor (one map, never a second canvas or a `setFilter` per frame); both slots on one scale (the union of their ranges), one slice per
+  period (`sliceCache.ts`), `t2 - t` in the engine's SQL (`gridAnomaly.ts`); `t` and `t2` are periods of the layer's grain, so erddap-places' `md` has no counterpart.
+  Every map shares one `setupMapLibre` (`map/setup.ts`); a `$effect` that makes a slot keys on strings
   (`layerKey`, the places' key), never on `view`, which is a new object on every hash change, or a new `t` remakes the slot instead of `update(t)`.
 - **The pickers** (`viewer/src/lib/pick/`): one place picker and one indicator picker for every view, the rules in plain
   `.ts` (`places.ts`, `placesTree.ts`, `indicators.ts`, `indicatorsTree.ts`; the `*Tree` files and the panels load on the

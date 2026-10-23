@@ -10,9 +10,10 @@
   // under the places, the layer the hash's `layer` names (layerSlot.ts; the `grid` kind: a slice of the dataset at the step of `t`,
   // computed in the browser over the places drawn, gridKind.ts). the Period scrubber moves `t` and the window [t - w, t] behind it.
   // the group's members that are not computed are drawn faint (and as a small hollow circle from far away), and a click on one offers
-  // the next steps.
+  // the next steps. Compare (the hash's t2, compare.ts) draws the same layer at a second period left of a swipe handle, or with
+  // anom=1 the difference t2 - t per cell; the legend names both periods.
   import { onMount, untrack } from 'svelte'
-  import { Button, Notice, Select } from '@marinebon/ui'
+  import { Button, Notice, Select, Toggle } from '@marinebon/ui'
   import { Icon } from '../../../../src/icons/index.ts'
   import { periodLabel } from '@oceanmetrics/status'
   import type { MethodId } from '@oceanmetrics/status'
@@ -41,6 +42,8 @@
   import { layerChoices, leftOutLine, slicedIds, slicePlaces, slicePlacesKey, slotLegendLine, stepDate } from './gridLayer.ts'
   import { defaultWindow } from './timeWindow.ts'
   import TimeScrubber from './TimeScrubber.svelte'
+  import SwipeHandle from './SwipeHandle.svelte'
+  import { compareLegendLine, defaultT2 } from './compare.ts'
   import { loadGazetteer } from './gazetteer.ts'
   import type { GazLayer } from './gazetteer.ts'
   import { buildParts, partsBbox } from './parts.ts'
@@ -231,6 +234,39 @@
   // the places the slice covers: their fills give way to it (MapCanvas), the ones it leaves out keep theirs
   const sliced = $derived.by(() => { void slotTick; return slicedIds(sliceSel.places, (slot as GridLayerSlot | null)?.leftOut?.() ?? [], slotLegend, !!slot) })
 
+  // ---- compare: the same layer at a second period t2 (the hash's), left of the swipe; or t2 - t per cell (anom=1) ----
+  const compareOn = $derived(!!view.t2)
+  const anomOn = $derived(!!view.t2 && view.anom)
+  const slot2T = $derived(stepDate(view.t2))
+  let slot2 = $state.raw<LayerSlot | null>(null)
+  let slot2Tick = $state(0)
+  $effect(() => {
+    const first = slot as GridLayerSlot | null
+    const on = compareOn, a = anomOn
+    slot2 = null
+    if (!first?.companion || !on) return
+    let live = true
+    slot2 = first.companion({ anom: a, onchange: () => { if (live) slot2Tick++ } })
+    return () => { live = false }
+  })
+  const slot2Legend = $derived.by(() => { void slot2Tick; void slotTick; return slot2?.legend() ?? null })
+  // the handle's position: the hash's (written on release), followed live while a drag runs
+  let swipeLive = $state<number | null>(null)
+  const swipeHash = $derived(view.swipe ?? 0.5)
+  $effect(() => { void swipeHash; swipeLive = null })
+  const swipeF = $derived(swipeLive ?? swipeHash)
+  const t2Options = $derived.by(() => {
+    if (!model) return []
+    const opts = periods.map(p => ({ value: periodToT(p, model.grain), label: periodLabel(p, model.grain) }))
+    if (view.t2 && !opts.some(o => o.value === view.t2)) opts.unshift({ value: view.t2, label: view.t2 })
+    return opts
+  })
+  const t2Default = $derived(model ? defaultT2(periods, idxNow, win) : null)
+  const periodOf = (t: string | null) => (t && model ? periodLabel(t, model.grain) : 'the latest time')
+  // the periods asked for (a slot's legend has its t only once mounted)
+  const leftLabel = $derived(periodOf(slot2T))
+  const rightLabel = $derived(periodOf(slotT))
+
   const placeName = (id: string) => places?.find(p => p.id === id)?.name ?? idx?.places.find(p => p.id === id)?.name ?? titles(id)
   const slotLine = $derived.by(() => {
     void slotTick
@@ -238,7 +274,10 @@
     if (!l || !model) return slotError
     const g = slot as GridLayerSlot | null
     const left = g?.leftOut ? leftOutLine(g.leftOut(), g.without(), placeName) : ''
-    return slotLegendLine(l, t => periodLabel(t, model.grain)) + (left ? ` · ${left}` : '')
+    void slot2Tick
+    const l2 = slot2?.legend() ?? null
+    const line = l2 ? compareLegendLine({ title: l.title, via: l.via, first: { ...l, t: slotT }, second: { ...l2, t: slot2T }, anom: anomOn }, t => periodLabel(t, model.grain)) : slotLegendLine(l, t => periodLabel(t, model.grain))
+    return line + (left ? ` · ${left}` : '')
   })
 
   // ---- the selected place (the hash's `place`): computed, or a member the group has not computed yet ----
@@ -351,6 +390,14 @@
     <div class="group layer">
       <Select label="Layer under the map" value={view.layer ?? ''} options={layerOptions} onchange={(v: string) => onpatch({ layer: v || null })} />
     </div>
+    <div class="group compare" role="group" aria-label="Compare two periods">
+      <Toggle label="Compare" hint={view.layer ? 'the layer at a second period, with a swipe' : 'choose a layer under the map first'} checked={compareOn}
+        disabled={!view.layer || periods.length < 2} onchange={(on: boolean) => onpatch(on ? { t2: t2Default ? periodToT(t2Default, model.grain) : null } : { t2: null, anom: false, swipe: null })} />
+      {#if compareOn}
+        <div class="with"><Select label="Compare with" value={view.t2 ?? ''} options={t2Options} onchange={(v: string) => onpatch({ t2: v || null })} /></div>
+        <Toggle label="Difference" hint={`${leftLabel} minus ${rightLabel}, per cell`} checked={anomOn} onchange={(a: boolean) => onpatch({ anom: a })} />
+      {/if}
+    </div>
   </section>
 
   {#if notice}<p class="notice" role="status"><Icon name="ui-info" size={16} />{notice}</p>{/if}
@@ -364,7 +411,9 @@
       <div class="frame">
         {#if parts.length}
           <MapCanvas {parts} {bbox} {colors} line={lineColor} none={noneColor} nofill={nofillColor} faint={faintColor} focus={focusColor} {dark} selected={selectedId} proj={view.proj} {marker}
-            {onpick} onstate={s => (drawn = s)} label={`Map of ${ind.short} by place`} {slot} {slotT} {sliced} oncredit={c => (baseCredit = c)} />
+            {onpick} onstate={s => (drawn = s)} label={`Map of ${ind.short} by place`} {slot} {slotT} {sliced} oncredit={c => (baseCredit = c)}
+            {slot2} {slot2T} swipe={swipeF} anom={anomOn} />
+          {#if slot2 && !anomOn}<SwipeHandle value={swipeF} left={leftLabel} right={rightLabel} onchange={f => (swipeLive = f)} oncommit={f => onpatch({ swipe: f })} />{/if}
           <MapFrameControls target={fsEl} proj={view.proj} onproj={p => onpatch({ proj: p })} bind:mode={full} />
         {:else if layerError}
           <div class="msg"><Notice kind="error">{layerError}</Notice></div>
@@ -378,7 +427,7 @@
     </div>
 
     <aside class="side">
-      <MapLegend {model} unit={ind.unit_label ?? ''} layer={slotLine} ramp={slotLegend?.ramp ?? null} rampUnit={slotLegend?.units ?? ''} />
+      <MapLegend {model} unit={ind.unit_label ?? ''} layer={slotLine} ramp={(anomOn ? slot2Legend?.ramp : slotLegend?.ramp) ?? null} rampUnit={slotLegend?.units ?? ''} />
       <section class="pick" aria-labelledby="pick-h" aria-live="polite">
         <h2 id="pick-h" class="mbon-label">Selected place</h2>
         {#if selectedId}
@@ -420,6 +469,8 @@
   .group { display: grid; gap: var(--space-2); min-width: 0; }
   .group.slide { min-width: min(20rem, 100%); flex: 1; max-width: 32rem; }
   .group.layer { width: min(18rem, 100%); }
+  .group.compare { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-2) var(--space-5); min-width: 0; flex: 1 1 100%; }
+  .group.compare .with { width: min(10rem, 100%); }
   .row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
   .one { font: var(--fw-semibold) var(--text-sm) / 1 var(--font-mono); color: var(--text-strong); }
   .notice { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: var(--space-2) var(--space-3); background: var(--bg-tint); border-radius: var(--radius-sm); font: var(--type-small); color: var(--text-strong); }

@@ -402,3 +402,44 @@ describe('the layer under the map (layer=<kind>:<id>[:<variable>])', () => {
     expect(parseHash('#view=map&layer=grid:a%20b').layer).toBeNull()
   })
 })
+
+describe('the compare mode: t2 (shared like t) and anom=1 (the Map\'s)', () => {
+  const COMPARE = 'view=map&ind=erddap:dhw_5km:CRW_SST:mean&layer=grid:jplMURSST41mday:sst&t=2024-07&t2=2016-07'
+  it('the gate\'s link round-trips: t2 after t, anom after them', () => {
+    const s = parseHash('#' + COMPARE)
+    expect(s.t).toBe('2024-07')
+    expect(s.t2).toBe('2016-07')
+    expect(s.anom).toBe(false)
+    expect(serializeHash(s)).toBe(COMPARE)
+    const a = parseHash('#' + COMPARE + '&anom=1')
+    expect(a.anom).toBe(true)
+    expect(serializeHash(a)).toBe(COMPARE + '&anom=1')
+  })
+  it('absent t2 is compare off; anom without t2 is dropped, and a malformed t2 too', () => {
+    expect(parseHash('#view=map&t=2024').t2).toBeNull()
+    expect(parseHash('#view=map&anom=1').anom).toBe(false)
+    expect(serializeHash(parseHash('#view=map&anom=1'))).toBe('view=map')
+    expect(parseHash('#view=map&t2=then').t2).toBeNull()
+    expect(serializeHash(st({ view: 'map', anom: true }))).toBe('view=map')
+  })
+  it('swipe: the handle\'s share of the width, three decimals, the middle left out, written only for the swipe (not the anomaly)', () => {
+    expect(parseHash('#' + COMPARE + '&swipe=0.35').swipe).toBe(0.35)
+    expect(serializeHash(parseHash('#' + COMPARE + '&swipe=0.35'))).toBe(COMPARE + '&swipe=0.35')
+    expect(serializeHash(st({ ...parseHash('#' + COMPARE), swipe: 0.123456 }))).toBe(COMPARE + '&swipe=0.123')
+    expect(parseHash('#' + COMPARE + '&swipe=0.5').swipe).toBeNull()
+    expect(parseHash('#' + COMPARE + '&swipe=7').swipe).toBe(1)
+    expect(parseHash('#' + COMPARE + '&swipe=left').swipe).toBeNull()
+    expect(serializeHash(parseHash('#' + COMPARE + '&anom=1&swipe=0.35'))).toBe(COMPARE + '&anom=1')
+    expect(serializeHash(st({ view: 'map', swipe: 0.3 }))).toBe('view=map')
+  })
+  it('t2 is written in every view and carried by a switch of views, as t is; anom is the Map\'s alone', () => {
+    expect(serializeHash(st({ t: '2024', t2: '2016' }))).toBe('t=2024&t2=2016')
+    expect(serializeHash(st({ view: 'report', t2: '2016' }))).toBe('view=report&t2=2016')
+    expect(serializeHash(st({ view: 'place', place: 'NMS:A', t2: '2016', anom: true }))).toBe('view=place&place=NMS:A&t2=2016')
+    const at = { ...from, t: '2024-07', t2: '2016-07' }
+    expect(mapToMatrixHref(at, null, null)).toBe('#t=2024-07&t2=2016-07')
+    expect(placeHref(at, 'NMS:A')).toBe('#view=place&place=NMS:A&t=2024-07&t2=2016-07')
+    expect(matrixToMapHref(at, null)).toBe('#view=map&t=2024-07&t2=2016-07')
+    expect(serializeHash(carryOver(st({ view: 'map', t2: '2010' }), from))).toBe('view=map')
+  })
+})

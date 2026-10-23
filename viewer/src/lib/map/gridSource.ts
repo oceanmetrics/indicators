@@ -16,6 +16,8 @@ import type { Geometry } from 'geojson'
 import { axisSteps, budgetLobes, placesParquetUrl } from './gridLayer.ts'
 import type { SlicePlace } from './gridLayer.ts'
 import { groupsFor, rowsToPlaces } from './placeGeometry.ts'
+import { anomalyRows } from './gridAnomaly.ts'
+import type { SliceCell } from '@oceanmetrics/map'
 import type { GeoPlace, MetaLike } from './placeGeometry.ts'
 
 // ---- the engine: one DuckDB-WASM a page, in its worker ----
@@ -67,6 +69,8 @@ export interface GridSource {
   /** cells per step the slice holds, and how many lobes ask ERDDAP for them */
   cells: number
   lobes: number
+  /** `now - then` per cell of `now`, in the engine's SQL (the compare mode's anomaly) */
+  anomaly(then: readonly SliceCell[], now: readonly SliceCell[]): Promise<SliceCell[]>
 }
 
 /**
@@ -87,5 +91,6 @@ export async function prepareGridSource(collection: unknown, variableName: strin
   return {
     source: sliceSource({ dataset: ds, variable, axes, mask: cells, engine: theEngine(), extent }),
     left: [...left, ...missing], cells: cells.length, lobes: kept.length,
+    anomaly: (then, now) => anomalyRows(theEngine(), then, now),
   }
 }

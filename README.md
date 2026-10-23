@@ -230,7 +230,8 @@ value (five quantile classes), its departure from the place's own mean (in SD), 
 `@oceanmetrics/status` as of the period shown), the length of its record, or, for a categorical indicator, its largest class or the share of
 one class. The Period scrubber walks the periods. Hash keys: `ind` (the indicator: the hash's when it is in the selection, else the first selected one with
 values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` (the place selected), `color` (`value|departure|status|trend|record|class|share`), `t`
-(shared by every view: `2024` or `2024-07`; none = each place's latest), `cls` (the class `share` maps), `grain`, `proj` (`globe`; absent = the flat map), `layer`
+(shared by every view: `2024` or `2024-07`; none = each place's latest), `t2` (the second period of the compare mode, shared like `t`; absent = off),
+`anom` (`1`: the compare mode draws `t2 - t`), `swipe` (the compare handle, 0..1), `cls` (the class `share` maps), `grain`, `proj` (`globe`; absent = the flat map), `layer`
 (the layer under the map, below) and `method`. The grammar did not change with the packages below.
 - **The map stack** is `@oceanmetrics/map` (the slot contract, `setupMapLibre`, the basemap, the ramps, the grid provider) and
   `@oceanmetrics/engine` (the mask, the lobes, the ERDDAP requests, DuckDB-WASM, the slice) on MapLibre 6 (named imports: it has no
@@ -271,7 +272,8 @@ values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` 
   in its own Web Worker by `connectBrowser`. None of it is in the entry or the map chunk (README "Size budget"). A first slice of the
   sanctuaries took 6 to 15 s from mount on 2026-10-23 (MUR monthly at 0.01°, `grid:jplMURSST41mday:sst`, 101,626 cells in 14 lobes, from
   erddap.oceanmetrics.io; 13 to 45 s for MUR daily); a new `t` only refetches the slabs (`update(t)`, 17 to 21 s a step from MUR daily).
-  PacIOOS did not answer that night, so the layer shots use the mirror (`shoot.mjs --layer grid:jplMURSST41mday:sst`). Each slice logs its
+  The axes and polygons of a slot are asked once more after 1.5 s when the first try fails (`RETRY_MS`; the mirror
+  answered 404 to a lobe's axis request on 2026-10-23, and later "Currently unknown datasetID" for a while). PacIOOS did not answer that night, so the layer shots use the mirror (`shoot.mjs --layer grid:jplMURSST41mday:sst`). Each slice logs its
   time to the console (`[om] grid slice ...`). Where two places' boxes overlap, the engine's `sliceSource` reads the lobes' slabs with
   `SELECT DISTINCT` (engine 0.1.1), so a cell of the overlap is drawn once; the squares of a 0.05° or finer grid have no outline (map 0.2.2).
 - **The Period scrubber** (`TimeScrubber.svelte`, rules in `timeWindow.ts`): `t` is the handle and the right edge of a window
@@ -280,6 +282,26 @@ values in the selected places), the selection (`pi`, `px`, `ii`, `ix`), `place` 
   resets it; click sets t; arrows move t, Shift+arrows resize the window, Home/End and PageUp/PageDown jump. A drag asks for the period once,
   on release. The slice always shows the step at t; the window is the view's own (not in the hash) and is what the live series reads once
   it is on the Map (build week 3, 2026-11-13 to 11-19).
+- **Compare: Then vs Now as two slices of one layer** (`compare.ts`; `t2=<period>` in the hash, shared like `t`, absent = off; the
+  "Compare" Toggle beside the Period scrubber, its "Compare with" period and the "Difference" Toggle). The layer is drawn at `t` (the
+  scrubber's) and a second grid slot of the same layer at `t2` (`gridSlot`'s `instance`, ids `slot:grid@t2`, map 0.2.3) sits just above
+  it, cut to the left of a swipe handle: **one MapLibre map, two layer groups**, the second slot's fill bracketed by two custom layers
+  that set and clear the WebGL scissor box (MapLibre 6 uses the scissor only for its debug drawing). That is erddap-places'
+  `thenNow/swipe.ts` `clipFor` (a CSS clip of the right-hand map of two synced maps) inside one canvas: a straight screen line on the
+  flat map and the globe, nothing re-laid-out while the handle or the camera moves. A `setFilter` on the cells' `lon` was the other
+  one-map way and was not taken: it rebuilds every tile of a 100,000-square GeoJSON source each frame, and on the globe a meridian is
+  not a screen line. Then (`t2`, usually the earlier) is on the left, Now (`t`) on the right, as in erddap-places; the handle moves by drag
+  or by its keys (arrows 5 %, Shift 1 %, Home/End, PageUp/PageDown), and its position is `swipe=` in the hash (0..1, three decimals,
+  the middle left out; written on release, not on every frame of a drag), as erddap-places had it. Both slots
+  draw on **one colour scale**, the union of the two slices' ranges (a `domain` function and `repaint()`), and share one slice per period
+  (`sliceCache.ts`: a period asked twice is fetched once; a request is aborted only when no slot waits for it). **`anom=1`** draws
+  `t2 - t` per cell, computed in the engine's SQL from the two slices (`gridAnomaly.ts`: both into DuckDB-WASM, `anomalySql`, NULL where
+  either period has no data), on the diverging `balance` ramp symmetric about 0; as in erddap-places the swipe is hidden and the
+  difference covers the map (the slot at `t` is hidden under it). The legend names both periods ("left of the handle 2016-07 · right
+  2024-07 · one colour scale over both periods", or "2016-07 minus 2024-07, per cell · blue lower in 2016-07, red higher"). erddap-places
+  pairs a day of the year (`md`) across a climatology and a year; here `t` and `t2` are periods of the layer's grain (a month of MUR
+  monthly, a year of a yearly grid), each one step of the dataset, so no day-of-year pairing is needed. Its exceedance pill and the
+  anomaly series of the Time strip go with the live series (build week 3).
 - **Every group of the selection is a layered part** of the map, as a place set is (see below): `viewer/src/lib/map/selection.ts` turns the rules into groups; a group chosen in part
   (places picked by id, or some taken away) is drawn restricted to its chosen places (a vector filter; for a Marine Regions group an SLD filter on the
   MRGIDs, up to 120 of them: past that the whole group is drawn). Excluded places are not drawn and not in the legend or the table.
@@ -403,6 +425,10 @@ hyparquet's codecs), loaded on the first slice. The budget script tells chunks a
 a lazy root when only that root's static imports reach it. Outside every line, and printed: DuckDB-WASM's worker scripts (381.3 kB gzip) and
 wasm (eh 7.6 MB, mvp 8.7 MB gzip, one of them fetched by the engine's worker), the worker modules (`.mjs`, 147.1 kB: MapLibre's), and the map
 package's COG protocol chunks (219.6 kB, requested on the first `cog://`, which no kind registered here makes).
+
+With the compare mode (2026-10-23: `t2`, `anom` and `swipe` in the hash, `compare.ts`, the swipe handle, the kit's Toggle, the slice cache, the
+companion slot, the anomaly SQL) the entry is 97.6 kB (+0.2, the hash keys), the other JS 197.0 kB, the map JS 319.9 kB of 330 (+3.5) and the
+engine JS 139.5 kB of 160 (+0.3, `gridAnomaly.ts`); nothing was raised.
 
 ## Brand and icons
 

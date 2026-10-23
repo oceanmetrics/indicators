@@ -1,7 +1,7 @@
 // screenshots with the real catalog: the Matrix (matrix_<brand>_<theme>[_390].png, places as rows matrix_*_placerows*,
 // the place and indicator pickers open matrix_*_places_picker and matrix_*_indicators_picker, the Select section select_*, a group
 // nothing is computed for uncomputed_*, the drawer), the Place view (place_<place>_<brand>_<theme>[_390].png), the
-// Map view (map_<indicator>_<color>_<theme>[_390].png; the layer under it map_layer_*), the Report view (report_*: the Scorecard, the Cards report, the
+// Map view (map_<indicator>_<color>_<theme>[_390].png; the layer under it map_layer_*, the compare mode map_compare_*), the Report view (report_*: the Scorecard, the Cards report, the
 // open builder over budget, the print preview, Small multiples, the Quad plot, the Map sheet and the Dossier), the order of the rows
 // and columns (order_*: the Order control open, a flat north-to-south order in both orientations, a custom order, a drag in progress with
 // its drop bar and a refused drop, the move buttons on focus) and the embed route (embed_*).
@@ -37,6 +37,10 @@ const MPA = 'view=map&ind=sdg:ER_MRN_MPA&pi=coll:mr_eez&color=value'
 // the layer under the map: a grid slice of the dataset at the step of t, computed in the browser. --layer swaps the dataset
 // (`--layer grid:jplMURSST41mday:sst`, the oceanmetrics mirror, when PacIOOS does not answer)
 const LAYER = SST + '&grain=month&t=2024-07&layer=' + arg('--layer', 'grid:dhw_5km:CRW_SST')
+// the compare mode: the layer at t (July 2024) right of the swipe and at t2 (July 2016) left of it, one scale over both; anom=1 the
+// difference. MUR monthly from the oceanmetrics mirror (PacIOOS has been down); 1280 wide, as the gate asks
+const COMPARE = SST + '&grain=month&t=2024-07&t2=2016-07&layer=' + arg('--compare-layer', 'grid:jplMURSST41mday:sst')
+const WIDE = { width: 1280, height: 1500, deviceScaleFactor: 2 }
 const FKNMS = 'view=place&place=NMS:FKNMS'
 const FKNMS_SST = 'cell=NMS:FKNMS|erddap:dhw_5km:CRW_SST:mean'
 // the way forward from an empty cell: Wells (a NERRS reserve) has no sea surface temperature computed (not computed yet), and the
@@ -217,6 +221,15 @@ const SHOTS = [
   ['map_layer_sst_cinms_oceanmetrics_light', 'oceanmetrics', 'light', MAP, LAYER + '&place=NMS:CINMS'],
   ['map_layer_sst_fknms_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, LAYER + '&place=NMS:FKNMS'],
   ['map_layer_sst_cinms_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, LAYER + '&place=NMS:CINMS'],
+  ['map_compare_sst_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, COMPARE],
+  ['map_compare_sst_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, COMPARE],
+  ['map_compare_sst_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, COMPARE],
+  ['map_compare_sst_oceanmetrics_dark_390', 'oceanmetrics', 'dark', MAP_PHONE, COMPARE],
+  // closer: the swipe through the Channel Islands, and the difference (anom=1) there
+  ['map_compare_sst_cinms_oceanmetrics_light', 'oceanmetrics', 'light', WIDE, COMPARE + '&place=NMS:CINMS'],
+  ['map_compare_sst_cinms_anom_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, COMPARE + '&place=NMS:CINMS&anom=1'],
+  ['map_compare_sst_cinms_globe_oceanmetrics_dark', 'oceanmetrics', 'dark', WIDE, COMPARE + '&place=NMS:CINMS&proj=globe&swipe=0.35'],
+  ['map_compare_sst_cinms_anom_oceanmetrics_light_390', 'oceanmetrics', 'light', MAP_PHONE, COMPARE + '&place=NMS:CINMS&anom=1'],
   ['map_sdg1451_value_oceanmetrics_light', 'oceanmetrics', 'light', MAP, MPA],
   ['map_sdg1451_value_oceanmetrics_dark', 'oceanmetrics', 'dark', MAP, MPA],
   // OBIS, the CoastWatch OBIS replacement: species of fish per EEZ, by year and by decade
@@ -386,7 +399,7 @@ try {
     // computed; the legend says "loading the slice" until it is drawn (or says why not), then the map is idle again
     if (hash.includes('layer=')) {
       const t0 = Date.now()
-      await page.waitForFunction(() => { const t = document.querySelector('.legend')?.textContent ?? ''; return /Layer:/.test(t) && !/loading the slice/.test(t) }, { timeout: 180000 })
+      await page.waitForFunction(() => { const t = document.querySelector('.legend')?.textContent ?? ''; return /Layer:|Compare:|Difference:/.test(t) && !/loading the slice/.test(t) }, { timeout: 180000 })
       console.log('   layer legend settled in', Date.now() - t0, 'ms:', await page.evaluate(() => [...document.querySelectorAll('.legend .note')].map(n => n.textContent).join(' | ')))
       await new Promise(r => setTimeout(r, 500))
       await page.waitForSelector('.map[data-state=done]', { timeout: 90000 })

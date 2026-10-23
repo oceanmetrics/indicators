@@ -9,10 +9,13 @@
   // the period `slotT`; its ids start `slot:`), under the first part's fill, else under the basemap's sea surface. what is
   // the basemap's is the layer ids of the style set (`basemapLayerIds`): clear() removes every other layer, a click tests
   // the others that are not the slot's, and a theme flip carries them into the next style (`carryLayers`). this component
-  // only draws: the classes, colours and credits come in as props, and a click goes out as a place id.
+  // only draws: the classes, colours and credits come in as props, and a click goes out as a place id. the compare mode
+  // (compare.ts) adds a second slot of the same layer (`slot2`, ids `slot:grid@t2`) just above the first, clipped to the left of
+  // the swipe handle by two custom layers around its fill that set and clear the WebGL scissor box: one map, two layer groups.
+  // with the anomaly the second slot is drawn whole and the first is hidden.
   import { onMount, untrack } from 'svelte'
   import { Map as MlMap, NavigationControl, ScaleControl } from 'maplibre-gl'
-  import type { GeoJSONSource, MapMouseEvent, RasterTileSource, StyleSpecification } from 'maplibre-gl'
+  import type { CustomLayerInterface, GeoJSONSource, MapMouseEvent, RasterTileSource, StyleSpecification } from 'maplibre-gl'
   import 'maplibre-gl/dist/maplibre-gl.css'
   import { BASEMAP_URL, basemapLayerIds, baseStyle, composeStyle, DEFAULT_TILES, seaSurfaceId } from '@oceanmetrics/map'
   import { setupMap } from './setup.ts'
@@ -29,6 +32,9 @@
   import type { WmsEntry } from './wms.ts'
   import { carryLayers, isSlotLayer, slotBeforeId } from './layerSlot.ts'
   import type { LayerSlot } from './layerSlot.ts'
+  import { GRID_LAYER } from '@oceanmetrics/map'
+  import type { GridSlot } from '@oceanmetrics/map'
+  import { scissorBox } from './compare.ts'
 
   interface Props {
     parts: MapPart[]
@@ -65,8 +71,15 @@
     sliced?: string[] | null
     /** the basemap's credit line, from the attribution of the style in force (called each time a style is set) */
     oncredit?: (credit: string) => void
+    /** the compare mode: a second slot of the slot's layer at `slot2T`, left of the swipe handle at `swipe` (0..1 of the width);
+     * with `anom` it is the difference, drawn whole, and the first slot is hidden */
+    slot2?: LayerSlot | null
+    slot2T?: string | null
+    swipe?: number
+    anom?: boolean
   }
-  let { parts, bbox, colors, line, none, nofill, faint, focus, dark, selected, proj = null, marker, onpick, onstate, label, compact = false, fitIds = null, onhover, slot = null, slotT = null, sliced = null, oncredit }: Props = $props()
+  let { parts, bbox, colors, line, none, nofill, faint, focus, dark, selected, proj = null, marker, onpick, onstate, label, compact = false, fitIds = null, onhover, slot = null, slotT = null, sliced = null, oncredit,
+    slot2 = null, slot2T = null, swipe = 0.5, anom = false }: Props = $props()
 
   let box: HTMLDivElement | undefined = $state()
   let phase = $state<'loading' | 'done'>('loading')
@@ -117,7 +130,7 @@
     m.setStyle(next, { diff: true, transformStyle: carryLayers(id => !old.has(id)) })
     setBasemap(next)
     styledDark = d
-    if (styleReady(m)) setRing(m)
+    if (styleReady(m)) { setRing(m); placeSwipe(m) }
     else m.once('style.load', () => { setRing(m); untrack(sync) })
   }
 
@@ -288,7 +301,7 @@
       })
       m.on('mouseout', () => onhover?.(null))
     })()
-    return () => { dead = true; clearInterval(poll); ro?.disconnect(); made?.remove(); map = null; ready = false; shown = null; mounted = null }
+    return () => { dead = true; clearInterval(poll); ro?.disconnect(); made?.remove(); map = null; ready = false; shown = null; mounted = null; mounted2 = null }
   })
 
   const hitLayers = (m: MlMap, i: number) => [`${sid(i)}:fill`, `${sid(i)}:dots`].filter(id => hits(id) && m.getLayer(id))
@@ -338,6 +351,8 @@
   // ---- the data layers ----
   // everything the basemap does not name goes, the slot's `slot:` layers with it
   function clear(m: MlMap) {
+    // custom layers are not in getStyle(): the swipe's two go by name
+    for (const id of [SWIPE_ON, SWIPE_OFF]) if (m.getLayer(id)) m.removeLayer(id)
     for (const l of m.getStyle().layers) if (isOurs(l.id)) m.removeLayer(l.id)
     for (const id of Object.keys(m.getStyle().sources)) if (!baseSources.has(id)) m.removeSource(id)
   }
@@ -347,11 +362,64 @@
   let mounted: LayerSlot | null = null
   let mountedT: string | null = null
   function mountSlot(m: MlMap) {
+    unmountSlot2(m)
     mounted?.unmount(m)
     mounted = slot
     mountedT = slotT
-    slot?.mount(m, slotBeforeId(m.getStyle().layers.map(l => l.id).filter(isOurs), { fallback: sea }), slotT)
+    const before = slotBeforeId(m.getStyle().layers.map(l => l.id).filter(isOurs), { fallback: sea })
+    slot?.mount(m, before, slotT)
+    mountSlot2(m, before)
     waitSlot(m)
+  }
+
+  // ---- the compare slot and the swipe ----
+  let mounted2: LayerSlot | null = null
+  let mounted2T: string | null = null
+  const SWIPE_ON = 'slot:swipe:on'
+  const SWIPE_OFF = 'slot:swipe:off'
+  // what the scissor reads each frame: the swipe fraction, or null to draw the second slot whole (the anomaly)
+  let clipAt: number | null = null
+  const swipeOn: CustomLayerInterface = {
+    id: SWIPE_ON, type: 'custom', renderingMode: '2d',
+    render(gl) {
+      if (clipAt == null) return
+      const [x, y, w, h] = scissorBox(clipAt, gl.drawingBufferWidth, gl.drawingBufferHeight)
+      gl.enable(gl.SCISSOR_TEST)
+      gl.scissor(x, y, w, h)
+    },
+  }
+  const swipeOff: CustomLayerInterface = { id: SWIPE_OFF, type: 'custom', renderingMode: '2d', render(gl) { gl.disable(gl.SCISSOR_TEST) } }
+  const layerOf = (sl: LayerSlot | null) => (sl ? (sl as Partial<GridSlot>).ids?.layer ?? GRID_LAYER : null)
+  function unmountSlot2(m: MlMap) {
+    for (const id of [SWIPE_ON, SWIPE_OFF]) if (m.getLayer(id)) m.removeLayer(id)
+    mounted2?.unmount(m)
+    mounted2 = null
+  }
+  /** the second slot just above the first (under `before`, else under the layer that follows the first) */
+  function mountSlot2(m: MlMap, before?: string | null) {
+    unmountSlot2(m)
+    mounted2 = mounted && slot2 ? slot2 : null
+    mounted2T = slot2T
+    if (mounted2) {
+      const ids = m.getStyle().layers.map(l => l.id)
+      const first = layerOf(mounted)
+      const at = before !== undefined ? before : (first && ids.includes(first) ? ids[ids.indexOf(first) + 1] ?? null : null)
+      mounted2.mount(m, at, slot2T)
+    }
+    placeSwipe(m)
+  }
+  /** the scissor pair around the second slot's fill, and the first slot hidden under the anomaly */
+  function placeSwipe(m: MlMap) {
+    for (const id of [SWIPE_ON, SWIPE_OFF]) if (m.getLayer(id)) m.removeLayer(id)
+    clipAt = anom ? null : swipe
+    const first = layerOf(mounted)
+    if (first && m.getLayer(first)) m.setLayoutProperty(first, 'visibility', mounted2 && anom ? 'none' : 'visible')
+    const second = layerOf(mounted2)
+    if (!second || !m.getLayer(second)) return
+    const ids = m.getStyle().layers.map(l => l.id)
+    const next = ids[ids.indexOf(second) + 1]
+    m.addLayer(swipeOn, second)
+    m.addLayer(swipeOff, next)
   }
   // a new slot source has asked for no tile yet, so "every tile is in" is true at once: until the map has been idle once since,
   // the slow poll in settle() does not call the map done (the slot's tiles are slow: a WMS draws each one)
@@ -408,9 +476,15 @@
       settle(m)
       return
     }
-    // same parts: repaint; a new slot is mounted, the same one draws the period asked for
+    // same parts: repaint; a new slot is mounted, the same one draws the period asked for (and the anomaly, which reads it, too)
     if (mounted !== slot) mountSlot(m)
-    else if (slot && mountedT !== slotT) { mountedT = slotT; slot.update(slotT); waitSlot(m) }
+    else {
+      const moved = !!slot && mountedT !== slotT
+      if (moved) { mountedT = slotT; slot!.update(slotT); waitSlot(m) }
+      if (mounted2 !== (mounted && slot2 ? slot2 : null)) { mountSlot2(m); waitSlot(m) }
+      else if (mounted2 && (mounted2T !== slot2T || (anom && moved))) { mounted2T = slot2T; mounted2.update(slot2T); waitSlot(m) }
+      else placeSwipe(m)
+    }
     setRing(m)
     parts.forEach((part, i) => {
       if (part.kind === 'vector') {
@@ -440,8 +514,16 @@
 
   $effect(() => {
     // every input the drawing reads, so a change redraws; the drawing itself reads no state
-    void [parts, bbox, colors, line, none, nofill, faint, focus, selected, marker, ready, fitIds, slot, slotT, sliced]
+    void [parts, bbox, colors, line, none, nofill, faint, focus, selected, marker, ready, fitIds, slot, slotT, sliced, slot2, slot2T, anom]
     if (ready) untrack(sync)
+  })
+
+  // ---- the swipe moves: the scissor reads it on the next frame, nothing else is redrawn ----
+  $effect(() => {
+    const f = swipe
+    if (!ready || !map) return
+    clipAt = anom ? null : f
+    map.triggerRepaint()
   })
 </script>
 

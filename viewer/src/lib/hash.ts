@@ -11,7 +11,9 @@
 //   default and is dropped on the next write), empty=1 (also the indicators with no value for any place on display), t (the
 //   period: "2024", "2024-07"; none = the latest). one `t` drives the Map, the layer under it and, from build week 3
 //   (2026-11-13 to 11-19, the period scrubber), the Matrix: today the Map and its layer read it, and the Matrix, the Report and
-//   the Place view carry it untouched, so it survives a switch of views.
+//   the Place view carry it untouched, so it survives a switch of views. t2 (a second period in the same grammar; none = compare
+//   off) is shared like t: the Map's compare mode draws the layer at t and at t2 with a swipe between them (map/compare.ts),
+//   and the other views carry it.
 // - Matrix: q (place search, narrows the selection), cell (an open drawer: place_id|indicator).
 // - Place: place (a place_id), coll (its group; kept for old links, the place is found by its id), method
 //   (iea-sd | names-pct | values: overrides every continuous card's status method), ind (the indicator opened: its card
@@ -19,7 +21,8 @@
 // - Map: ind (the indicator: one of the selection's), place (the place selected), color (value | departure | status | trend |
 //   record | class | share), cls (the class of `share`), grain (year | decade | month: the grain read; the indicator's status
 //   grain when absent), proj (globe; absent = the flat map), layer (the layer under the map, `<kind>:<id>[:<variable>]`:
-//   map/layerSlot.ts), method.
+//   map/layerSlot.ts), anom=1 (with t2: the second slice is t2 - t per cell), swipe (with t2 and no anom: the handle's share of
+//   the width, 0..1 in three decimals; 0.5 is left out), method.
 // - Report: the report spec's own flat keys after the selection (src/report/spec.ts: ctx, layout, status, recent, base,
 //   grain, from, to, asof, title).
 // defaults are left out. `?brand=` and `?theme=` are query switches, never hash keys.
@@ -58,6 +61,12 @@ export interface ViewState {
   showEmpty: boolean
   color: MapColor | null
   t: string | null
+  /** the second period of the Map's compare mode ("2016-07"); null = compare off. shared like `t` */
+  t2: string | null
+  /** with `t2`: draw `t2 - t` per cell instead of the slice at `t2` (the Map's `anom=1`) */
+  anom: boolean
+  /** the compare swipe's share of the map width (0..1); null = the middle */
+  swipe: number | null
   cls: string | null
   /** the Map's grain (the indicator's status grain when null) */
   grain: Grain | null
@@ -72,7 +81,17 @@ export interface ViewState {
 export const DEFAULT_STATE: ViewState = {
   view: 'matrix', q: '', vocab: 'onms', depth: 'swim', cell: null,
   place: null, coll: null, method: null, ind: null,
-  axes: 'indicators', showEmpty: false, color: null, t: null, cls: null, grain: null, proj: null, layer: null, spec: DEFAULT_SPEC,
+  axes: 'indicators', showEmpty: false, color: null, t: null, t2: null, anom: false, swipe: null, cls: null, grain: null, proj: null, layer: null, spec: DEFAULT_SPEC,
+}
+
+/** a period in the hash: "2024", "2024-07", "2024-07-15" */
+const PERIOD = /^\d{4}(-\d{2}(-\d{2})?)?$/
+
+/** a swipe fraction from the hash: a number in [0, 1], three decimals; anything else (or the middle) is null */
+const swipeOf = (v: string | undefined): number | null => {
+  if (v === undefined || v === '' || !Number.isFinite(Number(v))) return null
+  const f = Math.round(Math.min(1, Math.max(0, Number(v))) * 1000) / 1000
+  return f === 0.5 ? null : f
 }
 
 // keep the readable characters of ids (NMS:FKNMS, erddap:dhw_5km:CRW_SST:mean, a|b) out of percent-encoding
@@ -95,6 +114,7 @@ export function parseHash(hash: string): ViewState {
   const place = kv.get('place') || null
   const color = kv.get('color')
   const t = kv.get('t') ?? ''
+  const t2 = kv.get('t2') ?? ''
   const layer = parseLayerKey(kv.get('layer'))
   // a Place view without a place is the matrix; a Map view picks its indicator when it has none
   const view: ViewKind = kv.get('view') === 'place' && place ? 'place' : kv.get('view') === 'map' ? 'map' : kv.get('view') === 'report' ? 'report' : 'matrix'
@@ -113,7 +133,10 @@ export function parseHash(hash: string): ViewState {
     axes: kv.get('axes') === 'p' ? 'places' : 'indicators',
     showEmpty: kv.get('empty') === '1',
     color: MAP_COLORS.includes(color as MapColor) ? (color as MapColor) : null,
-    t: /^\d{4}(-\d{2}(-\d{2})?)?$/.test(t) ? t : null,
+    t: PERIOD.test(t) ? t : null,
+    t2: PERIOD.test(t2) ? t2 : null,
+    anom: PERIOD.test(t2) && kv.get('anom') === '1',
+    swipe: swipeOf(kv.get('swipe')),
     cls: kv.get('cls') || null,
     grain: MAP_GRAINS.includes(kv.get('grain') as Grain) ? (kv.get('grain') as Grain) : null,
     proj: kv.get('proj') === 'globe' ? 'globe' : null,
@@ -140,6 +163,7 @@ export function serializeHash(s: ViewState): string {
     if (s.axes === 'places') parts.push('axes=p')
     if (s.showEmpty) parts.push('empty=1')
     if (s.t) parts.push('t=' + s.t)
+    if (s.t2) parts.push('t2=' + s.t2)
   }
   if (s.view === 'place' && s.place) {
     parts.push('view=place', 'place=' + enc(s.place))
@@ -168,6 +192,8 @@ export function serializeHash(s: ViewState): string {
     if (s.proj) parts.push('proj=' + s.proj)
     if (s.layer) parts.push('layer=' + enc(s.layer))
     shared()
+    if (s.t2 && s.anom) parts.push('anom=1')
+    else if (s.t2 && s.swipe != null && Math.round(s.swipe * 1000) !== 500) parts.push('swipe=' + Math.round(Math.min(1, Math.max(0, s.swipe)) * 1000) / 1000)
     if (s.method) parts.push('method=' + s.method)
     return parts.join('&')
   }
@@ -179,25 +205,26 @@ export function serializeHash(s: ViewState): string {
   if (s.axes === 'places') parts.push('axes=p')
   if (s.showEmpty) parts.push('empty=1')
   if (s.t) parts.push('t=' + s.t)
+  if (s.t2) parts.push('t2=' + s.t2)
   return parts.join('&')
 }
 
 // ---- the context a view switch carries ----
 
 /** what a link to another view carries of the state it is opened from: the selection, the vocabulary, the detail level, the orientation, show-empty and the period */
-export type Carry = Pick<ViewState, 'vocab' | 'depth' | 'axes' | 'showEmpty' | 'spec'> & Partial<Pick<ViewState, 'method' | 't'>>
+export type Carry = Pick<ViewState, 'vocab' | 'depth' | 'axes' | 'showEmpty' | 'spec'> & Partial<Pick<ViewState, 'method' | 't' | 't2'>>
 
 const selOnly = (from: Pick<ViewState, 'spec'>): ReportSpec => selectionSpec(from.spec)
 
 const carried = (from: Carry): ViewState => ({
-  ...DEFAULT_STATE, vocab: from.vocab, depth: from.depth, axes: from.axes, showEmpty: from.showEmpty, t: from.t ?? null, spec: selOnly(from),
+  ...DEFAULT_STATE, vocab: from.vocab, depth: from.depth, axes: from.axes, showEmpty: from.showEmpty, t: from.t ?? null, t2: from.t2 ?? null, spec: selOnly(from),
 })
 
 /** another view's state with this one's shared keys: its own keys stay, the selection, vocabulary, detail, orientation, show-empty and period follow */
 export function carryOver(target: ViewState, from: Carry): ViewState {
   const spec = withSelection(target, { places: from.spec.places, indicators: from.spec.indicators, order: from.spec.order }).spec
   return {
-    ...target, vocab: from.vocab, depth: from.depth, axes: from.axes, showEmpty: from.showEmpty, t: from.t ?? null,
+    ...target, vocab: from.vocab, depth: from.depth, axes: from.axes, showEmpty: from.showEmpty, t: from.t ?? null, t2: from.t2 ?? null,
     spec: target.view === 'report' ? { ...spec, depth: from.depth } : spec,
   }
 }
