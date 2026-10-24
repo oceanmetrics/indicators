@@ -317,8 +317,14 @@ NMS18 = {"NMS:CBNMS", "NMS:CHNMS", "NMS:CINMS", "NMS:FGBNMS", "NMS:FKNMS", "NMS:
          "NMS:LONMS", "NMS:MBNMS", "NMS:MBPR", "NMS:MNMS", "NMS:NMSAS", "NMS:OCNMS", "NMS:PMNM", "NMS:SBNMS", "NMS:TBNMS",
          "NMS:WSCNMS"}
 REEF4 = {"NMS:FKNMS", "NMS:HIHWNMS", "NMS:NMSAS", "NMS:PMNM"}
+MONTHLY = [("IMERG_monthly_global_precip", "precipitation"), ("moda_npp_mo_glob", "npp"), ("cmems_salinity", "so"),
+           *(("cmems_biogeochem_nutrients", v) for v in ("fe", "no3", "po4", "si")),
+           ("cmems_biogeochem_phyto", "chl"), ("cmems_biogeochem_phyto", "phyc"), ("cmems_biogeochem_pp", "nppv"),
+           ("cmems_biogeochem_pp", "o2"), ("cmems_biogeochem_carbon", "dissic"), ("cmems_biogeochem_carbon", "ph"),
+           ("cmems_biogeochem_co2", "spco2"), ("cmems_biogeochem_zoo", "zooc"), ("cmems_altimetry", "mlotst"),
+           ("cmems_altimetry", "tob")]
 SERIES_CADENCE = {("dhw_5km", "CRW_SST"): "daily", ("dhw_5km", "CRW_BAA"): "daily",
-                  ("IMERG_monthly_global_precip", "precipitation"): "monthly"}
+                  **{s: "monthly" for s in MONTHLY}, ("noaa_aoml_seascapes_8day", "CLASS"): "weekly"}
 
 
 def unit_rows():
@@ -333,7 +339,10 @@ def test_the_parity_units_are_the_sanctuaries_by_each_series_the_engine_owns_wit
   assert all(len(u) == 5 for u in units) and len({tuple(u[:4]) for u in units}) == len(units)
   assert {u[1] for u in units} == {"places"}
   series = {(u[2], u[3]) for u in units}
-  assert series == set(SERIES_CADENCE)
+  # the series move one by one (week 6): each one in the TSV is a known one, with its cadence; dhw_5km (week 1) and
+  # IMERG (the first of week 6) are there
+  assert len(SERIES_CADENCE) == 20 and series <= set(SERIES_CADENCE)
+  assert {("dhw_5km", "CRW_SST"), ("dhw_5km", "CRW_BAA"), ("IMERG_monthly_global_precip", "precipitation")} <= series
   for ds, var in series:
     mine = [u for u in units if (u[2], u[3]) == (ds, var)]
     want = REEF4 if ds == "noaa_aoml_seascapes_8day" else NMS18
