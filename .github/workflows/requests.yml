@@ -8,9 +8,23 @@
 # OM_STATS_PUBLISH (a repository variable) decides whether the engine's stats files are uploaded to
 # gazetteer/stats/ of the bucket (om-publish.sh, both stores): unset or anything but `publish` is a dry run. the files are produced,
 # listed and attached to the run as an artifact, nothing is uploaded, the catalog is not rebuilt, and the issue gets a
-# comment saying so and stays open for a maintainer to re-run (the `run` label) once publishing is on. the default waits
-# on the parity criterion, ledger 2026-10-23: the engine's sums differ from erddap-places' published ones in the last
-# bits, which "bit for bit" does not allow, so the engine writes nothing under gazetteer/stats/ until Ben restates it.
+# comment saying so and stays open for a maintainer to re-run (the `run` label) once publishing is on. the default waited
+# on the parity criterion, ledger 2026-10-23 (Ben accepted it that day; the variable is `publish` since).
+#
+# the compare gate (ledger 2026-10-24): after the compute, the published file of the same unit is read from the storage
+# host and `om-extract compare --allow-newer` decides (scripts/stats_unit.sh gate): the order-independent columns exact,
+# the sums within 1e-9 relative, the same keys, except the engine's days after the published file's last date (the
+# engine caught up); a key only in the published file, or only in the engine's on or before that date, fails; no
+# published file is the first publish. the files are uploaded ONLY on PASS, whatever the mode says. the verdict line is
+# in the log and the run summary, and the comparison is the `compare` artifact.
+#
+# daily (the `daily` job, 09:30 UTC): the 36 parity units of scripts/parity_units.tsv (the 18 sanctuaries x dhw_5km
+# CRW_SST and CRW_BAA) through the same steps (scripts/stats_unit.sh daily: check-job, compute, gate, publish on PASS),
+# one at a time on macmini-quick in the run job's concurrency group. a unit whose compute fails (a PacIOOS outage) is
+# retried 3 times 10 min apart, then skipped and listed, never published in part. 09:30 UTC: NOAA CRW posts day D on
+# its server in the afternoon (US Eastern) of D+1 and PacIOOS's ERDDAP serves it by that evening (2026-10-22 was there by
+# 21:14 UTC on 10-23, 10-23 not yet at 02:57 UTC on 10-24; the dataset's metadata carries no update hour), so 09:30 is
+# well after the day's update and before 14:15 UTC, when erddap-places' stats run wrote these files until 2026-10-24.
 #
 # a Copernicus Marine request (cmems: indicators) is never `auto`: it uses a maintainer's personal Copernicus Marine
 # login. triage marks it `needs-review` with approvable=true when the place producer can do it, and a maintainer's `run`
@@ -43,29 +57,46 @@ name: requests
 on:
   issues:
     types: [opened, edited, reopened, labeled]
+  schedule:
+    - cron: '30 9 * * *'      # 09:30 UTC daily: the parity units (the `daily` job), see the header
   workflow_dispatch:
     inputs:
       place:
-        description: place_id, like NMS:CINMS
-        required: true
+        description: place_id, like NMS:CINMS (one unit; not used with daily)
+        required: false
         type: string
       coll:
         description: the place's collection slug, like places
-        required: true
+        required: false
         type: string
       dataset:
         description: ERDDAP dataset id, like dhw_5km
-        required: true
+        required: false
         type: string
       variable:
         description: variable of the dataset, like CRW_SST
-        required: true
+        required: false
         type: string
       publish:
-        description: upload the stats files to gazetteer/stats/ and rebuild the catalog (false is a dry run)
+        description: upload the stats files to gazetteer/stats/ (only on the gate's PASS) and rebuild the catalog (false is a dry run)
         required: false
         type: boolean
         default: false
+      reference_version:
+        description: "a test of the gate: compare against this S3 version id of the published file instead (never publishes)"
+        required: false
+        type: string
+        default: ''
+      daily:
+        description: run the daily job (scripts/parity_units.tsv) instead of one unit
+        required: false
+        type: boolean
+        default: false
+      units:
+        description: "daily only: an extended regex a line of parity_units.tsv must match (default: every unit)"
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -138,7 +169,7 @@ jobs:
     # Copernicus Marine one, or a refresh of existing values) runs only on a maintainer's `run` label, never by itself; a
     # manual dispatch runs without an issue (triage is skipped then, so !cancelled() keeps the job from being skipped with it)
     if: >-
-      !cancelled() && (github.event_name == 'workflow_dispatch' ||
+      !cancelled() && ((github.event_name == 'workflow_dispatch' && !inputs.daily) ||
       (needs.triage.outputs.label == 'auto' &&
        ((github.event.action != 'labeled' && vars.REQUESTS_AUTORUN == 'on') || github.event.label.name == 'run')) ||
       (needs.triage.outputs.approvable == 'true' && github.event.action == 'labeled' && github.event.label.name == 'run'))
@@ -216,31 +247,29 @@ jobs:
           OM_CHUNKS: ${{ vars.OM_CHUNKS }}
         run: |
           export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
-          # the place from the gazetteer (a reference collection from the runner's private copy, PLACES_INTERNAL), the
-          # whole record through the chunk store (kept between runs outside the checkout, so a re-run fetches only the
-          # chunks it lacks), and erddap-places' stats/ layout with its STAC item under out/gazetteer/stats
-          rm -rf out
-          uv run om-extract run \
-            --collection "https://storage.oceanmetrics.io/gazetteer/erddap/$REQ_DATASET/collection.json" \
-            --place "$REQ_PLACE" --coll "$REQ_COLL" --var "$REQ_VARIABLE" \
-            --chunks "${OM_CHUNKS:-$HOME/.cache/oceanmetrics/chunks}" \
-            --stats-dir out/gazetteer/stats --out out/run
-      - name: list the stats files, and upload them only when OM_STATS_PUBLISH is publish
+          # om-extract run into out/gazetteer/stats and out/run (the same command as the daily job's)
+          scripts/stats_unit.sh compute out
+      - name: list the stats files and decide the mode (OM_STATS_PUBLISH, or the dispatch's publish)
         id: stats
         if: steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems'
         env:
           OM_STATS_PUBLISH: ${{ vars.OM_STATS_PUBLISH }}
           DISPATCH_PUBLISH: ${{ inputs.publish }}
+          REF_VERSION: ${{ inputs.reference_version }}
         run: |
           export PATH="/opt/homebrew/bin:$PATH"
-          # dry-run by default: waits on the parity criterion, ledger 2026-10-23 (the engine writes nothing under
-          # gazetteer/stats/ until Ben restates "bit for bit"); `publish` uploads
+          # dry-run by default (it waited on the parity criterion, ledger 2026-10-23); `publish` uploads, after the gate's PASS
           mode=dry-run
           if [ "$EVENT" = workflow_dispatch ]; then
             # a dispatch decides by its own `publish` input (default false), whatever OM_STATS_PUBLISH says
             if [ "${DISPATCH_PUBLISH:-}" = true ]; then mode=publish; fi
           elif [ "${OM_STATS_PUBLISH:-}" = publish ]; then
             mode=publish
+          fi
+          # a test reference (reference_version) tests the gate: such a run never publishes
+          if [ -n "${REF_VERSION:-}" ] && [ "$mode" = publish ]; then
+            echo "reference_version is set (a test of the gate): a dry run, whatever publish says"
+            mode=dry-run
           fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           cd out/gazetteer
@@ -250,21 +279,39 @@ jobs:
           cat ../stats_files.txt
           # the artifact is a tarball: actions/upload-artifact refuses the ':' of a place id in a file name
           tar -czf ../stats.tgz stats
-          if [ "$mode" = publish ]; then
-            # om-publish.sh, both stores (content types by extension: parquet, json), in the order listed above
-            "$OM_PUBLISH" --really --include '*.parquet' --include '*.provenance.json' --include 'items/*.json' \
-              --last '*.provenance.json' --last 'items/*' stats gazetteer/stats
-          else
-            echo "dry run: nothing uploaded to gazetteer/stats/ (OM_STATS_PUBLISH is not publish)"
-          fi
-      - uses: actions/upload-artifact@v4
+      # the compare gate: the published file of the same unit from the storage host against the engine's
+      # (om-extract compare --allow-newer); a FAIL ends the job here, so nothing is uploaded
+      - name: the compare gate (om-extract compare against the published file)
+        id: gate
         if: steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems'
+        env:
+          REF_VERSION: ${{ inputs.reference_version }}
+        run: |
+          export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+          rc=0
+          scripts/stats_unit.sh gate out || rc=$?
+          echo "verdict=$(grep -o 'verdict: [A-Z]*' out/compare/verdict.txt | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+          if [ "$rc" != 0 ]; then echo "::error::$(cat out/compare/verdict.txt)"; exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems'
         with:
           name: stats
           path: |
             out/stats.tgz
             out/stats_files.txt
           retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems'
+        with:
+          name: compare
+          path: out/compare/
+          retention-days: 30
+      - name: upload the stats files (publish mode and the gate's PASS only)
+        if: steps.cap.outputs.over != '1' && env.REQ_FAMILY != 'cmems' && steps.stats.outputs.mode == 'publish' && steps.gate.outputs.verdict == 'PASS'
+        run: |
+          export PATH="/opt/homebrew/bin:$PATH"
+          # om-publish.sh, both stores: the parquet, its provenance, then the item; refuses without the gate's PASS
+          scripts/stats_unit.sh publish out
       - name: compute the place (Copernicus Marine place producer, with the maintainer's own login)
         if: steps.cap.outputs.over != '1' && env.REQ_FAMILY == 'cmems'
         run: |
@@ -319,18 +366,94 @@ jobs:
         env:
           JOB_STATUS: ${{ job.status }}
           MODE: ${{ steps.stats.outputs.mode }}
+          REF_VERSION: ${{ inputs.reference_version }}
         run: |
           {
             echo "### requests dispatch: ${REQ_INDICATOR:-no valid job} at ${REQ_PLACE:-?} (${REQ_COLL:-?})"
             echo
             echo "- status: $JOB_STATUS, mode: ${MODE:-not reached}"
+            if [ -f out/compare/verdict.txt ]; then echo "- gate: \`$(cat out/compare/verdict.txt)\`"; fi
+            if [ -f out/compare/reference.txt ]; then echo "- $(cat out/compare/reference.txt)"; fi
             if [ -f out/stats_files.txt ]; then
               echo "- $(wc -l < out/stats_files.txt | tr -d ' ') stats file(s):"
               sed 's/^/  - `/; s/$/`/' out/stats_files.txt
             fi
-            if [ "$MODE" = publish ] && [ "$JOB_STATUS" = success ]; then
+            if [ "$MODE" = publish ] && [ "$JOB_STATUS" = success ] && grep -q 'verdict: PASS' out/compare/verdict.txt; then
               echo "- published; Place view: https://oceanmetrics.io/indicators/#view=place&place=${REQ_PLACE}&coll=${REQ_COLL}&ind=${REQ_INDICATOR}"
             elif [ "$MODE" = dry-run ]; then
               echo "- dry run: nothing uploaded to gazetteer/stats/ (the files are in the \`stats\` artifact)"
+            else
+              echo "- not published (the gate refused or a step failed; the comparison is the \`compare\` artifact)"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # the parity units every day (09:30 UTC, see the header), or a dispatch with daily=true: scripts/stats_unit.sh daily
+  # runs each unit of scripts/parity_units.tsv through the run job's own steps (check-job, compute, the compare gate,
+  # publish only on PASS), one at a time, in the run job's concurrency group on the same runner
+  daily:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.daily)
+    runs-on: [self-hosted, macmini-quick]
+    concurrency:
+      group: requests-run           # one job at a time on the runner, never cancelled mid-run
+      cancel-in-progress: false
+    # 36 units of a few minutes each, plus one unit's retries (30 min) in an outage
+    timeout-minutes: 300
+    env:
+      AWS_DEFAULT_REGION: us-east-1
+      OM_PUBLISH: ${{ github.workspace }}/.om-platform/scripts/om-publish.sh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: oceanmetrics/platform
+          path: .om-platform
+          sparse-checkout: scripts/om-publish.sh
+          sparse-checkout-cone-mode: false
+      - name: install the npm packages
+        run: |
+          export PATH="/opt/homebrew/bin:$PATH"
+          npm ci --no-audit --no-fund
+      - name: the parity units, each computed, gated and published on PASS
+        id: units
+        env:
+          OM_CHUNKS: ${{ vars.OM_CHUNKS }}
+          # the schedule publishes; a dispatch by its own `publish` input
+          PUBLISH: ${{ github.event_name == 'schedule' || inputs.publish }}
+          UNITS_FILTER: ${{ inputs.units }}
+        run: |
+          export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+          rm -rf out
+          rc=0
+          scripts/stats_unit.sh daily scripts/parity_units.tsv out/daily || rc=$?
+          cat out/daily/summary.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -s out/daily/published.txt ]; then echo "published=1" >> "$GITHUB_OUTPUT"; fi
+          exit "$rc"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compare-daily
+          path: |
+            out/daily/summary.md
+            out/daily/*/verdict.txt
+            out/daily/*/compute.log
+            out/daily/*/compare/
+          retention-days: 30
+      # once for the day, as the run job does after a publish: the stats items on the requested-items list, the catalog
+      # rebuilt and published (a refused or skipped unit does not hold the others back)
+      - name: rebuild and publish the catalog
+        if: always() && steps.units.outputs.published == '1'
+        run: |
+          export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+          # the published list first (add-item's default), then the local one it wrote
+          listarg=()
+          for d in out/daily/*/; do
+            grep -qxF "$(jq -r '.dataset + "/" + .variable + "/" + .place' "$d/job.json")" out/daily/published.txt || continue
+            uv run python -m om_indicators.requests add-item "$d/job.json" "${listarg[@]}" --out requested_items.json.new
+            mv requested_items.json.new requested_items.json
+            listarg=(--list requested_items.json)
+          done
+          "$OM_PUBLISH" --really --cache-control "public, max-age=300" requested_items.json indicators/requests --as items.json
+          scripts/build_catalog.sh
+          npm run -s changes:build -- catalog --prev https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/coverage.parquet \
+            || echo "::warning::the change files were not written; recover them with scripts/backfill_changes.mjs"
+          scripts/publish_catalog.sh

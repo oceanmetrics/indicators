@@ -147,8 +147,13 @@ indicators.json + coverage.parquet ──► viewer/ (imports @oceanmetrics/stat
   eco-indicators' `terra::extract`) and publishes `<dataset>/<var>/<place>/{data.parquet,provenance.json}` plus
   `index.json` under `s3://oceanmetrics.io-public/indicators/producers/cmems/`. The ERDDAP path of `requests.yml` is
   `om-extract run --chunks --stats-dir` (the chunked engine and its stats item, in erddap-places' `stats/` layout); its
-  upload to `gazetteer/stats/` runs only when the repository variable `OM_STATS_PUBLISH` is `publish` (default a dry run
-  with the files as an artifact: it waits on the parity criterion, ledger 2026-10-23). `adapters/cmems_places.py` reads that
+  upload to `gazetteer/stats/` runs only when the repository variable `OM_STATS_PUBLISH` is `publish` (`publish` since Ben
+  accepted the parity criterion, ledger 2026-10-23; else a dry run with the files as an artifact) AND the compare gate
+  passes (ledger 2026-10-24): `scripts/stats_unit.sh gate` reads the published file of the same unit from the storage host and
+  runs `om-extract compare --allow-newer` (the criterion on the published window; the engine's days after its last date
+  allowed; no published file is the first publish). The `daily` job (09:30 UTC) runs the 36 parity units of
+  `scripts/parity_units.tsv` through the same script (`stats_unit.sh daily`: retry, skip and list, publish on PASS);
+  the gate's rule lives in om-extract (`parity.gate()`), never here, and `tests/test_stats_unit.py` runs the script on fakes. `adapters/cmems_places.py` reads that
   folder into `values/indicator=<id>/coll=<the place's collection>/`; the sanctuaries (`coll=places`) stay
   eco-indicators' (a values file another adapter wrote is never overwritten), and the manifest states the dataset of the
   family's own producer when an indicator has files from both. Its scientific stack is the `cmems` dependency group

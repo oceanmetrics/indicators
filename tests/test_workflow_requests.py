@@ -22,7 +22,8 @@ def test_no_expression_is_spliced_into_a_script():
 
 def test_the_run_job_takes_an_approvable_request_only_on_the_run_label_never_by_itself():
   cond = " ".join(RUN["if"].split())
-  auto, approvable = cond.split(") ||", 1)
+  auto, approvable = cond.split("(needs.triage.outputs.approvable", 1)
+  approvable = "(needs.triage.outputs.approvable" + approvable
   assert "REQUESTS_AUTORUN" in auto and "outputs.label == 'auto'" in auto
   assert "REQUESTS_AUTORUN" not in approvable
   for needed in ("outputs.approvable == 'true'", "github.event.action == 'labeled'", "github.event.label.name == 'run'"):
@@ -77,9 +78,18 @@ def step(name):
   return next(s for s in RUN["steps"] if s.get("name") == name)
 
 
+UNIT_SH = (Path(__file__).resolve().parent.parent / "scripts" / "stats_unit.sh").read_text()
+
+
+def unit_fn(name):
+  """the body of one function of scripts/stats_unit.sh"""
+  return UNIT_SH.split(f"\n{name}() {{\n", 1)[1].split("\n}\n", 1)[0]
+
+
 def test_the_erddap_path_is_om_extract_run_on_the_chunked_engine_with_its_stats_item():
   engine = step("compute the place (om-extract, the chunked engine and its stats item)")
-  cmd = " ".join(engine["run"].replace("\\\n", " ").split())
+  assert "scripts/stats_unit.sh compute out" in engine["run"]
+  cmd = " ".join(unit_fn("compute").replace("\\\n", " ").replace('"$out/', "out/").split())
   assert "uv run om-extract run" in cmd
   for flag in ('--place "$REQ_PLACE"', '--coll "$REQ_COLL"', '--var "$REQ_VARIABLE"', "--chunks ", "--stats-dir out/gazetteer/stats",
                'gazetteer/erddap/$REQ_DATASET/collection.json'):
@@ -90,18 +100,26 @@ def test_the_erddap_path_is_om_extract_run_on_the_chunked_engine_with_its_stats_
   assert not any("precompute" in s.get("run", "") for s in RUN["steps"])
 
 
+STATS_STEP = "list the stats files and decide the mode (OM_STATS_PUBLISH, or the dispatch's publish)"
+UPLOAD_STEP = "upload the stats files (publish mode and the gate's PASS only)"
+GATE_STEP = "the compare gate (om-extract compare against the published file)"
+
+
 def test_the_stats_upload_is_a_dry_run_unless_om_stats_publish_is_publish():
-  st = step("list the stats files, and upload them only when OM_STATS_PUBLISH is publish")
+  st = step(STATS_STEP)
   assert st["id"] == "stats" and st["env"]["OM_STATS_PUBLISH"] == "${{ vars.OM_STATS_PUBLISH }}"
   script = st["run"]
   assert "mode=dry-run\n" in script and 'elif [ "${OM_STATS_PUBLISH:-}" = publish ]; then' in script
-  upload, dry = script.split('if [ "$mode" = publish ]; then', 1)[1].split("else", 1)
+  assert "OM_PUBLISH" not in script and "stats_unit.sh publish" not in script
+  up = step(UPLOAD_STEP)
+  assert "steps.stats.outputs.mode == 'publish'" in up["if"] and "scripts/stats_unit.sh publish out" in up["run"]
   # om-publish.sh (both stores), the parquet first, then the provenance, then the item; never aws, never a delete
+  upload = unit_fn("publish")
   assert '"$OM_PUBLISH" --really' in upload and upload.rstrip().endswith("stats gazetteer/stats")
   assert upload.index("--last '*.provenance.json'") < upload.index("--last 'items/*'")
-  assert "aws s3" not in script and "--delete" not in script
-  assert "OM_PUBLISH" not in script.split('if [ "$mode" = publish ]; then', 1)[0] and "OM_PUBLISH" not in dry
-  assert "waits on the parity criterion, ledger 2026-10-23" in script
+  for text in (script, up["run"], UNIT_SH):
+    assert "aws s3 cp" not in text and "aws s3 sync" not in text and "--delete" not in text
+  assert "it waited on the parity criterion, ledger 2026-10-23" in script
   # the files are listed and attached as an artifact either way (a tarball: upload-artifact refuses ':' in a name)
   assert "tar -czf ../stats.tgz stats" in script
   art = next(s for s in RUN["steps"] if s.get("uses", "").startswith("actions/upload-artifact") and s["with"]["name"] == "stats")
@@ -129,16 +147,18 @@ ON = WF.get("on", WF.get(True))                      # PyYAML reads the key `on`
 
 def test_the_dispatch_takes_a_place_a_collection_a_dataset_a_variable_and_publish_off_by_default():
   inputs = ON["workflow_dispatch"]["inputs"]
-  assert set(inputs) == {"place", "coll", "dataset", "variable", "publish"}
+  assert set(inputs) == {"place", "coll", "dataset", "variable", "publish", "reference_version", "daily", "units"}
   for k in ("place", "coll", "dataset", "variable"):
-    assert inputs[k]["required"] is True and inputs[k]["type"] == "string"
+    # not required since the daily dispatch (2026-10-24), which takes none; check-job refuses an empty one
+    assert inputs[k]["required"] is False and inputs[k]["type"] == "string"
   assert inputs["publish"]["type"] == "boolean" and inputs["publish"]["default"] is False
   assert "issues" in ON                                  # the issue events are still there
 
 
 def test_a_dispatch_runs_the_same_run_job_without_triage_and_the_job_survives_the_skipped_triage():
   cond = " ".join(RUN["if"].split())
-  assert RUN["needs"] == "triage" and cond.startswith("!cancelled() && (github.event_name == 'workflow_dispatch' ||")
+  assert RUN["needs"] == "triage"
+  assert cond.startswith("!cancelled() && ((github.event_name == 'workflow_dispatch' && !inputs.daily) ||")
   assert "github.event_name == 'workflow_dispatch'" not in WF["jobs"]["triage"].get("if", "")
   assert "github.event.issue.state == 'open'" in WF["jobs"]["triage"]["if"]          # no issue, no triage
   assert RUN["env"]["EVENT"] == "${{ github.event_name }}"
@@ -163,13 +183,15 @@ def step_by_id(i):
 
 
 def test_publish_true_sets_the_same_mode_as_the_variable_and_a_dispatch_ignores_the_variable():
-  st = step("list the stats files, and upload them only when OM_STATS_PUBLISH is publish")
+  st = step(STATS_STEP)
   assert st["env"]["DISPATCH_PUBLISH"] == "${{ inputs.publish }}"
   script = st["run"]
   assert 'if [ "$EVENT" = workflow_dispatch ]; then' in script
   assert 'if [ "${DISPATCH_PUBLISH:-}" = true ]; then mode=publish; fi' in script
   assert 'elif [ "${OM_STATS_PUBLISH:-}" = publish ]; then\n  mode=publish' in script
   assert script.count("mode=publish") == 2 and "mode=dry-run\n" in script
+  # a test reference never publishes
+  assert 'if [ -n "${REF_VERSION:-}" ] && [ "$mode" = publish ]; then' in script
 
 
 def test_a_dispatch_neither_comments_nor_closes_and_writes_the_summary_instead():

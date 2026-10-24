@@ -493,11 +493,24 @@ Anyone with a GitHub account can ask for an indicator the catalog does not hold 
    - **unset (the default) or anything but `publish`: a dry run.** The files are listed in the log and attached to the
      run as the `stats` artifact (a tarball: an artifact cannot hold the `:` of a place id), nothing is uploaded, the
      catalog is not rebuilt, and the bot comments that the values are computed but not published; the issue stays open.
-     The default waits on the parity criterion (ledger 2026-10-23): the engine's sums differ from erddap-places'
-     published ones in the last bits, so it writes nothing under `gazetteer/stats/` until "bit for bit" is restated.
-   - **`publish`:** the parquet, its provenance and then the item are uploaded to `gazetteer/stats/` of the bucket
-     (one `om-publish.sh` call, both stores), the item goes on the requested-items list, the catalog is rebuilt
-     and published, and the bot comments the Place view link and closes the issue.
+     (The variable is `publish` since Ben accepted the parity criterion, ledger 2026-10-23.)
+   - **`publish`:** first the **compare gate** (ledger 2026-10-24; `scripts/stats_unit.sh gate`): the published file of
+     the same unit is read from the storage host and `om-extract compare --allow-newer` decides. The order-independent
+     columns must be exact and the sums within 1e-9 relative, with the same keys, except the engine's days after the
+     published file's last date (the engine caught up); a key only in the published file, or only in the engine's on or
+     before that date, fails; no published file is the first publish. The verdict line is in the log and on the run
+     page, and the comparison is the `compare` artifact. Only on PASS are the parquet, its provenance and then the item
+     uploaded to `gazetteer/stats/` of the bucket (one `om-publish.sh` call, both stores); the item goes on the
+     requested-items list, the catalog is rebuilt and published, and the bot comments the Place view link and closes
+     the issue. A FAIL stops the run: nothing is uploaded.
+
+   **Daily.** At 09:30 UTC the `daily` job runs the 36 parity units of `scripts/parity_units.tsv` (the 18 sanctuaries ×
+   `dhw_5km` CRW_SST and CRW_BAA) through the same script (`stats_unit.sh daily`), one at a time on `macmini-quick`:
+   each is computed (a failing compute, such as a PacIOOS outage, is retried 3 times 10 min apart, then skipped and
+   listed; after a skip the next units get one try each until one computes), gated and published on PASS, and the
+   catalog is rebuilt once. A refused unit makes the run red; a skipped one is a warning. These files were erddap-places'
+   own daily stats run's (14:15 UTC) until 2026-10-24. By hand: `gh workflow run requests.yml -f daily=true -f publish=true`
+   (`-f units=CINMS` for a subset, an extended regex over the TSV's lines).
 
    Issue #1 (Wells NERR, precipitation) is the worked example (run by erddap-places before the switch).
 
@@ -513,7 +526,9 @@ Anyone with a GitHub account can ask for an indicator the catalog does not hold 
    `dataset`, `variable` (the indicator is `erddap:<dataset>:<variable>:mean`, checked like any job) and `publish`
    (default false). It skips the triage and the comment-and-close steps and writes a summary on the run page. `publish`
    true is the dispatch's `OM_STATS_PUBLISH=publish` (upload, requested-items list, catalog rebuild); false is a dry run
-   whatever the repository variable says. For example, the sanctuary NMS:CINMS, sea surface temperature, published:
+   whatever the repository variable says; publishing still needs the gate's PASS. `reference_version` (an S3 version id of
+   the published file) tests the gate against that older file instead, and such a run never publishes. For example,
+   the sanctuary NMS:CINMS, sea surface temperature, published:
 
    ```sh
    gh workflow run requests.yml -R oceanmetrics/indicators -f place=NMS:CINMS -f coll=places -f dataset=dhw_5km -f variable=CRW_SST -f publish=true
