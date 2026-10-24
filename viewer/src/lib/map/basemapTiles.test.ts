@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BASEMAP_URL, basemapLayerIds, DEFAULT_TILES, LAND_LAYER, seaSurfaceId } from '@oceanmetrics/map'
+import { BASEMAP_URL, BASEMAP_VERSION, basemapLayerIds, DEFAULT_TILES, LAND_LAYER, seaSurfaceId } from '@oceanmetrics/map'
 import type { StyleSpecification } from 'maplibre-gl'
 import { BASEMAP_BUCKET, basemapStyle, demOn, slotBefore, TILES, tilesAt } from './basemapTiles.ts'
 import { store } from '../../../../src/storage.ts'
@@ -28,12 +28,12 @@ describe('the basemap tiers', () => {
     expect(BASEMAP_BUCKET).toBe(store('basemap/'))
     const t = tilesAt(DEFAULT_TILES, BASEMAP_URL)
     expect(t).toEqual(TILES)
-    expect(t.far).toBe(`${BASEMAP_BUCKET}gebco/far.pmtiles`)
-    expect(t.core).toBe(`${BASEMAP_BUCKET}gebco/core.pmtiles`)
-    expect(t.regional).toEqual([`${BASEMAP_BUCKET}gebco/core-sanctuaries.pmtiles`])
-    expect(t.contours).toBe(`${BASEMAP_BUCKET}gebco/contours.pmtiles`)
-    expect(t.names).toBe(`${BASEMAP_BUCKET}gebco/names.pmtiles`)
-    expect(t.land).toBe(`${BASEMAP_BUCKET}osm/land.pmtiles`)
+    expect(t.far).toBe(`${BASEMAP_BUCKET}gebco/v${BASEMAP_VERSION}/far.pmtiles`)
+    expect(t.core).toBe(`${BASEMAP_BUCKET}gebco/v${BASEMAP_VERSION}/core.pmtiles`)
+    expect(t.regional).toEqual([`${BASEMAP_BUCKET}gebco/v${BASEMAP_VERSION}/core-sanctuaries.pmtiles`])
+    expect(t.contours).toBe(`${BASEMAP_BUCKET}gebco/v${BASEMAP_VERSION}/contours.pmtiles`)
+    expect(t.names).toBe(`${BASEMAP_BUCKET}gebco/v${BASEMAP_VERSION}/names.pmtiles`)
+    expect(t.land).toBe(`${BASEMAP_BUCKET}osm/v${BASEMAP_VERSION}/land.pmtiles`)
     expect(Object.values(t).flat().every(u => u == null || String(u).startsWith(BASEMAP_BUCKET))).toBe(true)
   })
   it('keeps a url from elsewhere and a null tier as they are', () => {
@@ -61,12 +61,12 @@ describe('the composed style, both themes', () => {
     const s = basemapStyle(CARTO, theme, true)
     const src = s.sources as Record<string, { type: string; url?: string; attribution?: string }>
     it(`${theme}: every tier is a source, read as pmtiles:// on the storage host`, () => {
-      expect(src['gebco-far']).toMatchObject({ type: 'raster-dem', url: `pmtiles://${BASEMAP_BUCKET}gebco/far.pmtiles` })
-      expect(src['gebco']).toMatchObject({ type: 'raster-dem', url: `pmtiles://${BASEMAP_BUCKET}gebco/core.pmtiles` })
-      expect(src['gebco-regional']).toMatchObject({ type: 'raster-dem', url: `pmtiles://${BASEMAP_BUCKET}gebco/core-sanctuaries.pmtiles` })
-      expect(src['gebco-contours']).toMatchObject({ type: 'vector', url: `pmtiles://${BASEMAP_BUCKET}gebco/contours.pmtiles` })
-      expect(src['gebco-names']).toMatchObject({ type: 'vector', url: `pmtiles://${BASEMAP_BUCKET}gebco/names.pmtiles` })
-      expect(src['osm-land']).toMatchObject({ type: 'vector', url: `pmtiles://${BASEMAP_BUCKET}osm/land.pmtiles` })
+      expect(src['gebco-far']).toMatchObject({ type: 'raster-dem', url: `pmtiles://${BASEMAP_BUCKET}gebco/v${BASEMAP_VERSION}/far.pmtiles` })
+      expect(src['gebco']).toMatchObject({ type: 'raster-dem', url: `pmtiles://${BASEMAP_BUCKET}gebco/v${BASEMAP_VERSION}/core.pmtiles` })
+      expect(src['gebco-regional']).toMatchObject({ type: 'raster-dem', url: `pmtiles://${BASEMAP_BUCKET}gebco/v${BASEMAP_VERSION}/core-sanctuaries.pmtiles` })
+      expect(src['gebco-contours']).toMatchObject({ type: 'vector', url: `pmtiles://${BASEMAP_BUCKET}gebco/v${BASEMAP_VERSION}/contours.pmtiles` })
+      expect(src['gebco-names']).toMatchObject({ type: 'vector', url: `pmtiles://${BASEMAP_BUCKET}gebco/v${BASEMAP_VERSION}/names.pmtiles` })
+      expect(src['osm-land']).toMatchObject({ type: 'vector', url: `pmtiles://${BASEMAP_BUCKET}osm/v${BASEMAP_VERSION}/land.pmtiles` })
     })
     it(`${theme}: the order: the sea, far under core under the regional tier, the isobaths, the land mask, then CARTO's land and its labels`, () => {
       const o = ids(s)
