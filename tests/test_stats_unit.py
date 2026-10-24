@@ -121,7 +121,9 @@ def test_a_sum_1e10_off_passes_and_1e8_off_is_refused_and_not_published(tmp_path
 
 def test_a_missing_middle_day_is_refused(tmp_path):
   g, p, line = unit(tmp_path, setup(tmp_path, stats([D[0], D[1], D[3]]), stats()))
-  assert g.returncode == 1 and "key(s) only in the published file" in line and published(tmp_path) == []
+  assert g.returncode == 1 and published(tmp_path) == []
+  assert line == ("dhw_5km/CRW_SST/NMS:CINMS verdict: FAIL -> differs: "
+                  "1 key(s) only in the published file (first ['2026-10-22'])")
 
 
 def test_no_published_file_is_the_first_publish(tmp_path):

@@ -82,7 +82,8 @@ gate() {
     > "$out/compare/compare.txt" 2>&1 || rc=$?
   cat "$out/compare/compare.txt"
   # the verdict and its reasons as one line
-  line="$(tag) $(sed -n '/^verdict:/,$p' "$out/compare/compare.txt" | sed 's/^ *//' | paste -sd' ' -)"
+  line="$(tag) $(sed -n '/^verdict:/,$p' "$out/compare/compare.txt" | sed 's/^ *//' |
+    awk 'NR == 1 { printf "%s", $0; next } { printf "%s%s", (NR == 2 ? ": " : "; "), $0 } END { print "" }')"
   if [ "$rc" != 0 ] || ! grep -q '^verdict: PASS' "$out/compare/compare.txt"; then
     case "$line" in *"verdict: "*) ;; *) line="$(tag) verdict: FAIL -> om-extract compare exited $rc" ;; esac
     echo "$line" | tee "$out/compare/verdict.txt"
