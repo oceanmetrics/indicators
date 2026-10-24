@@ -404,9 +404,10 @@ jobs:
     concurrency:
       group: requests-run           # one job at a time on the runner, never cancelled mid-run
       cancel-in-progress: false
-    # 36 units of a few minutes each, plus one unit's retries (30 min) in an outage; on the 1st of a month the monthly
-    # series too, each unit a few seconds from the chunk store (the upstreams are frozen)
-    timeout-minutes: 300
+    # 36 daily units of a few minutes each, plus one unit's retries (30 min) in an outage; on Mondays the 4 seascapes
+    # units, and on the 1st of a month the 306 monthly units too, about 30 s each from the chunk store (run 40060392665:
+    # 18 IMERG units in 10 min; the upstreams are frozen), so up to about 3 h more on the 1st
+    timeout-minutes: 600
     env:
       AWS_DEFAULT_REGION: us-east-1
       OM_PUBLISH: ${{ github.workspace }}/.om-platform/scripts/om-publish.sh

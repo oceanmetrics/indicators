@@ -295,6 +295,9 @@ def test_the_daily_job_runs_the_parity_units_at_0930_on_the_quick_runner_one_at_
   assert ON["schedule"] == [{"cron": "30 9 * * *"}]
   assert DAILY["if"] == "github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.daily)"
   assert DAILY["runs-on"] == ["self-hosted", "macmini-quick"]
+  # the 1st of a month runs the 306 monthly units after the 36 daily ones (about 30 s each from the chunk store, run
+  # 40060392665: 18 units in 10 min), so the job gets 10 h, not 5 (ledger week 6)
+  assert DAILY["timeout-minutes"] == 600
   assert DAILY["concurrency"] == RUN["concurrency"] == {"group": "requests-run", "cancel-in-progress": False}
   u = next(s for s in DAILY["steps"] if s.get("id") == "units")
   assert 'if grep -q . out/daily/published.txt' in u["run"]
