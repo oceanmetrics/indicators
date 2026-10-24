@@ -9,7 +9,7 @@ requires-python = ">=3.12"
 dependencies = [
   "duckdb>=1.4",
   "jsonschema>=4.23",
-  "om-extract>=0.6.4",
+  "om-extract>=0.6.5",
   "pyarrow>=21",
   "pyyaml>=6",
   "requests>=2.32",
@@ -29,7 +29,7 @@ cmems = ["copernicusmarine>=2.0", "xarray>=2024.1", "shapely>=2.0", "numpy>=1.26
 
 [tool.uv.sources]
 # om_extract.contract is the values contract (oceanmetrics/extract), pinned to a commit of its main
-om-extract = { git = "https://github.com/oceanmetrics/extract", rev = "223e594ff9289168721e6888ea83a13bcfc140bd" }
+om-extract = { git = "https://github.com/oceanmetrics/extract", rev = "10e815cb4f22d059ad8d68b9d5b1760cfdf69a37" }
 
 [build-system]
 requires = ["hatchling"]

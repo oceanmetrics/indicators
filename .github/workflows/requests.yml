@@ -451,12 +451,16 @@ jobs:
             out/daily/*/compute.log
             out/daily/*/compare/
           retention-days: 30
-      # once for the day, as the run job does after a publish: the stats items on the requested-items list, the catalog
-      # rebuilt and published (a refused or skipped unit does not hold the others back)
+      # once for the day, as the run job does after a publish: gazetteer/stats/collection.json rebuilt from the Items
+      # (the engine's since 2026-10-24, when erddap-places' stac.ts stopped writing it) and published after them, then
+      # the stats items on the requested-items list, the catalog rebuilt and published (its erddap-places adapter reads
+      # the collection; a refused or skipped unit does not hold the others back)
       - name: rebuild and publish the catalog
         if: always() && steps.units.outputs.published == '1'
         run: |
           export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+          # the stats collection (om-extract stats-collection over the units' Items), no-cache, the last stats file
+          scripts/stats_unit.sh collection scripts/parity_units.tsv out/daily out/collection
           # the published list first (add-item's default), then the local one it wrote
           listarg=()
           for d in out/daily/*/; do

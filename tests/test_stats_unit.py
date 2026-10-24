@@ -44,6 +44,13 @@ if [ "$1" = om-extract ] && [ "$2" = run ]; then
   echo '{{}}' > "$sd/items/x.json"
   exit 0
 fi
+if [ "$1" = om-extract ] && [ "$2" = stats-collection ]; then
+  echo "$*" >> "$FAKE_LOG.collection"
+  [ -n "${{FAKE_COLL_FAIL:-}}" ] && {{ echo "error: HTTP 503 from the storage host" >&2; exit 1; }}
+  while [ $# -gt 0 ]; do [ "$1" = --out ] && o=$2; shift; done
+  mkdir -p "$o"; echo '{{}}' > "$o/collection.json"; echo png > "$o/stats.thumb.png"
+  exit 0
+fi
 if [ "$1" = om-extract ]; then shift; exec {sys.executable} -c 'import sys; from om_extract.cli import main; sys.exit(main(sys.argv[1:]))' "$@"; fi
 if [ "$1" = python ]; then shift; exec {sys.executable} "$@"; fi
 exit 9
@@ -209,6 +216,42 @@ def test_daily_filter_and_check_job(tmp_path):
   env["UNITS_FILTER"] = "bad"
   r = sh(env, "daily", str(units_tsv(tmp_path, ("bad place;",))), str(tmp_path / "daily2"))
   assert r.returncode == 1 and "a malformed unit" in r.stdout
+
+
+# ---- the stats collection after the daily units (the engine's since 2026-10-24) ----
+
+def test_collection_rebuilds_from_this_runs_published_items_and_publishes_it_last_no_cache_with_history(tmp_path):
+  env = {**setup(tmp_path, stats(), stats(D[:3])), "PUBLISH": "true"}
+  tsv = units_tsv(tmp_path)
+  assert sh(env, "daily", str(tsv), str(tmp_path / "daily")).returncode == 0
+  # one unit of the three was not published (a refusal, say): its Item is not read in place of the host's
+  pub = tmp_path / "daily/published.txt"
+  pub.write_text("\n".join(pub.read_text().split()[:2]) + "\n")
+  n = len(published(tmp_path))
+  r = sh(env, "collection", str(tsv), str(tmp_path / "daily"), str(tmp_path / "coll"))
+  assert r.returncode == 0, r.stdout + r.stderr
+  call = (tmp_path / "log.collection").read_text().split()
+  assert call[:5] == ["om-extract", "stats-collection", "--units", str(tsv), "--out"]
+  items = [call[i + 1] for i, a in enumerate(call) if a == "--items"]
+  assert items == [str(tmp_path / f"daily/dhw_5km_CRW_SST_NMS-{p}/unit/gazetteer/stats/items") for p in ("CINMS", "MBNMS")]
+  last = published(tmp_path)[n:]
+  assert last == [["--really", "--cache-control", "no-cache", "--keep-history", "--include", "collection.json",
+                   "--include", "stats.thumb.png", "--last", "collection.json", str(tmp_path / "coll/stats"),
+                   "gazetteer/stats"]]
+
+
+def test_a_failed_collection_rebuild_publishes_nothing(tmp_path):
+  env = {**setup(tmp_path, stats(), stats()), "FAKE_COLL_FAIL": "1"}
+  r = sh(env, "collection", str(units_tsv(tmp_path)), str(tmp_path / "daily"), str(tmp_path / "coll"))
+  assert r.returncode != 0 and "503" in r.stderr and published(tmp_path) == []
+
+
+def test_the_daily_catalog_step_rebuilds_the_collection_before_the_catalog_and_after_the_units():
+  names = [s.get("name", "") for s in DAILY["steps"]]
+  assert names.index("the parity units, each computed, gated and published on PASS") < names.index("rebuild and publish the catalog")
+  run = steps(DAILY)["rebuild and publish the catalog"]["run"]
+  i = run.index("scripts/stats_unit.sh collection scripts/parity_units.tsv out/daily out/collection")
+  assert i < run.index("scripts/build_catalog.sh") and i < run.index("add-item")
 
 
 def cadence_tsv(tmp_path, cadences=("daily", "weekly", "monthly")):

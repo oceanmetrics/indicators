@@ -16,6 +16,13 @@
 #                                      and published only on PASS when PUBLISH is true; ROOT/summary.md lists them.
 #                                      cadence: daily (every day; also a line without the column), weekly (Mondays) or
 #                                      monthly (the 1st), by the UTC date (ledger week 6: a monthly series runs monthly)
+#   stats_unit.sh collection UNITS.tsv ROOT OUT
+#                                      after the daily units: gazetteer/stats/collection.json (it links every Item) and
+#                                      stats.thumb.png rebuilt by `om-extract stats-collection` from the units' Items (the
+#                                      ones ROOT/published.txt lists from this run, the storage host's for the rest) into
+#                                      OUT/stats, then om-publish.sh with --cache-control no-cache --keep-history, the
+#                                      thumbnail then collection.json last. erddap-places' stac.ts wrote it until its
+#                                      precompute went off (2026-10-24); a failed rebuild publishes nothing
 #
 # environment: OM_CHUNKS (the chunk store, default ~/.cache/oceanmetrics/chunks), OM_STORAGE_HOST (default
 # https://storage.oceanmetrics.io), OM_PUBLISH (om-publish.sh), REF_VERSION (gate: an S3 version id of the published file
@@ -216,10 +223,33 @@ daily() {
   [ ${#refused[@]} = 0 ] && [ ${#failed[@]} = 0 ]
 }
 
+collection() {
+  local units=$1 root=$2 out=$3 tag ds rest var place d
+  local -a items=()
+  need OM_PUBLISH
+  [ -s "$units" ] || { echo "error: no units file $units" >&2; exit 2; }
+  # this run's published Items, read in place of the host's (whose edge copy may predate the publish)
+  while IFS= read -r tag; do
+    [ -n "$tag" ] || continue
+    ds=${tag%%/*}; rest=${tag#*/}; var=${rest%%/*}; place=${rest#*/}
+    d="$root/$(printf '%s_%s_%s' "$ds" "$var" "$place" | tr ':/' '--')/unit/gazetteer/stats/items"
+    [ -d "$d" ] && items+=(--items "$d")
+  done < <(cat "$root/published.txt" 2> /dev/null || true)
+  rm -rf "$out"
+  mkdir -p "$out/stats"
+  uv run om-extract stats-collection --units "$units" --out "$out/stats" "${items[@]+"${items[@]}"}"
+  [ -s "$out/stats/collection.json" ] && [ -s "$out/stats/stats.thumb.png" ] \
+    || { echo "error: the rebuild wrote no collection: nothing published" >&2; exit 1; }
+  # both stores; no-cache (it changes every run); the thumbnail, then the collection that records its checksum, last
+  "$OM_PUBLISH" --really --cache-control no-cache --keep-history --include collection.json --include stats.thumb.png \
+    --last collection.json "$out/stats" gazetteer/stats
+}
+
 cmd=${1:-}
 shift || true
 case "$cmd" in
   compute|gate|publish) [ $# = 1 ] || { echo "usage: $0 $cmd OUT" >&2; exit 2; }; "$cmd" "$1" ;;
   daily) [ $# = 2 ] || { echo "usage: $0 daily UNITS.tsv ROOT" >&2; exit 2; }; daily "$1" "$2" ;;
-  *) echo "usage: $0 compute|gate|publish OUT | daily UNITS.tsv ROOT" >&2; exit 2 ;;
+  collection) [ $# = 3 ] || { echo "usage: $0 collection UNITS.tsv ROOT OUT" >&2; exit 2; }; collection "$1" "$2" "$3" ;;
+  *) echo "usage: $0 compute|gate|publish OUT | daily UNITS.tsv ROOT | collection UNITS.tsv ROOT OUT" >&2; exit 2 ;;
 esac
