@@ -346,3 +346,7 @@ NMS:PMNM	places	cmems_altimetry	tob	monthly
 NMS:SBNMS	places	cmems_altimetry	tob	monthly
 NMS:TBNMS	places	cmems_altimetry	tob	monthly
 NMS:WSCNMS	places	cmems_altimetry	tob	monthly
+NMS:FKNMS	places	noaa_aoml_seascapes_8day	CLASS	weekly
+NMS:HIHWNMS	places	noaa_aoml_seascapes_8day	CLASS	weekly
+NMS:NMSAS	places	noaa_aoml_seascapes_8day	CLASS	weekly
+NMS:PMNM	places	noaa_aoml_seascapes_8day	CLASS	weekly
