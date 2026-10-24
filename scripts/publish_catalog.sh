@@ -5,7 +5,7 @@
 #   scripts/publish_catalog.sh [out] [--dry-run]
 # order matters for readers: the values first, then coverage.parquet, then the change files and feeds
 # (scripts/publish_changes.sh), then indicators.json last, so a reader never follows a manifest to a file that is not
-# there yet. nothing is deleted (until 2026-10-24 values/ was synced with --delete): a values file a build no longer
+# there yet. nothing is deleted (until 2026-10-23 values/ was synced with --delete): a values file a build no longer
 # writes stays on the stores but is not linked from indicators.json. coverage.parquet and indicators.json keep the R2
 # copy they replace under indicators/_history/<date>/ (R2 has no object versions; the change backfill reads them).
 # env: OM_PUBLISH (the script; default a platform checkout beside this repo), INDICATORS_PREFIX (default indicators),

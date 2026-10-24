@@ -254,7 +254,7 @@ back to the Place view; `?theme=` and `?brand=` work as in the app, and `main.em
   `scripts/build_catalog.sh` (erddap-places, eco-indicators, the Copernicus Marine place producer's folder and obis rebuilt from what they publish, the SDG series pulled
   from the published catalog), then `scripts/publish_catalog.sh` publishes to `indicators/` of the bucket (values first, the
   manifest last) through oceanmetrics/platform `scripts/om-publish.sh`, the one publisher: both stores (R2, which the
-  storage host serves, then S3), content types by extension, nothing deleted (until 2026-10-24 `values/` was synced with
+  storage host serves, then S3), content types by extension, nothing deleted (until 2026-10-23 `values/` was synced with
   `--delete`, which removed nothing in its last 30 days: a values file a build stops writing now stays, unlinked from
   `indicators.json`), and the R2 copies of `coverage.parquet` and `indicators.json` it replaces kept under
   `indicators/_history/<date>/` (R2 has no object versions). The workflows check platform out at `main` and set
