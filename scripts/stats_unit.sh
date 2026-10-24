@@ -11,14 +11,18 @@
 #                                      first publish). prints one `<unit> verdict: ...` line, writes OUT/compare/
 #                                      (compare.txt, compare.json, verdict.txt, reference.txt); exit 0 PASS, 1 FAIL
 #   stats_unit.sh publish OUT          om-publish.sh the unit's three files (parquet, provenance, item) to both stores
-#   stats_unit.sh daily UNITS.tsv ROOT every unit of the TSV (place, coll, dataset, variable): checked, computed (up to
-#                                      OM_TRIES tries, OM_RETRY_WAIT s apart: a PacIOOS outage), gated, and published
-#                                      only on PASS when PUBLISH is true; ROOT/summary.md lists them
+#   stats_unit.sh daily UNITS.tsv ROOT every unit of the TSV (place, coll, dataset, variable, cadence) due today: checked,
+#                                      computed (up to OM_TRIES tries, OM_RETRY_WAIT s apart: a PacIOOS outage), gated,
+#                                      and published only on PASS when PUBLISH is true; ROOT/summary.md lists them.
+#                                      cadence: daily (every day; also a line without the column), weekly (Mondays) or
+#                                      monthly (the 1st), by the UTC date (ledger week 6: a monthly series runs monthly)
 #
 # environment: OM_CHUNKS (the chunk store, default ~/.cache/oceanmetrics/chunks), OM_STORAGE_HOST (default
 # https://storage.oceanmetrics.io), OM_PUBLISH (om-publish.sh), REF_VERSION (gate: an S3 version id of the published file
 # to compare against instead, a test of the gate: requests.yml never publishes with it), UNITS_FILTER (daily: an
-# extended regex the TSV line must match), OM_TRIES (daily, default 4: a try and 3 retries), OM_RETRY_WAIT (default 600).
+# extended regex the TSV line must match), OM_TRIES (daily, default 4: a try and 3 retries), OM_RETRY_WAIT (default 600),
+# OM_CADENCE (daily: `due`, the default, runs the units due on the day; `all` every unit), OM_TODAY (daily: the UTC date
+# the cadence is read against, yyyy-mm-dd; default today).
 #
 # a unit is never published in part: OUT is emptied before each compute, a failed compute leaves nothing to publish, and
 # publish refuses unless OUT holds exactly the unit's parquet, provenance and item and the gate wrote PASS for them.
@@ -112,16 +116,41 @@ publish() {
     --last '*.provenance.json' --last 'items/*' stats gazetteer/stats
 }
 
+# whether a unit of `cadence` is due on the UTC date `today` (yyyy-mm-dd): daily always, weekly on a Monday, monthly
+# on the 1st; exit 2 for an unknown cadence
+due() {
+  local cadence=$1 today=$2 y m dd w
+  y=$((10#${today:0:4})); m=$((10#${today:5:2})); dd=$((10#${today:8:2}))
+  case "$cadence" in
+    daily) return 0 ;;
+    monthly) [ "$dd" = 1 ] ;;
+    weekly)
+      # the day of the week (Sakamoto), 0 = Sunday, 1 = Monday
+      local -a t=(0 3 2 5 0 3 5 1 4 6 2 4)
+      [ "$m" -lt 3 ] && y=$((y - 1))
+      w=$(( (y + y / 4 - y / 100 + y / 400 + ${t[$((m - 1))]} + dd) % 7 ))
+      [ "$w" = 1 ] ;;
+    *) return 2 ;;
+  esac
+}
+
 daily() {
-  local units=$1 root=$2 tries outage=0 i ok place coll dataset variable rest d t k v
+  local units=$1 root=$2 tries outage=0 i ok place coll dataset variable cadence rest d t k v rc notdue=0
   local -a published=() passed=() refused=() skipped=() failed=()
-  local wait="${OM_RETRY_WAIT:-600}" max="${OM_TRIES:-4}"
+  local wait="${OM_RETRY_WAIT:-600}" max="${OM_TRIES:-4}" mode="${OM_CADENCE:-due}" today="${OM_TODAY:-$(date -u +%F)}"
+  case "$mode" in due|all) ;; *) echo "error: OM_CADENCE is due or all, not '$mode'" >&2; exit 2 ;; esac
+  [[ "$today" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "error: OM_TODAY is yyyy-mm-dd, not '$today'" >&2; exit 2; }
   mkdir -p "$root"
-  while IFS=$'\t' read -r place coll dataset variable rest || [ -n "$place" ]; do
+  while IFS=$'\t' read -r place coll dataset variable cadence rest || [ -n "$place" ]; do
     case "$place" in ''|'#'*|place) continue ;; esac
     if [ -n "${UNITS_FILTER:-}" ] && ! printf '%s\t%s\t%s\t%s\n' "$place" "$coll" "$dataset" "$variable" | grep -Eq "$UNITS_FILTER"; then
       continue
     fi
+    # the unit's cadence (none is daily): a unit not due today is passed over, and counted
+    cadence="${cadence:-daily}"
+    rc=0; due "$cadence" "$today" || rc=$?
+    if [ "$rc" = 2 ]; then failed+=("$dataset/$variable/$place (an unknown cadence: $cadence)"); continue; fi
+    if [ "$rc" != 0 ] && [ "$mode" = due ]; then notdue=$((notdue + 1)); continue; fi
     # the unit checked like any job (check-job), then passed on as REQ_*
     d="$root/$(printf '%s_%s_%s' "$dataset" "$variable" "$place" | tr ':/' '--')"
     mkdir -p "$d"
@@ -164,6 +193,7 @@ daily() {
   {
     echo "### daily stats: $(( ${#published[@]} + ${#passed[@]} + ${#refused[@]} + ${#skipped[@]} + ${#failed[@]} )) unit(s), publish ${PUBLISH:-false}"
     echo
+    echo "- not due on $today: $notdue (cadence $mode)"
     echo "- published (PASS): ${#published[@]}"
     echo "- PASS, not published (a dry run): ${#passed[@]}"
     echo "- refused (FAIL, not published): ${#refused[@]}"

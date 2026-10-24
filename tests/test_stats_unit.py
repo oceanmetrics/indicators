@@ -211,6 +211,55 @@ def test_daily_filter_and_check_job(tmp_path):
   assert r.returncode == 1 and "a malformed unit" in r.stdout
 
 
+def cadence_tsv(tmp_path, cadences=("daily", "weekly", "monthly")):
+  f = tmp_path / "units.tsv"
+  places = ("NMS:CINMS", "NMS:MBNMS", "NMS:OCNMS")
+  f.write_text("place\tcoll\tdataset\tvariable\tcadence\n"
+               + "".join(f"{p}\tplaces\tdhw_5km\tCRW_SST\t{c}\n" for p, c in zip(places, cadences)))
+  return f
+
+
+def computed(tmp_path):
+  f = tmp_path / "log.compute"
+  return f.read_text().split() if f.exists() else []
+
+
+def test_daily_runs_a_unit_only_on_its_cadence_days_a_week_on_mondays_a_month_on_the_1st(tmp_path):
+  # CINMS daily, MBNMS weekly, OCNMS monthly; the day is the UTC date (OM_TODAY in a test)
+  env = {**setup(tmp_path, stats(), stats()), "PUBLISH": "true"}
+  for today, want in (("2026-11-04", ["NMS:CINMS"]),                          # a Wednesday, not the 1st
+                      ("2026-11-02", ["NMS:CINMS", "NMS:MBNMS"]),              # a Monday
+                      ("2026-11-01", ["NMS:CINMS", "NMS:OCNMS"]),              # the 1st, a Sunday
+                      ("2027-02-01", ["NMS:CINMS", "NMS:MBNMS", "NMS:OCNMS"])):  # the 1st and a Monday
+    (tmp_path / "log.compute").unlink(missing_ok=True)
+    r = sh({**env, "OM_TODAY": today}, "daily", str(cadence_tsv(tmp_path)), str(tmp_path / f"d{today}"))
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert computed(tmp_path) == want, today
+    assert f"- not due on {today}: {3 - len(want)}" in (tmp_path / f"d{today}/summary.md").read_text()
+
+
+def test_daily_with_cadence_all_runs_every_unit_whatever_the_day(tmp_path):
+  env = {**setup(tmp_path, stats(), stats()), "PUBLISH": "false", "OM_TODAY": "2026-11-04", "OM_CADENCE": "all"}
+  r = sh(env, "daily", str(cadence_tsv(tmp_path)), str(tmp_path / "daily"))
+  assert r.returncode == 0 and computed(tmp_path) == ["NMS:CINMS", "NMS:MBNMS", "NMS:OCNMS"]
+
+
+def test_daily_a_unit_without_a_cadence_column_is_daily(tmp_path):
+  env = {**setup(tmp_path, stats(), stats()), "PUBLISH": "false", "OM_TODAY": "2026-11-04"}
+  r = sh(env, "daily", str(units_tsv(tmp_path)), str(tmp_path / "daily"))
+  assert r.returncode == 0 and len(computed(tmp_path)) == 3
+
+
+def test_daily_an_unknown_cadence_is_a_malformed_unit_and_a_red_run(tmp_path):
+  env = {**setup(tmp_path, stats(), stats()), "PUBLISH": "true", "OM_TODAY": "2026-11-01"}
+  r = sh(env, "daily", str(cadence_tsv(tmp_path, ("daily", "hourly", "monthly"))), str(tmp_path / "daily"))
+  assert r.returncode == 1 and computed(tmp_path) == ["NMS:CINMS", "NMS:OCNMS"]
+  assert "dhw_5km/CRW_SST/NMS:MBNMS (an unknown cadence: hourly)" in r.stdout
+  env["OM_CADENCE"] = "sometimes"
+  r = sh(env, "daily", str(cadence_tsv(tmp_path)), str(tmp_path / "daily2"))
+  assert r.returncode == 2 and "OM_CADENCE" in r.stderr
+
+
 # ---- the workflow ----
 
 def steps(job):
@@ -251,6 +300,10 @@ def test_the_daily_job_runs_the_parity_units_at_0930_on_the_quick_runner_one_at_
   assert 'if grep -q . out/daily/published.txt' in u["run"]
   assert "scripts/stats_unit.sh daily scripts/parity_units.tsv out/daily" in u["run"]
   assert u["env"]["PUBLISH"] == "${{ github.event_name == 'schedule' || inputs.publish }}"
+  # the schedule runs the units due that day; a dispatch every unit unless it asks for `due` (ledger week 6)
+  assert u["env"]["OM_CADENCE"] == "${{ github.event_name == 'schedule' && 'due' || inputs.cadence }}"
+  cad = ON["workflow_dispatch"]["inputs"]["cadence"]
+  assert cad["type"] == "choice" and cad["options"] == ["all", "due"] and cad["default"] == "all"
   assert next(s for s in DAILY["steps"] if s.get("with", {}).get("name") == "compare-daily")["if"] == "always()"
   # the run job does not take the daily dispatch
   assert "!inputs.daily" in RUN["if"]
@@ -258,14 +311,39 @@ def test_the_daily_job_runs_the_parity_units_at_0930_on_the_quick_runner_one_at_
     assert "${{" not in s.get("run", ""), s.get("name")
 
 
-def test_the_parity_units_are_the_18_sanctuaries_by_crw_sst_and_crw_baa():
+# the sanctuaries series the engine takes from erddap-places (ledger week 6, 2026-10-24), each with its cadence: the 17
+# monthly series of the USF re-serves (frozen upstreams, 2023-12 to 2025-09) run monthly, seascapes (8-day) weekly
+NMS18 = {"NMS:CBNMS", "NMS:CHNMS", "NMS:CINMS", "NMS:FGBNMS", "NMS:FKNMS", "NMS:GFNMS", "NMS:GRNMS", "NMS:HIHWNMS",
+         "NMS:LONMS", "NMS:MBNMS", "NMS:MBPR", "NMS:MNMS", "NMS:NMSAS", "NMS:OCNMS", "NMS:PMNM", "NMS:SBNMS", "NMS:TBNMS",
+         "NMS:WSCNMS"}
+REEF4 = {"NMS:FKNMS", "NMS:HIHWNMS", "NMS:NMSAS", "NMS:PMNM"}
+SERIES_CADENCE = {("dhw_5km", "CRW_SST"): "daily", ("dhw_5km", "CRW_BAA"): "daily",
+                  ("IMERG_monthly_global_precip", "precipitation"): "monthly"}
+
+
+def unit_rows():
   rows = [l.split("\t") for l in (ROOT / "scripts/parity_units.tsv").read_text().splitlines()
           if l and not l.startswith("#")]
-  assert rows[0] == ["place", "coll", "dataset", "variable"]
-  units = rows[1:]
-  assert len(units) == 36 and len({tuple(u) for u in units}) == 36
-  assert {u[2] for u in units} == {"dhw_5km"} and {u[1] for u in units} == {"places"}
-  places = {u[0] for u in units}
-  assert len(places) == 18 and all(p.startswith("NMS:") for p in places)
-  for p in places:
-    assert sorted(u[3] for u in units if u[0] == p) == ["CRW_BAA", "CRW_SST"]
+  return rows[0], rows[1:]
+
+
+def test_the_parity_units_are_the_sanctuaries_by_each_series_the_engine_owns_with_its_cadence():
+  head, units = unit_rows()
+  assert head == ["place", "coll", "dataset", "variable", "cadence"]
+  assert all(len(u) == 5 for u in units) and len({tuple(u[:4]) for u in units}) == len(units)
+  assert {u[1] for u in units} == {"places"}
+  series = {(u[2], u[3]) for u in units}
+  assert series == set(SERIES_CADENCE)
+  for ds, var in series:
+    mine = [u for u in units if (u[2], u[3]) == (ds, var)]
+    want = REEF4 if ds == "noaa_aoml_seascapes_8day" else NMS18
+    assert {u[0] for u in mine} == want, (ds, var)
+    assert {u[4] for u in mine} == {SERIES_CADENCE[(ds, var)]}, (ds, var)
+
+
+def test_the_dhw_5km_units_are_the_36_daily_ones_of_week_1():
+  _, units = unit_rows()
+  dhw = [u for u in units if u[2] == "dhw_5km"]
+  assert len(dhw) == 36 and {u[4] for u in dhw} == {"daily"}
+  for p in NMS18:
+    assert sorted(u[3] for u in dhw if u[0] == p) == ["CRW_BAA", "CRW_SST"]

@@ -504,13 +504,16 @@ Anyone with a GitHub account can ask for an indicator the catalog does not hold 
      requested-items list, the catalog is rebuilt and published, and the bot comments the Place view link and closes
      the issue. A FAIL stops the run: nothing is uploaded.
 
-   **Daily.** At 09:30 UTC the `daily` job runs the 36 parity units of `scripts/parity_units.tsv` (the 18 sanctuaries ×
-   `dhw_5km` CRW_SST and CRW_BAA) through the same script (`stats_unit.sh daily`), one at a time on `macmini-quick`:
+   **Daily.** At 09:30 UTC the `daily` job runs the parity units of `scripts/parity_units.tsv` that are due that day by
+   their `cadence` column: `daily` (the 18 sanctuaries × `dhw_5km` CRW_SST and CRW_BAA), `monthly` on the 1st (the
+   sanctuaries series taken from erddap-places in build week 6, whose upstreams are monthly and frozen) and `weekly` on
+   Mondays (seascapes, 8-day). They go through the same script (`stats_unit.sh daily`), one at a time on `macmini-quick`:
    each is computed (a failing compute, such as a PacIOOS outage, is retried 3 times 10 min apart, then skipped and
    listed; after a skip the next units get one try each until one computes), gated and published on PASS, and the
    catalog is rebuilt once. A refused unit makes the run red; a skipped one is a warning. These files were erddap-places'
    own daily stats run's (14:15 UTC) until 2026-10-24. By hand: `gh workflow run requests.yml -f daily=true -f publish=true`
-   (`-f units=CINMS` for a subset, an extended regex over the TSV's lines).
+   runs every unit whatever its cadence (`-f cadence=due` only the units due today; `-f units=CINMS` for a subset, an
+   extended regex over the TSV's lines).
 
    Issue #1 (Wells NERR, precipitation) is the worked example (run by erddap-places before the switch).
 

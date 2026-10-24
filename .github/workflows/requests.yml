@@ -18,8 +18,10 @@
 # published file is the first publish. the files are uploaded ONLY on PASS, whatever the mode says. the verdict line is
 # in the log and the run summary, and the comparison is the `compare` artifact.
 #
-# daily (the `daily` job, 09:30 UTC): the 36 parity units of scripts/parity_units.tsv (the 18 sanctuaries x dhw_5km
-# CRW_SST and CRW_BAA) through the same steps (scripts/stats_unit.sh daily: check-job, compute, gate, publish on PASS),
+# daily (the `daily` job, 09:30 UTC): the parity units of scripts/parity_units.tsv due that day by their cadence column
+# (the 18 sanctuaries x dhw_5km CRW_SST and CRW_BAA daily; the sanctuaries series taken from erddap-places in week 6,
+# monthly on the 1st or, seascapes, weekly on Mondays) through the same steps (scripts/stats_unit.sh daily: check-job,
+# compute, gate, publish on PASS),
 # one at a time on macmini-quick in the run job's concurrency group. a unit whose compute fails (a PacIOOS outage) is
 # retried 3 times 10 min apart, then skipped and listed, never published in part. 09:30 UTC: NOAA CRW posts day D on
 # its server in the afternoon (US Eastern) of D+1 and PacIOOS's ERDDAP serves it by that evening (2026-10-22 was there by
@@ -97,6 +99,12 @@ on:
         required: false
         type: string
         default: ''
+      cadence:
+        description: "daily only: all (every unit, the default) or due (only the units due today by their cadence, as the schedule)"
+        required: false
+        type: choice
+        options: [all, due]
+        default: all
 
 permissions:
   contents: read
@@ -396,7 +404,8 @@ jobs:
     concurrency:
       group: requests-run           # one job at a time on the runner, never cancelled mid-run
       cancel-in-progress: false
-    # 36 units of a few minutes each, plus one unit's retries (30 min) in an outage
+    # 36 units of a few minutes each, plus one unit's retries (30 min) in an outage; on the 1st of a month the monthly
+    # series too, each unit a few seconds from the chunk store (the upstreams are frozen)
     timeout-minutes: 300
     env:
       AWS_DEFAULT_REGION: us-east-1
@@ -420,6 +429,9 @@ jobs:
           # the schedule publishes; a dispatch by its own `publish` input
           PUBLISH: ${{ github.event_name == 'schedule' || inputs.publish }}
           UNITS_FILTER: ${{ inputs.units }}
+          # the schedule runs the units due that day by their cadence column (daily, weekly on Mondays, monthly on the
+          # 1st, ledger week 6); a dispatch every unit unless it asks for `due`
+          OM_CADENCE: ${{ github.event_name == 'schedule' && 'due' || inputs.cadence }}
         run: |
           export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
           rm -rf out

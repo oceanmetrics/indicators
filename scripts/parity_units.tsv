@@ -1,39 +1,60 @@
-# the 36 parity units of build week 1 (ledger 2026-10-24): the 18 sanctuaries x dhw_5km CRW_SST and CRW_BAA, the units
-# the week 1 batch passed and published (stats36_final.txt); requests.yml's `daily` job runs them every day
-place	coll	dataset	variable
-NMS:CINMS	places	dhw_5km	CRW_SST
-NMS:CBNMS	places	dhw_5km	CRW_SST
-NMS:CHNMS	places	dhw_5km	CRW_SST
-NMS:FGBNMS	places	dhw_5km	CRW_SST
-NMS:FKNMS	places	dhw_5km	CRW_SST
-NMS:GFNMS	places	dhw_5km	CRW_SST
-NMS:GRNMS	places	dhw_5km	CRW_SST
-NMS:HIHWNMS	places	dhw_5km	CRW_SST
-NMS:LONMS	places	dhw_5km	CRW_SST
-NMS:MBNMS	places	dhw_5km	CRW_SST
-NMS:MBPR	places	dhw_5km	CRW_SST
-NMS:MNMS	places	dhw_5km	CRW_SST
-NMS:NMSAS	places	dhw_5km	CRW_SST
-NMS:OCNMS	places	dhw_5km	CRW_SST
-NMS:PMNM	places	dhw_5km	CRW_SST
-NMS:SBNMS	places	dhw_5km	CRW_SST
-NMS:TBNMS	places	dhw_5km	CRW_SST
-NMS:WSCNMS	places	dhw_5km	CRW_SST
-NMS:CBNMS	places	dhw_5km	CRW_BAA
-NMS:CHNMS	places	dhw_5km	CRW_BAA
-NMS:CINMS	places	dhw_5km	CRW_BAA
-NMS:FGBNMS	places	dhw_5km	CRW_BAA
-NMS:FKNMS	places	dhw_5km	CRW_BAA
-NMS:GFNMS	places	dhw_5km	CRW_BAA
-NMS:GRNMS	places	dhw_5km	CRW_BAA
-NMS:HIHWNMS	places	dhw_5km	CRW_BAA
-NMS:LONMS	places	dhw_5km	CRW_BAA
-NMS:MBNMS	places	dhw_5km	CRW_BAA
-NMS:MBPR	places	dhw_5km	CRW_BAA
-NMS:MNMS	places	dhw_5km	CRW_BAA
-NMS:NMSAS	places	dhw_5km	CRW_BAA
-NMS:OCNMS	places	dhw_5km	CRW_BAA
-NMS:PMNM	places	dhw_5km	CRW_BAA
-NMS:SBNMS	places	dhw_5km	CRW_BAA
-NMS:TBNMS	places	dhw_5km	CRW_BAA
-NMS:WSCNMS	places	dhw_5km	CRW_BAA
+# the parity units (ledger 2026-10-24): the units the one engine owns, each computed, gated by `om-extract compare` against
+# the published file and published on PASS by requests.yml's `daily` job (scripts/stats_unit.sh daily) when its
+# cadence says (daily; weekly = Mondays; monthly = the 1st; UTC). week 1: the 18 sanctuaries x dhw_5km CRW_SST and
+# CRW_BAA, daily (stats36_final.txt). week 6: the sanctuaries series taken from erddap-places series by series
+# (om/plans_todo/2026-10-24_engine-takes-19-series_plan.md), each after its parity batch passed on the mini
+place	coll	dataset	variable	cadence
+NMS:CINMS	places	dhw_5km	CRW_SST	daily
+NMS:CBNMS	places	dhw_5km	CRW_SST	daily
+NMS:CHNMS	places	dhw_5km	CRW_SST	daily
+NMS:FGBNMS	places	dhw_5km	CRW_SST	daily
+NMS:FKNMS	places	dhw_5km	CRW_SST	daily
+NMS:GFNMS	places	dhw_5km	CRW_SST	daily
+NMS:GRNMS	places	dhw_5km	CRW_SST	daily
+NMS:HIHWNMS	places	dhw_5km	CRW_SST	daily
+NMS:LONMS	places	dhw_5km	CRW_SST	daily
+NMS:MBNMS	places	dhw_5km	CRW_SST	daily
+NMS:MBPR	places	dhw_5km	CRW_SST	daily
+NMS:MNMS	places	dhw_5km	CRW_SST	daily
+NMS:NMSAS	places	dhw_5km	CRW_SST	daily
+NMS:OCNMS	places	dhw_5km	CRW_SST	daily
+NMS:PMNM	places	dhw_5km	CRW_SST	daily
+NMS:SBNMS	places	dhw_5km	CRW_SST	daily
+NMS:TBNMS	places	dhw_5km	CRW_SST	daily
+NMS:WSCNMS	places	dhw_5km	CRW_SST	daily
+NMS:CBNMS	places	dhw_5km	CRW_BAA	daily
+NMS:CHNMS	places	dhw_5km	CRW_BAA	daily
+NMS:CINMS	places	dhw_5km	CRW_BAA	daily
+NMS:FGBNMS	places	dhw_5km	CRW_BAA	daily
+NMS:FKNMS	places	dhw_5km	CRW_BAA	daily
+NMS:GFNMS	places	dhw_5km	CRW_BAA	daily
+NMS:GRNMS	places	dhw_5km	CRW_BAA	daily
+NMS:HIHWNMS	places	dhw_5km	CRW_BAA	daily
+NMS:LONMS	places	dhw_5km	CRW_BAA	daily
+NMS:MBNMS	places	dhw_5km	CRW_BAA	daily
+NMS:MBPR	places	dhw_5km	CRW_BAA	daily
+NMS:MNMS	places	dhw_5km	CRW_BAA	daily
+NMS:NMSAS	places	dhw_5km	CRW_BAA	daily
+NMS:OCNMS	places	dhw_5km	CRW_BAA	daily
+NMS:PMNM	places	dhw_5km	CRW_BAA	daily
+NMS:SBNMS	places	dhw_5km	CRW_BAA	daily
+NMS:TBNMS	places	dhw_5km	CRW_BAA	daily
+NMS:WSCNMS	places	dhw_5km	CRW_BAA	daily
+NMS:CBNMS	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:CHNMS	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:CINMS	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:FGBNMS	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:FKNMS	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:GFNMS	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:GRNMS	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:HIHWNMS	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:LONMS	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:MBNMS	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:MBPR	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:MNMS	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:NMSAS	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:OCNMS	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:PMNM	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:SBNMS	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:TBNMS	places	IMERG_monthly_global_precip	precipitation	monthly
+NMS:WSCNMS	places	IMERG_monthly_global_precip	precipitation	monthly

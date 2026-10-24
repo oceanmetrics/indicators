@@ -147,7 +147,8 @@ ON = WF.get("on", WF.get(True))                      # PyYAML reads the key `on`
 
 def test_the_dispatch_takes_a_place_a_collection_a_dataset_a_variable_and_publish_off_by_default():
   inputs = ON["workflow_dispatch"]["inputs"]
-  assert set(inputs) == {"place", "coll", "dataset", "variable", "publish", "reference_version", "daily", "units"}
+  assert set(inputs) == {"place", "coll", "dataset", "variable", "publish", "reference_version", "daily", "units",
+                         "cadence"}
   for k in ("place", "coll", "dataset", "variable"):
     # not required since the daily dispatch (2026-10-24), which takes none; check-job refuses an empty one
     assert inputs[k]["required"] is False and inputs[k]["type"] == "string"
