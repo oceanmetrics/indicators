@@ -173,6 +173,8 @@ def test_daily_dry_run_publishes_nothing(tmp_path):
   r = sh(env, "daily", str(units_tsv(tmp_path)), str(tmp_path / "daily"))
   assert r.returncode == 0 and published(tmp_path) == []
   assert "- PASS, not published (a dry run): 3" in r.stdout
+  # regression (run 40058284122): an empty list was one newline, so the catalog step ran and found no items list
+  assert (tmp_path / "daily/published.txt").read_text() == ""
 
 
 def test_daily_retries_a_failing_compute_then_skips_and_lists_it_and_publishes_nothing_of_it(tmp_path):
@@ -246,6 +248,7 @@ def test_the_daily_job_runs_the_parity_units_at_0930_on_the_quick_runner_one_at_
   assert DAILY["runs-on"] == ["self-hosted", "macmini-quick"]
   assert DAILY["concurrency"] == RUN["concurrency"] == {"group": "requests-run", "cancel-in-progress": False}
   u = next(s for s in DAILY["steps"] if s.get("id") == "units")
+  assert 'if grep -q . out/daily/published.txt' in u["run"]
   assert "scripts/stats_unit.sh daily scripts/parity_units.tsv out/daily" in u["run"]
   assert u["env"]["PUBLISH"] == "${{ github.event_name == 'schedule' || inputs.publish }}"
   assert next(s for s in DAILY["steps"] if s.get("with", {}).get("name") == "compare-daily")["if"] == "always()"

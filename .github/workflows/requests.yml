@@ -426,7 +426,7 @@ jobs:
           rc=0
           scripts/stats_unit.sh daily scripts/parity_units.tsv out/daily || rc=$?
           cat out/daily/summary.md >> "$GITHUB_STEP_SUMMARY"
-          if [ -s out/daily/published.txt ]; then echo "published=1" >> "$GITHUB_OUTPUT"; fi
+          if grep -q . out/daily/published.txt 2> /dev/null; then echo "published=1" >> "$GITHUB_OUTPUT"; fi
           exit "$rc"
       - uses: actions/upload-artifact@v4
         if: always()
@@ -452,6 +452,7 @@ jobs:
             mv requested_items.json.new requested_items.json
             listarg=(--list requested_items.json)
           done
+          [ -s requested_items.json ] || { echo "error: no published unit's item on the list" >&2; exit 1; }
           "$OM_PUBLISH" --really --cache-control "public, max-age=300" requested_items.json indicators/requests --as items.json
           scripts/build_catalog.sh
           npm run -s changes:build -- catalog --prev https://s3.us-east-1.amazonaws.com/oceanmetrics.io-public/indicators/coverage.parquet \

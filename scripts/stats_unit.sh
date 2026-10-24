@@ -177,7 +177,9 @@ daily() {
     cat "$root"/*/verdict.txt 2> /dev/null || true
     echo '```'
   } > "$root/summary.md"
-  printf '%s\n' "${published[@]+"${published[@]}"}" > "$root/published.txt"
+  # one line per published unit, and an empty file when none was (printf of no argument would still write a newline)
+  : > "$root/published.txt"
+  for x in "${published[@]+"${published[@]}"}"; do echo "$x" >> "$root/published.txt"; done
   cat "$root/summary.md"
   for x in "${skipped[@]+"${skipped[@]}"}"; do echo "::warning::skipped (not published): $x"; done
   # a refused or failed unit is a red run; a skipped one (an outage) is a warning
